@@ -37,7 +37,8 @@ final class RecordingPipeline: @unchecked Sendable {
     /// Creates the writers (video encoders start immediately) and `events.jsonl`.
     init(
         configuration: RecordingPipelineConfiguration,
-        onStreamFailure: @escaping @Sendable (StreamKind, String) -> Void
+        onStreamFailure: @escaping @Sendable (StreamKind, String) -> Void,
+        eventWriter: EventLogWriter? = nil
     ) throws {
         self.configuration = configuration
         let package = configuration.package
@@ -71,7 +72,11 @@ final class RecordingPipeline: @unchecked Sendable {
         }
         for writer in writers.values { try writer.prepare() }
         self.writers = writers
-        events = configuration.recordsEvents ? try EventLogWriter(url: package.url(PackageLayout.events)) : nil
+        if configuration.recordsEvents {
+            events = try eventWriter ?? EventLogWriter(url: package.url(PackageLayout.events))
+        } else {
+            events = nil
+        }
     }
 
     /// Called once, on the screen capture queue, when the first screen frame starts the session clock.

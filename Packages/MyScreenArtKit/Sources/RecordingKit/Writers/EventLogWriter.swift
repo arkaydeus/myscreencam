@@ -18,12 +18,12 @@ final class EventLogWriter: @unchecked Sendable {
     private var failure: String?
 
     /// Creates (or truncates) the file.
-    init(url: URL) throws {
+    init(url: URL, handle suppliedHandle: FileHandle? = nil) throws {
         self.url = url
         guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
             throw RecordingError.packageFailed("Can't create \(url.lastPathComponent)")
         }
-        handle = try FileHandle(forWritingTo: url)
+        handle = try suppliedHandle ?? FileHandle(forWritingTo: url)
         buffer.reserveCapacity(Self.flushThreshold * 2)
     }
 
