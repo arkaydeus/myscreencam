@@ -1,4 +1,6 @@
+import AppKit
 import ProjectKit
+import QuartzCore
 import SwiftUI
 
 /// Time, skip/play, cut/delete/reset, and timeline zoom.
@@ -113,18 +115,122 @@ struct TransportBar: View {
     }
 }
 
-/// The only view that reads the ~10 Hz clock.
+/// "time / duration". The ~10 Hz time is drawn by a `CATextLayer` fed straight from the clock, so playback never
+/// invalidates SwiftUI (see `PlaybackClock`).
 private struct TimeLabel: View {
     let clock: PlaybackClock
     let duration: Double
 
     var body: some View {
-        HStack(spacing: 0) {
-            Text(TimeFormat.clock(clock.time))
-            Text(" / " + TimeFormat.clock(duration)).foregroundStyle(.secondary)
+        TimeLabelRepresentable(clock: clock, duration: duration)
+            .frame(width: max(150, TimeLabelView.width(forDuration: duration)), height: 18, alignment: .leading)
+    }
+}
+
+private struct TimeLabelRepresentable: NSViewRepresentable {
+    let clock: PlaybackClock
+    let duration: Double
+
+    func makeNSView(context: Context) -> TimeLabelView {
+        TimeLabelView(clock: clock)
+    }
+
+    func updateNSView(_ view: TimeLabelView, context: Context) {
+        view.duration = duration
+    }
+
+    static func dismantleNSView(_ view: TimeLabelView, coordinator: ()) {
+        view.teardown()
+    }
+}
+
+final class TimeLabelView: NSView {
+    private let clock: PlaybackClock
+    private let text = CATextLayer()
+    private var time: Double
+
+    var duration: Double = 0 {
+        didSet { if duration != oldValue { redraw() } }
+    }
+
+    private static var font: NSFont {
+        NSFont.monospacedSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .callout).pointSize, weight: .regular)
+    }
+
+    /// Width of "m:ss.cc / m:ss.cc" for a duration (monospaced, so any digits measure the same).
+    static func width(forDuration duration: Double) -> CGFloat {
+        let sample = TimeFormat.clock(duration) + " / " + TimeFormat.clock(duration)
+        return ceil((sample as NSString).size(withAttributes: [.font: font]).width) + 2
+    }
+
+    init(clock: PlaybackClock) {
+        self.clock = clock
+        time = clock.time
+        super.init(frame: .zero)
+        wantsLayer = true
+        text.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull()]
+        text.truncationMode = .end
+        layer?.addSublayer(text)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        clock.observeTime(self) { [weak self] t in
+            self?.time = t
+            self?.redraw()
         }
-        .font(.system(.callout, design: .monospaced))
-        .frame(minWidth: 150, alignment: .leading)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func teardown() {
+        clock.removeTimeObserver(self)
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let lineHeight = ceil(Self.font.ascender - Self.font.descender + Self.font.leading)
+        text.frame = CGRect(x: 0, y: (bounds.height - lineHeight) / 2, width: bounds.width, height: lineHeight)
+        CATransaction.commit()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        text.contentsScale = window?.backingScaleFactor ?? 2
+        redraw()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        text.contentsScale = window?.backingScaleFactor ?? 2
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        redraw()
+    }
+
+    private func redraw() {
+        let current = TimeFormat.clock(time)
+        let total = " / " + TimeFormat.clock(duration)
+        let string = NSMutableAttributedString()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            string.append(
+                NSAttributedString(
+                    string: current, attributes: [.font: Self.font, .foregroundColor: NSColor.labelColor.cgColor]))
+            string.append(
+                NSAttributedString(
+                    string: total,
+                    attributes: [.font: Self.font, .foregroundColor: NSColor.secondaryLabelColor.cgColor]))
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        text.string = string
+        CATransaction.commit()
+        setAccessibilityValue(current + total)
     }
 }
 

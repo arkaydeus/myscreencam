@@ -81,7 +81,11 @@ final class RenderSnapshot: Sendable {
     let cursorTrack: CursorTrack?
     let resources: ProjectResources
     /// Static background (fill + content shadow), in canvas pixels (Core Image, y up), or nil when disabled.
-    let backgroundLayer: CIImage?
+    /// Built on first use (on the compositor's queue), so snapshots made during slider drags that are never drawn
+    /// don't render their shadows.
+    var backgroundLayer: CIImage? { background.value { backgroundRenderer.backgroundLayer() } }
+    private let backgroundRenderer: BackgroundRenderer
+    private let background = LockedLazy<CIImage?>()
     /// Rounded-rect alpha mask for the content, or nil when corners are square.
     let contentMask: CIImage?
 
@@ -102,17 +106,17 @@ final class RenderSnapshot: Sendable {
             ZoomEvaluator.needsFollowTrack(edit.zoom) && !resources.events.isEmpty
             ? resources.followTrack(smoothing: edit.cursor.smoothing) : nil
         zoom = ZoomEvaluator(settings: edit.zoom, follow: follow)
-        let background = BackgroundRenderer(layout: layout, settings: edit.background, resources: resources)
-        backgroundLayer = background.backgroundLayer()
-        contentMask = background.contentMask()
+        backgroundRenderer = BackgroundRenderer(layout: layout, settings: edit.background, resources: resources)
+        contentMask = backgroundRenderer.contentMask()
     }
 
     /// Webcam overlay mask and shadow for one camera size (static for a snapshot).
     struct WebcamOverlay: Sendable {
         let frame: CGRect
         let frameCI: CGRect
-        /// Rounded-rect alpha mask, or nil for square corners.
+        /// Rounded-rect alpha mask (analytic), or nil for square corners.
         let mask: CIImage?
+        /// The drop shadow, rendered once into a texture.
         let shadow: CIImage?
     }
 
@@ -123,7 +127,7 @@ final class RenderSnapshot: Sendable {
 
     private let webcamOverlays = LockedDictionary<CameraSizeKey, WebcamOverlay>()
 
-    /// The webcam geometry, mask and shadow for `cameraSize`, built once and cached as GPU intermediates.
+    /// The webcam geometry, mask and shadow for `cameraSize`, built once.
     func webcamOverlay(cameraSize: CGSize) -> WebcamOverlay {
         let key = CameraSizeKey(width: Int(cameraSize.width), height: Int(cameraSize.height))
         if let cached = webcamOverlays[key] { return cached }
@@ -136,11 +140,9 @@ final class RenderSnapshot: Sendable {
         let unit = layout.outputUnit
         let shadow =
             settings.shadow
-            ? CIHelpers.shadow(of: shape, sigma: 6 * unit, offsetDown: 4 * unit, opacity: 0.3)
-                .insertingIntermediate(cache: true) : nil
-        let overlay = WebcamOverlay(
-            frame: frame, frameCI: frameCI, mask: radius >= 0.5 ? shape.insertingIntermediate(cache: true) : nil,
-            shadow: shadow)
+            ? RenderContext.rasterize(CIHelpers.shadow(of: shape, sigma: 6 * unit, offsetDown: 4 * unit, opacity: 0.3))
+            : nil
+        let overlay = WebcamOverlay(frame: frame, frameCI: frameCI, mask: radius >= 0.5 ? shape : nil, shadow: shadow)
         webcamOverlays[key] = overlay
         return overlay
     }

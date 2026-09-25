@@ -37,22 +37,28 @@ public final class ProjectRenderer {
     public private(set) var options: RenderOptions
     /// The current composition, video composition, audio mix and layout.
     public private(set) var built: BuiltComposition
-    /// Meter levels written by the preview audio taps.
+    /// Meter levels written by the preview audio taps while `isMetering`.
     public let audioLevels = AudioLevels()
+    /// Whether the preview audio mix meters every audio track into `audioLevels`. Each meter is an
+    /// `MTAudioProcessingTap` running on the audio thread, so turn it on only while meters are on screen. Tracks
+    /// with gain above 0 dB get a tap either way.
+    public private(set) var isMetering: Bool
 
     private let resources: ProjectResources
     private var assembled: CompositionBuilder.Assembled
 
     /// Builds the initial composition for `project`.
-    public init(project: RenderProject, options: RenderOptions) async throws {
+    public init(project: RenderProject, options: RenderOptions, metering: Bool = false) async throws {
         let resources = ProjectResources(project: project)
         let assembled = try await CompositionBuilder.assemble(project: project)
         self.project = project
         self.options = options
         self.resources = resources
         self.assembled = assembled
+        isMetering = metering
         built = CompositionBuilder.finish(
-            assembled, edit: project.edit, options: options, resources: resources, levels: audioLevels)
+            assembled, edit: project.edit, options: options, resources: resources,
+            levels: metering ? audioLevels : nil)
     }
 
     public var composition: AVComposition { built.composition }
@@ -108,13 +114,26 @@ public final class ProjectRenderer {
         return kind
     }
 
+    /// Turns metering on or off (see `isMetering`); returns `.audioMix` when the mix changed.
+    @discardableResult
+    public func setMetering(_ metering: Bool) -> UpdateKind {
+        guard metering != isMetering else { return [] }
+        isMetering = metering
+        if !metering { audioLevels.reset() }
+        rebuild(.audioMix)
+        return .audioMix
+    }
+
     private func rebuild(_ kind: UpdateKind) {
         guard !kind.isEmpty else { return }
-        let snapshot = CompositionBuilder.makeSnapshot(
-            assembled: assembled, edit: project.edit, options: options, resources: resources)
+        // Audio-only changes keep the render snapshot (and the static layers it has already rendered).
+        let snapshot =
+            kind.contains(.videoComposition) || kind.contains(.composition)
+            ? CompositionBuilder.makeSnapshot(
+                assembled: assembled, edit: project.edit, options: options, resources: resources) : built.snapshot
         built = CompositionBuilder.finish(
-            assembled, snapshot: snapshot, edit: project.edit, options: options, levels: audioLevels,
-            audioMix: kind.contains(.audioMix) ? nil : built.audioMix)
+            assembled, snapshot: snapshot, edit: project.edit, options: options,
+            levels: isMetering ? audioLevels : nil, audioMix: kind.contains(.audioMix) ? nil : built.audioMix)
     }
 
     /// Applies an update to a player showing this renderer's composition.

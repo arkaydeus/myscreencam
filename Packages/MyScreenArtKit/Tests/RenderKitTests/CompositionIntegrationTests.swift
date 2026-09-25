@@ -332,6 +332,29 @@ struct CompositionIntegrationTests {
 
 @MainActor
 struct ProjectRendererTests {
+    private func taps(_ renderer: ProjectRenderer) -> Int {
+        renderer.audioMix.inputParameters.filter { $0.audioTapProcessor != nil }.count
+    }
+
+    @Test func meteringTapsOnlyWhileRequested() async throws {
+        let project = try await TestMedia.project()
+        let renderer = try await ProjectRenderer(project: project, options: .preview())
+        #expect(!renderer.isMetering)
+        #expect(taps(renderer) == 0)
+        let snapshot = renderer.built.snapshot
+        #expect(renderer.setMetering(true) == [.audioMix])
+        #expect(taps(renderer) == 2)
+        #expect(renderer.setMetering(true) == [])
+        // Audio-only rebuilds keep the render snapshot (and the static layers it has rendered).
+        #expect(renderer.built.snapshot === snapshot)
+
+        var edit = project.edit
+        edit.audio.microphone.gainDB = 6
+        #expect(try await renderer.update(edit: edit) == [.audioMix])
+        #expect(renderer.setMetering(false) == [.audioMix])
+        #expect(taps(renderer) == 1)  // gain above 0 dB still needs its tap
+    }
+
     @Test func updatesRebuildOnlyWhatChanged() async throws {
         let project = try await TestMedia.project()
         let renderer = try await ProjectRenderer(

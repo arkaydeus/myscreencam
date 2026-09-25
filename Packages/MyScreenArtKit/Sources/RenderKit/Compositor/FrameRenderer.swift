@@ -35,9 +35,13 @@ enum FrameRenderer {
     /// - Parameters:
     ///   - screen: the screen frame, or nil when the screen track has no media here (renders black).
     ///   - webcam: the webcam frame, or nil when the webcam isn't covering this moment.
+    ///
+    /// Video frames are scaled with plain affine transforms, never Lanczos: Core Image samples them straight from the
+    /// decoded surface inside the frame's one render pass (with its own multi-pass downsampling for reductions
+    /// below 50%). Lanczos needs full-resolution half-float intermediates per frame, and every new zoom scale needs
+    /// a new set, so it cost ~1.5 ms of CPU per frame and ~700 MB of cached IOSurfaces during exports.
     static func compose(
-        screen: CIImage?, webcam: CIImage?, snapshot: RenderSnapshot, sourceTime t: Double, canvasSize: CGSize,
-        highQuality: Bool = true
+        screen: CIImage?, webcam: CIImage?, snapshot: RenderSnapshot, sourceTime t: Double, canvasSize: CGSize
     ) -> CIImage {
         let layout = snapshot.layout
         let edit = snapshot.edit
@@ -56,9 +60,9 @@ enum FrameRenderer {
         var image: CIImage
         if let screen, screen.extent.width > 0, screen.extent.height > 0 {
             let e = screen.extent
-            image = CIHelpers.scaled(
-                screen.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY)), sx: work.width / e.width,
-                sy: work.height / e.height, highQuality: highQuality)
+            image = screen.transformed(
+                by: CGAffineTransform(translationX: -e.minX, y: -e.minY)
+                    .concatenating(CGAffineTransform(scaleX: work.width / e.width, y: work.height / e.height)))
         } else {
             image = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: workRect)
         }
@@ -104,7 +108,7 @@ enum FrameRenderer {
 
         // 6. Webcam overlay (not zoomed).
         if edit.webcam.enabled, let webcam, webcam.extent.width > 0, webcam.extent.height > 0 {
-            output = drawWebcam(webcam, over: output, snapshot: snapshot, highQuality: highQuality)
+            output = drawWebcam(webcam, over: output, snapshot: snapshot)
         }
 
         output = output.composited(over: CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: canvasRect))
@@ -187,9 +191,7 @@ enum FrameRenderer {
 
     // MARK: webcam
 
-    private static func drawWebcam(
-        _ webcam: CIImage, over output: CIImage, snapshot: RenderSnapshot, highQuality: Bool
-    ) -> CIImage {
+    private static func drawWebcam(_ webcam: CIImage, over output: CIImage, snapshot: RenderSnapshot) -> CIImage {
         let settings = snapshot.edit.webcam
         let e = webcam.extent
         let cameraSize = e.size
@@ -206,10 +208,10 @@ enum FrameRenderer {
         if settings.mirrored {
             camera = camera.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -crop.width, y: 0))
         }
-        camera = CIHelpers.scaled(
-            camera, sx: frame.width / crop.width, sy: frame.height / crop.height, highQuality: highQuality
+        camera = camera.transformed(
+            by: CGAffineTransform(scaleX: frame.width / crop.width, y: frame.height / crop.height)
+                .concatenating(CGAffineTransform(translationX: frameCI.minX, y: frameCI.minY))
         )
-        .transformed(by: CGAffineTransform(translationX: frameCI.minX, y: frameCI.minY))
         .cropped(to: frameCI)
 
         if let mask = overlay.mask { camera = CIHelpers.masked(camera, by: mask) }

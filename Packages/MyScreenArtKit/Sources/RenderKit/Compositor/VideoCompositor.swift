@@ -65,6 +65,40 @@ public enum RenderContext {
         destination.alphaMode = .none
         return try shared.startTask(toRender: image, to: destination)
     }
+
+    /// Renders a static image (a background with its shadow, a blurred drop shadow) once into an IOSurface, so
+    /// frames sample one texture instead of re-running its filters. `insertingIntermediate(cache:)` isn't
+    /// dependable for this: Core Image re-ran the blurs on every frame.
+    ///
+    /// Stored as premultiplied 8-bit sRGB, the working space's own encoding, so the pixels round-trip unchanged
+    /// (to 8 bits). Returns `image` unchanged if it's unbounded, empty, or the render fails.
+    static func rasterize(_ image: CIImage) -> CIImage {
+        let extent = image.extent.integral
+        guard !extent.isInfinite, extent.width >= 1, extent.height >= 1, extent.width * extent.height <= 64e6
+        else { return image }
+        var created: CVPixelBuffer?
+        let attributes: [CFString: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey: [CFString: Any](),
+            kCVPixelBufferMetalCompatibilityKey: true,
+        ]
+        CVPixelBufferCreate(
+            nil, Int(extent.width), Int(extent.height), kCVPixelFormatType_32BGRA, attributes as CFDictionary, &created)
+        guard let buffer = created else { return image }
+        CVBufferSetAttachment(
+            buffer, kCVImageBufferAlphaChannelModeKey, kCVImageBufferAlphaChannelMode_PremultipliedAlpha,
+            .shouldPropagate)
+        let destination = CIRenderDestination(pixelBuffer: buffer)
+        destination.colorSpace = CIHelpers.sRGB
+        destination.alphaMode = .premultiplied
+        let origin = CGAffineTransform(translationX: -extent.minX, y: -extent.minY)
+        do {
+            _ = try shared.startTask(toRender: image.transformed(by: origin), to: destination).waitUntilCompleted()
+        } catch {
+            return image
+        }
+        return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CIHelpers.sRGB])
+            .transformed(by: CGAffineTransform(translationX: extent.minX, y: extent.minY))
+    }
 }
 
 /// Pixel formats the compositor reads and writes.
@@ -185,8 +219,7 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
         let sourceTime = snapshot.sourceTime(forEdited: editedTime.isFinite ? editedTime : 0)
         let size = CGSize(width: CVPixelBufferGetWidth(output), height: CVPixelBufferGetHeight(output))
         let image = FrameRenderer.compose(
-            screen: screen, webcam: webcam, snapshot: snapshot, sourceTime: sourceTime, canvasSize: size,
-            highQuality: true)
+            screen: screen, webcam: webcam, snapshot: snapshot, sourceTime: sourceTime, canvasSize: size)
         return (output, try RenderContext.startRender(image, into: output))
     }
 }

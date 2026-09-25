@@ -5,6 +5,8 @@
 //   msa-tool export <package.msarec> <output file> [--format h264|hevc|prores|gif] [--fps 24|30|60]
 //       [--scale 1|0.75|0.5] [--quality low|medium|high|max]
 //       Renders + exports with RenderKit/ExportKit and prints wall time and this process's CPU time.
+//   msa-tool play <package.msarec> [--seconds N] [--size WxH] [--fps N] [--display-fps N] [--mute] [--meter]
+//       Headless editor-playback benchmark: plays the preview composition, pulling frames at display rate.
 
 import AVFoundation
 import ExportKit
@@ -161,10 +163,18 @@ func runExport(package: RecordingPackage, to output: URL, args: [String]) async 
     let wallStart = Date()
     let cpuStart = cpuSeconds()
     let project = try RenderProject.load(package)
-    let built = try await CompositionBuilder.build(
-        project: project, options: .export(scale: scale.rawValue, frameRate: fps.framesPerSecond))
     let natural = try await CompositionBuilder.build(project: project, options: .export(scale: 1, frameRate: 30))
     let expected = settings.outputSize(forSource: natural.renderSize)
+    var built = try await CompositionBuilder.build(
+        project: project, options: .export(scale: scale.rawValue, frameRate: fps.framesPerSecond))
+    if expected != built.renderSize {
+        // A preset cap (e.g. GIF's size limit) shrank the output below the plain scale: fit the canvas to it.
+        built = try await CompositionBuilder.build(
+            project: project,
+            options: RenderOptions(
+                purpose: .export, frameRate: fps.framesPerSecond,
+                sizing: .fit(width: expected.width, height: expected.height)))
+    }
     guard expected == built.renderSize else { throw ToolError.sizeMismatch(built.renderSize, expected) }
     print(
         "Rendering \(Int(built.renderSize.width))×\(Int(built.renderSize.height)) @\(fps.framesPerSecond) fps, "
@@ -199,8 +209,12 @@ do {
         try await runExport(
             package: RecordingPackage(url: URL(filePath: args[1], directoryHint: .isDirectory)),
             to: URL(filePath: args[2]), args: args)
+    case "play" where args.count >= 2:
+        try await runPlay(
+            package: RecordingPackage(url: URL(filePath: args[1], directoryHint: .isDirectory)), args: args)
     default:
-        throw ToolError.usage("usage: msa-tool import-legacy <legacy dir> <root> | export <pkg> <out> [options]")
+        throw ToolError.usage(
+            "usage: msa-tool import-legacy <legacy dir> <root> | export <pkg> <out> [options] | play <pkg> [options]")
     }
 } catch {
     FileHandle.standardError.write(Data("error: \(error)\n".utf8))
