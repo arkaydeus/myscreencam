@@ -1,6 +1,8 @@
+import AVFoundation
 import ExportKit
 import Foundation
 import ProjectKit
+import RenderKit
 import Testing
 
 @testable import MyScreenArt_Dev
@@ -17,6 +19,54 @@ struct AppStateTests {
                 contentRectPoints: RectPoints(x: 0, y: 0, width: 320, height: 180)))
         try package.saveMeta(meta)
         return (root, package, meta)
+    }
+
+    private func editorFixture() async throws -> (URL, EditorModel) {
+        let (root, package, originalMeta) = try temporaryPackage()
+        let screen = package.url(for: .screen)
+        let writer = try AVAssetWriter(outputURL: screen, fileType: .mov)
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: 320,
+                AVVideoHeightKey: 180,
+            ])
+        input.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: 320,
+                kCVPixelBufferHeightKey as String: 180,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            ])
+        writer.add(input)
+        guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
+        writer.startSession(atSourceTime: .zero)
+        let pool = try #require(adaptor.pixelBufferPool)
+        for index in 0..<2 {
+            guard input.isReadyForMoreMediaData else { throw CocoaError(.fileWriteUnknown) }
+            var buffer: CVPixelBuffer?
+            CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+            let frame = try #require(buffer)
+            guard adaptor.append(frame, withPresentationTime: CMTime(seconds: Double(index), preferredTimescale: 600))
+            else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
+        }
+        writer.endSession(atSourceTime: CMTime(seconds: 2, preferredTimescale: 600))
+        input.markAsFinished()
+        await writer.finishWriting()
+        guard writer.status == .completed else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
+
+        var meta = originalMeta
+        meta.streams = [.screen: StreamTiming(startOffset: 0)]
+        meta.screen.codec = "avc1"
+        try package.saveMeta(meta)
+        let edit = EditConfig.initial(for: meta)
+        let project = RenderProject(package: package, meta: meta, edit: edit, events: [], cursorIndex: CursorIndex())
+        let renderer = try await ProjectRenderer(
+            project: project, options: .preview(maxSize: CGSize(width: 640, height: 360)))
+        return (root, EditorModel(project: project, renderer: renderer))
     }
 
     @Test func libraryRefusesTrashForOpenEditor() throws {
@@ -66,5 +116,32 @@ struct AppStateTests {
         await center.waitUntilIdle()
         #expect(job.state == .cancelled)
         #expect(ContinuousClock.now - started < .seconds(2))
+    }
+
+    @Test func editorGroupsGestureUndoAndFlushesLatestEdit() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let undo = UndoManager()
+        model.undoManager = undo
+        let original = model.edit.background.padding
+
+        model.beginContinuousChange()
+        model.update("Padding") { $0.background.padding = 0.1 }
+        model.update("Padding") { $0.background.padding = 0.2 }
+        model.endContinuousChange()
+        #expect(model.edit.background.padding == 0.2)
+        undo.undo()
+        #expect(model.edit.background.padding == original)
+
+        model.update("Padding", coalesce: "padding") { $0.background.padding = 0.1 }
+        model.update("Padding", coalesce: "padding") { $0.background.padding = 0.2 }
+        undo.undo()
+        #expect(model.edit.background.padding == original)
+
+        model.update("Padding") { $0.background.padding = 0.15 }
+        await model.flush()
+        #expect(try model.package.loadEdit() == model.edit)
+        #expect(!model.hasUnsavedChanges)
+        await model.close()
     }
 }
