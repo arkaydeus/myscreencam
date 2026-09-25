@@ -48,6 +48,10 @@ enum InspectorTab: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class EditorModel {
+    private enum SaveCommand: Sendable {
+        case schedule(EditConfig)
+        case flush(EditConfig, CheckedContinuation<Result<Void, any Error>, Never>)
+    }
     static let autoZoomDefaultsKey = "autoZoomFromClicks"
 
     let package: RecordingPackage
@@ -85,7 +89,7 @@ final class EditorModel {
 
     @ObservationIgnored weak var undoManager: UndoManager?
     @ObservationIgnored private let autosaver: EditAutosaver
-    @ObservationIgnored private let saveQueue: AsyncStream<EditConfig>.Continuation
+    @ObservationIgnored private let saveQueue: AsyncStream<SaveCommand>.Continuation
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let presetStore = PresetStore(directory: PresetStore.defaultDirectory())
 
@@ -105,6 +109,7 @@ final class EditorModel {
     @ObservationIgnored private var seekTarget: Double?
     @ObservationIgnored private var messageTask: Task<Void, Never>?
     @ObservationIgnored private var previewSizeTask: Task<Void, Never>?
+    @ObservationIgnored private var waveformTasks: [Task<Void, Never>] = []
     @ObservationIgnored private var isClosed = false
 
     /// Preview frame rate: the recording's rate, 24…60.
@@ -130,7 +135,7 @@ final class EditorModel {
         player = AVPlayer(playerItem: renderer.makePlayerItem())
         player.actionAtItemEnd = .pause
 
-        let (stream, continuation) = AsyncStream<EditConfig>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let (stream, continuation) = AsyncStream<SaveCommand>.makeStream()
         saveQueue = continuation
         let saver = EditAutosaver(package: project.package) { edit, package in
             try package.saveEdit(edit)
@@ -138,7 +143,19 @@ final class EditorModel {
         autosaver = saver
         // One consumer keeps the snapshots in order on their way to the autosaver actor.
         saveTask = Task {
-            for await config in stream { await saver.schedule(config) }
+            for await command in stream {
+                switch command {
+                case .schedule(let config): await saver.schedule(config)
+                case .flush(let config, let continuation):
+                    await saver.schedule(config)
+                    do {
+                        try await saver.flush()
+                        continuation.resume(returning: .success(()))
+                    } catch {
+                        continuation.resume(returning: .failure(error))
+                    }
+                }
+            }
         }
         startObservingPlayer()
         loadWaveforms()
@@ -225,7 +242,7 @@ final class EditorModel {
         validateSelection()
         hasUnsavedChanges = true
         saveError = nil
-        saveQueue.yield(next)
+        saveQueue.yield(.schedule(next))
         scheduleSaveConfirmation(for: next)
         scheduleRender()
     }
@@ -254,11 +271,13 @@ final class EditorModel {
         saveConfirmTask?.cancel()
         guard hasUnsavedChanges else { return }
         let latest = edit
-        await autosaver.schedule(latest)
-        do {
-            try await autosaver.flush()
+        let result = await withCheckedContinuation { continuation in
+            saveQueue.yield(.flush(latest, continuation))
+        }
+        switch result {
+        case .success:
             if latest == edit { hasUnsavedChanges = false }
-        } catch {
+        case .failure(let error):
             saveError = "Couldn't save edits: \(error.localizedDescription)"
         }
     }
@@ -445,14 +464,16 @@ final class EditorModel {
 
     private func loadWaveforms() {
         for kind in [StreamKind.systemAudio, .microphone] where recordedStreams.contains(kind) {
-            Task { [weak self, package] in
+            let task = Task { [weak self, package] in
                 do {
                     let waveform = try await Waveform.load(package: package, stream: kind)
+                    guard !Task.isCancelled else { return }
                     self?.waveforms[kind] = waveform
                 } catch {
                     Log.app.error("Waveform for \(kind.rawValue, privacy: .public) failed: \(error)")
                 }
             }
+            waveformTasks.append(task)
         }
     }
 
@@ -516,6 +537,8 @@ final class EditorModel {
     func deleteRecording() async -> String? {
         pause()
         await flush()
+        if let saveError { return saveError }
+        waveformTasks.forEach { $0.cancel() }
         do {
             try library.delete(package)
             return nil
@@ -537,6 +560,7 @@ final class EditorModel {
         rateObserver = nil
         undoManager?.removeAllActions(withTarget: self)
         previewSizeTask?.cancel()
+        waveformTasks.forEach { $0.cancel() }
         messageTask?.cancel()
         await flush()
         saveQueue.finish()

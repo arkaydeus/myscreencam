@@ -6,6 +6,7 @@ public enum PackageLayout {
     public static let edit = "edit.json"
     public static let events = "events.jsonl"
     public static let cursorsDirectory = "cursors"
+    public static let backgroundsDirectory = "backgrounds"
     public static let cursorIndex = "cursors/index.json"
     public static let screen = "screen.mov"
     public static let webcam = "webcam.mov"
@@ -48,6 +49,17 @@ public struct RecordingPackage: Sendable, Hashable {
     public func url(_ relativePath: String) -> URL { url.appending(path: relativePath) }
     public func url(for stream: StreamKind) -> URL { url(stream.fileName) }
 
+    /// Resolves an untrusted path stored in package JSON. Symlinks cannot escape the package.
+    public func containedURL(_ relativePath: String) -> URL? {
+        guard !relativePath.isEmpty, !relativePath.hasPrefix("/"),
+            !relativePath.split(separator: "/").contains("..")
+        else { return nil }
+        let base = url.resolvingSymlinksInPath().standardizedFileURL
+        let candidate = url(relativePath).resolvingSymlinksInPath().standardizedFileURL
+        guard candidate.path.hasPrefix(base.path + "/") else { return nil }
+        return candidate
+    }
+
     /// Creates a new empty package folder (with `cursors/` and `cache/`) under `root`.
     public static func create(in root: URL, date: Date = Date(), id: UUID = UUID()) throws -> RecordingPackage {
         let folder = root.appending(path: PackageLayout.folderName(for: date, id: id), directoryHint: .isDirectory)
@@ -86,6 +98,13 @@ public struct RecordingPackage: Sendable, Hashable {
         let file = url(PackageLayout.edit)
         guard FileManager.default.fileExists(atPath: file.path) else { return nil }
         return try JSONDecoder.iso8601.decode(EditConfig.self, from: Data(contentsOf: file))
+    }
+
+    /// The edit shown by the editor and used for a direct Library export.
+    public func loadEffectiveEdit(meta: RecordingMeta, autoZoom: Bool) throws -> EditConfig {
+        if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
+        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), autoZoom: autoZoom)
+            .normalized(duration: meta.duration)
     }
 
     /// Atomic write (temp file + rename), so a crash never leaves a half-written `edit.json`.

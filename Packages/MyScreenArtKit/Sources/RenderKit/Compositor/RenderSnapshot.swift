@@ -60,7 +60,7 @@ final class ProjectResources: Sendable {
     /// Background image files, decoded once per path.
     func imageFill(path: String) -> CIImage? {
         if let image = fills[path] { return image }
-        guard let image = CIImage(contentsOf: URL(filePath: path)) else { return nil }
+        guard let file = package.containedURL(path), let image = CIImage(contentsOf: file) else { return nil }
         let cached = image.insertingIntermediate(cache: true)
         fills[path] = cached
         return cached

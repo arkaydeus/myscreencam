@@ -179,7 +179,8 @@ final class CursorImageCache: Sendable {
         switch art {
         case .captured(let id):
             guard let info = index[id],
-                let source = CGImageSourceCreateWithURL(package.url(info.file) as CFURL, nil),
+                let file = package.containedURL(info.file),
+                let source = CGImageSourceCreateWithURL(file as CFURL, nil),
                 let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
             else { return nil }
             let size = CGSize(

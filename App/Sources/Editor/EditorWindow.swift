@@ -152,8 +152,7 @@ enum EditorLoader {
         if let saved {
             edit = saved.normalized(duration: meta.duration)
         } else {
-            edit = EditConfig.makeInitial(meta: meta, events: events, autoZoom: autoZoom).normalized(
-                duration: meta.duration)
+            edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
             do {
                 try package.saveEdit(edit)
             } catch {

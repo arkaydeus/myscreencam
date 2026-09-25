@@ -69,8 +69,10 @@ public struct Waveform: Sendable, Equatable {
         var waveform = try await build(contentsOf: audio)
         waveform.startOffset = offset
         do {
-            try FileManager.default.createDirectory(
-                at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let cacheDirectory = cacheURL.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: cacheDirectory.path) {
+                try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: false)
+            }
             try waveform.encoded(stamp: stamp).write(to: cacheURL, options: .atomic)
         } catch {
             Log.app.error("Couldn't write waveform cache \(cacheURL.path, privacy: .public): \(error)")

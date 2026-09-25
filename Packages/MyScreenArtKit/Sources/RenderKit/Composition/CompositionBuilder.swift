@@ -68,8 +68,10 @@ public enum CompositionBuilder {
     public static func build(project: RenderProject, options: RenderOptions, levels: AudioLevels? = nil)
         async throws -> BuiltComposition
     {
+        try Task.checkCancellation()
         let resources = ProjectResources(project: project)
         let assembled = try await assemble(project: project)
+        try Task.checkCancellation()
         return finish(assembled, edit: project.edit, options: options, resources: resources, levels: levels)
     }
 
@@ -109,13 +111,16 @@ public enum CompositionBuilder {
             (.systemAudio, .audio, TrackID.systemAudio), (.microphone, .audio, TrackID.microphone),
         ]
         for (kind, mediaType, trackID) in streams where available.contains(kind) {
+            try Task.checkCancellation()
             let asset = AVURLAsset(
                 url: package.url(for: kind), options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             guard let source = try await asset.loadTracks(withMediaType: mediaType).first else {
                 if kind == .screen { throw RenderError.missingScreenTrack }
                 continue
             }
+            try Task.checkCancellation()
             let sourceRange = try await source.load(.timeRange)
+            try Task.checkCancellation()
             if kind == .screen {
                 let natural = try await source.load(.naturalSize)
                 if natural.width > 0, natural.height > 0 { sourceSize = natural }
@@ -157,6 +162,7 @@ public enum CompositionBuilder {
         let fileEnd = sourceRange.end.seconds
         var inserted = false
         for piece in timeline.pieces {
+            try Task.checkCancellation()
             // Session range → file range, clipped to what the file holds.
             let start = max(piece.segment.start - offset, fileStart)
             let end = min(piece.segment.end - offset, fileEnd)

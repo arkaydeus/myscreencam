@@ -10,6 +10,38 @@ import Testing
 /// End-to-end writer tests: synthetic capture buffers → `RecordingPipeline` → files read back with AVFoundation.
 @Suite(.serialized)
 struct WriterTests {
+    @Test func emptyScreenCannotBeReportedAsSaved() async throws {
+        let root = try TestPackages.root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = try TestPackages.configuration(in: root, width: 320, height: 180)
+        let pipeline = try RecordingPipeline(configuration: configuration) { _, _ in }
+        await #expect(throws: RecordingError.self) {
+            _ = try await pipeline.finish(cursorIndex: nil)
+        }
+        #expect(!FileManager.default.fileExists(atPath: configuration.package.url(PackageLayout.meta).path))
+        #expect(!FileManager.default.fileExists(atPath: configuration.package.url(for: .screen).path))
+    }
+
+    @Test func failedScreenAppendKeepsFragmentsButDoesNotSaveMetadata() async throws {
+        let root = try TestPackages.root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = try TestPackages.configuration(in: root, width: 320, height: 180)
+        let pipeline = try RecordingPipeline(configuration: configuration) { _, _ in }
+        let video = try SyntheticVideo(width: 320, height: 180)
+        let t0 = HostClock.now()
+        for index in 0..<5 {
+            pipeline.appendScreen(try video.frame(at: t0 + Double(index) * 0.1))
+            try await Task.sleep(for: .milliseconds(8))
+        }
+        pipeline.appendScreen(try SyntheticAudio.buffer(at: t0 + 0.6))
+        pipeline.stopClock(atHostTime: t0 + 0.7)
+        await #expect(throws: RecordingError.self) {
+            _ = try await pipeline.finish(cursorIndex: nil)
+        }
+        #expect(!FileManager.default.fileExists(atPath: configuration.package.url(PackageLayout.meta).path))
+        #expect(FileManager.default.fileExists(atPath: configuration.package.url(for: .screen).path))
+    }
+
     /// Irregular (VFR) screen frame times in seconds after the first frame, with a pause from 1.1 to 1.6.
     static let frameTimes = [0, 0.016, 0.033, 0.2, 0.21, 0.5, 1.0, 1.2, 1.3, 1.7, 2.0]
     static let pauseStart = 1.1

@@ -269,6 +269,28 @@ struct VideoExportTests {
         #expect(try filesIn(directory).isEmpty)
     }
 
+    @Test func cancellingWedgedCompositorFinishesPromptly() async throws {
+        let settings = ExportSettings(format: .h264, frameRate: .fps30, scale: .half)
+        let source = try await Fixtures.shared.clip(.hd)
+        let fixture = try await CompositionFixture.make(
+            source: source, settings: settings, compositor: HangingTestCompositor.self)
+        let directory = try await Fixtures.shared.outputDirectory("cancel-stall")
+        let job = VideoExporter(options: .init(stallTimeout: .seconds(1))).start(
+            asset: fixture.composition, videoComposition: fixture.videoComposition,
+            to: directory.appendingPathComponent("out.mp4"), settings: settings)
+        try await Task.sleep(for: .milliseconds(150))
+        let started = ContinuousClock.now
+        job.cancel()
+        await #expect {
+            _ = try await job.result
+        } throws: { error in
+            if case ExportError.cancelled = error { return true }
+            return false
+        }
+        #expect(ContinuousClock.now - started < .seconds(10))
+        #expect(try filesIn(directory).isEmpty)
+    }
+
     private func expectWellFormed(_ updates: [ExportProgress]) {
         #expect(updates.count >= 3)
         let fractions = updates.map(\.fraction)

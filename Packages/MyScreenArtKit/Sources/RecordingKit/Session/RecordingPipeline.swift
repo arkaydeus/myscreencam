@@ -1,6 +1,7 @@
 import CaptureKit
 import CoreMedia
 import Foundation
+import MyScreenArtCore
 import ProjectKit
 
 /// Static facts for a recording's `meta.json` and writers.
@@ -148,7 +149,18 @@ final class RecordingPipeline: @unchecked Sendable {
             for writer in writers.values { group.addTask { await writer.finish(endFileTime: endFileTime) } }
             return await group.reduce(into: [StreamWriter.Result]()) { $0.append($1) }
         }
-        try await events?.close()
+        // Pointer events are optional media. A failed log must not make complete video
+        // disappear from the library.
+        do { try await events?.close() } catch {
+            Log.app.error("Couldn't finish recording events: \(error)")
+        }
+        guard let screen = results.first(where: { $0.kind == .screen }) else {
+            throw RecordingError.writerFailed(.screen, "No screen writer result")
+        }
+        if let error = screen.error { throw RecordingError.writerFailed(.screen, error) }
+        guard screen.startOffset != nil else {
+            throw RecordingError.writerFailed(.screen, "No screen frames were saved")
+        }
         let package = configuration.package
         do {
             if let cursorIndex { try package.saveCursorIndex(cursorIndex) }

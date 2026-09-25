@@ -107,6 +107,7 @@ enum CompositorPixelFormats {
     static let yuv420f = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     static let bgra = kCVPixelFormatType_32BGRA
     static let yuv10 = kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+    static let yuv42210 = kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange
 
     static let source: [String: any Sendable] = [
         kCVPixelBufferPixelFormatTypeKey as String: [yuv420v, yuv420f, bgra, yuv10],
@@ -114,9 +115,9 @@ enum CompositorPixelFormats {
         kCVPixelBufferMetalCompatibilityKey as String: true,
     ]
 
-    /// 420v first (what export asks for and the cheapest to display), then BGRA.
+    /// Advertise the export formats so AVFoundation does not down-convert before encoding.
     static let output: [String: any Sendable] = [
-        kCVPixelBufferPixelFormatTypeKey as String: [yuv420v, bgra],
+        kCVPixelBufferPixelFormatTypeKey as String: [yuv420v, yuv10, yuv42210, bgra],
         kCVPixelBufferIOSurfacePropertiesKey as String: [String: any Sendable](),
         kCVPixelBufferMetalCompatibilityKey as String: true,
     ]

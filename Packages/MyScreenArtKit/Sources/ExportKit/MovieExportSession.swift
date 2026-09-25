@@ -257,6 +257,7 @@ final class MovieExportSession: @unchecked Sendable {
         // Outcome.
         if outcome.isAbandoned {
             output.discard()
+            if control.isCancelled { throw .cancelled }
             throw control.failure ?? .stalled(seconds: options.stallTimeout.seconds)
         }
         if control.isCancelled || control.failure != nil || reader.status == .failed {

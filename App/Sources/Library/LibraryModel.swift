@@ -11,6 +11,11 @@ import ProjectKit
 @MainActor
 @Observable
 final class LibraryModel {
+    enum LibraryActionError: LocalizedError {
+        case openInEditor
+
+        var errorDescription: String? { "Close this recording's editor before moving it to the Trash." }
+    }
     enum Phase: Equatable {
         case loading
         case loaded
@@ -18,6 +23,7 @@ final class LibraryModel {
     }
 
     let library: RecordingLibrary
+    @ObservationIgnored private let editors: EditorSessions
     private(set) var phase: Phase = .loading
     private(set) var items: [ProjectKit.LibraryItem] = []
     private(set) var failures: [LibraryFailure] = []
@@ -27,8 +33,9 @@ final class LibraryModel {
     @ObservationIgnored private var isScanning = false
     @ObservationIgnored private var rescanRequested = false
 
-    init(root: URL) {
+    init(root: URL, editors: EditorSessions) {
         library = RecordingLibrary(root: root)
+        self.editors = editors
     }
 
     /// Items matching the search text (by name), newest first.
@@ -97,6 +104,7 @@ final class LibraryModel {
 
     /// Moves the recording to the Trash (restorable from Finder; there's no in-app undo).
     func moveToTrash(_ item: ProjectKit.LibraryItem) throws {
+        guard editors.session(for: item.package.url) == nil else { throw LibraryActionError.openInEditor }
         try library.delete(item.package)
         items.removeAll { $0.id == item.id }
         if selection == item.id { selection = nil }

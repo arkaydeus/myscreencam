@@ -5,12 +5,13 @@ import SwiftUI
 /// The Library window: every recording in the recordings folder as a grid of cards.
 struct LibraryView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(AppModel.self) private var app
 
     var body: some View {
         Group {
             switch environment.recordingsRoot {
             case .success(let root):
-                LibraryContent(root: root)
+                LibraryContent(root: root, editors: app.editors)
             case .failure(let error):
                 ContentUnavailableView(
                     "Recordings Folder Unavailable",
@@ -49,9 +50,9 @@ private struct LibraryContent: View {
         var id: URL { package.url }
     }
 
-    init(root: URL) {
+    init(root: URL, editors: EditorSessions) {
         self.root = root
-        _model = State(initialValue: LibraryModel(root: root))
+        _model = State(initialValue: LibraryModel(root: root, editors: editors))
     }
 
     var body: some View {
@@ -250,7 +251,10 @@ private struct LibraryContent: View {
     /// Exports with the recording's saved edit (or the initial edit when it has never been edited).
     private func export(_ item: ProjectKit.LibraryItem) {
         do {
-            let edit = try item.package.loadEdit() ?? EditConfig.initial(for: item.meta)
+            let autoZoom = UserDefaults.standard.object(forKey: EditorModel.autoZoomDefaultsKey) as? Bool ?? true
+            let edit =
+                try app.editors.session(for: item.package.url)?.edit
+                ?? item.package.loadEffectiveEdit(meta: item.meta, autoZoom: autoZoom)
             exportRequest = ExportRequest(package: item.package, edit: edit)
         } catch {
             actionError = "Couldn't read the edits of “\(item.meta.name)”: \(error.localizedDescription)"

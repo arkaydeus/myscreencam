@@ -5,7 +5,7 @@ import QuickLookThumbnailing
 
 /// Finder / Quick Look thumbnails for `com.myscreenart.recording` packages (`*.msarec`).
 ///
-/// Uses the cached still the app writes (`cache/thumbnail.heic`) when present; otherwise grabs a frame
+/// Uses the cached still the app writes (HEIC or JPEG) when present; otherwise grabs a frame
 /// near the start of `screen.mov` with `AVAssetImageGenerator` (nearest keyframe, so it stays cheap).
 final class ThumbnailProvider: QLThumbnailProvider {
     enum ThumbnailError: Error {
@@ -16,8 +16,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
         for request: QLFileThumbnailRequest, _ handler: @escaping (QLThumbnailReply?, (any Error)?) -> Void
     ) {
         let package = RecordingPackage(url: request.fileURL)
-        let cached = package.url(PackageLayout.thumbnail)
-        if FileManager.default.fileExists(atPath: cached.path) {
+        if let cached = ThumbnailGenerator.cachedThumbnailURL(for: package) {
             handler(QLThumbnailReply(imageFileURL: cached), nil)
             return
         }

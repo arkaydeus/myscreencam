@@ -84,6 +84,7 @@ final class GIFExportSession: @unchecked Sendable {
         switch outcome {
         case nil:
             output.discard()
+            if control.isCancelled { throw .cancelled }
             throw control.failure ?? .stalled(seconds: options.stallTimeout.seconds)
         case .success(let value):
             encoded = value

@@ -4,6 +4,20 @@ import Testing
 @testable import ProjectKit
 
 struct ProjectModelTests {
+    @Test func packagePathsCannotEscapeThroughTraversalOrSymlinks() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "pk-paths-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let package = try RecordingPackage.create(in: root)
+        let outside = root.appending(path: "outside.png")
+        try Data([1, 2, 3]).write(to: outside)
+        let link = package.url("cursors/escape.png")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        #expect(package.containedURL("cursors/valid.png") != nil)
+        #expect(package.containedURL("../../outside.png") == nil)
+        #expect(package.containedURL(outside.path) == nil)
+        #expect(package.containedURL("cursors/escape.png") == nil)
+    }
+
     func sampleMeta() -> RecordingMeta {
         RecordingMeta(
             name: "Test",
@@ -40,6 +54,22 @@ struct ProjectModelTests {
         edit.blur.append(BlurMask(start: 1, end: 3))
         try package.saveEdit(edit)
         #expect(try package.loadEdit() == edit)
+    }
+
+    @Test func effectiveEditSeedsClicksAndNormalizesSavedEdit() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "pk-edit-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let package = try RecordingPackage.create(in: root)
+        let meta = sampleMeta()
+        let click = InputEvent(t: 2, kind: .down, x: 0.25, y: 0.75, button: 0)
+        try InputEventLog.encodeLine(click).write(to: package.url(PackageLayout.events))
+        let initial = try package.loadEffectiveEdit(meta: meta, autoZoom: true)
+        #expect(initial.zoom.keyframes.count == 1)
+        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: false).zoom.keyframes.isEmpty)
+        var saved = initial
+        saved.zoom.keyframes = []
+        try package.saveEdit(saved)
+        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: true).zoom.keyframes.isEmpty)
     }
 
     @Test func initialEditReflectsMeta() {

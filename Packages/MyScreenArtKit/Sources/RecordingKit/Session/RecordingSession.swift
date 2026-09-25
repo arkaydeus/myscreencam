@@ -52,6 +52,8 @@ public final class RecordingSession: @unchecked Sendable {
     private var cursors: CursorImageTracker?
     private var activity: (any NSObjectProtocol)?
     private var stopTask: Task<RecordingPackage, any Error>?
+    private var firstFrameGate: FirstFrameGate?
+    private var startupFailure: RecordingError?
 
     /// - Parameters:
     ///   - camera: a running preview camera to reuse for recording (it keeps running afterwards). If nil, or for a
@@ -91,6 +93,12 @@ public final class RecordingSession: @unchecked Sendable {
         }
         do {
             try await startStreams()
+            try lock.withLock {
+                if let startupFailure { throw startupFailure }
+                activity = ProcessInfo.processInfo.beginActivity(
+                    options: [.userInitiated, .idleSystemSleepDisabled], reason: "Recording the screen")
+                currentState = .recording
+            }
         } catch {
             await stopStreams()
             _ = await lock.withLock({ cursors })?.finish()
@@ -100,14 +108,10 @@ public final class RecordingSession: @unchecked Sendable {
             lock.withLock {
                 currentState = .failed
                 recordingPackage = nil
+                firstFrameGate = nil
             }
             continuation.finish()
             throw (error as? RecordingError) ?? RecordingError.captureFailed(error.localizedDescription)
-        }
-        lock.withLock {
-            activity = ProcessInfo.processInfo.beginActivity(
-                options: [.userInitiated, .idleSystemSleepDisabled], reason: "Recording the screen")
-            currentState = .recording
         }
         continuation.yield(.started)
     }
@@ -218,6 +222,7 @@ public final class RecordingSession: @unchecked Sendable {
         if let microphone { await microphone.start { pipeline.append($0, to: .microphone) } }
 
         let firstFrame = FirstFrameGate()
+        lock.withLock { firstFrameGate = firstFrame }
         pipeline.onFirstFrame { firstFrame.open() }
         do {
             try await screen.start(
@@ -233,6 +238,7 @@ public final class RecordingSession: @unchecked Sendable {
             throw RecordingError.captureFailed(error.localizedDescription)
         }
         try await firstFrame.wait(timeout: 5, timeoutError: RecordingError.noFirstFrame)
+        lock.withLock { firstFrameGate = nil }
     }
 
     private func openCamera() throws -> CameraCapture? {
@@ -346,7 +352,14 @@ public final class RecordingSession: @unchecked Sendable {
     }
 
     private func autoStop(_ reason: AutoStopReason) {
-        let running = lock.withLock { currentState == .recording || currentState == .paused }
+        let (running, gate) = lock.withLock { () -> (Bool, FirstFrameGate?) in
+            if currentState == .starting {
+                startupFailure = .captureFailed("Capture stopped while starting: \(reason)")
+                return (false, firstFrameGate)
+            }
+            return (currentState == .recording || currentState == .paused, nil)
+        }
+        gate?.fail(RecordingError.captureFailed("Capture stopped while starting: \(reason)"))
         guard running else { return }
         Log.app.notice("Recording auto-stopped: \(String(describing: reason), privacy: .public)")
         continuation.yield(.autoStopped(reason))
@@ -359,9 +372,17 @@ public final class RecordingSession: @unchecked Sendable {
             return
         }
         // Without the screen there's no recording: finalise what we have.
-        let running = lock.withLock { currentState == .recording || currentState == .paused }
+        let error = RecordingError.writerFailed(kind, message)
+        let (running, gate) = lock.withLock { () -> (Bool, FirstFrameGate?) in
+            if currentState == .starting {
+                startupFailure = error
+                return (false, firstFrameGate)
+            }
+            return (currentState == .recording || currentState == .paused, nil)
+        }
+        gate?.fail(error)
         guard running else { return }
-        continuation.yield(.failed(.writerFailed(kind, message)))
+        continuation.yield(.failed(error))
         Task { _ = try? await stop() }
     }
 }

@@ -40,6 +40,7 @@ final class ExportCenter {
         fileprivate let edit: EditConfig
         private(set) var state: State = .queued
         @ObservationIgnored fileprivate var exportJob: ExportJob?
+        @ObservationIgnored fileprivate var prepareTask: Task<PreparedExport, any Error>?
         @ObservationIgnored fileprivate var cancelRequested = false
 
         fileprivate init(
@@ -80,6 +81,7 @@ final class ExportCenter {
             guard isActive else { return }
             cancelRequested = true
             exportJob?.cancel()
+            prepareTask?.cancel()
             if state == .queued { state = .cancelled }
         }
 
@@ -148,11 +150,18 @@ final class ExportCenter {
         dockProgress.show(fraction: 0)
         let prepared: PreparedExport
         do {
-            prepared = try await ExportPipeline.prepare(package: job.package, edit: job.edit, settings: job.settings)
+            let task = Task {
+                try await ExportPipeline.prepare(package: job.package, edit: job.edit, settings: job.settings)
+            }
+            job.prepareTask = task
+            if job.cancelRequested { task.cancel() }
+            prepared = try await task.value
         } catch {
+            job.prepareTask = nil
             finish(job, with: job.cancelRequested ? .cancelled : .failed(error.localizedDescription))
             return
         }
+        job.prepareTask = nil
         if job.cancelRequested {
             finish(job, with: .cancelled)
             return

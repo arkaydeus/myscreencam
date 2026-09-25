@@ -222,6 +222,16 @@ struct CompositionIntegrationTests {
 
     // MARK: formats
 
+    @Test(arguments: [
+        kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+        kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange,
+    ])
+    func tenBitReaderOutputFormats(format: OSType) async throws {
+        let built = try await build(try await TestMedia.plainEdit(), options: .export(scale: 0.5, frameRate: 24))
+        let buffers = try await FrameGrabber.readerFrames(built, pixelFormat: format, count: 1)
+        #expect(CVPixelBufferGetPixelFormatType(try #require(buffers.first)) == format)
+    }
+
     @Test(arguments: [kCVPixelFormatType_32BGRA, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
     func readerOutputFormats(format: OSType) async throws {
         var edit = try await TestMedia.plainEdit()

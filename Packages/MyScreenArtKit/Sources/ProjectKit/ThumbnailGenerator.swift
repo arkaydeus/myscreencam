@@ -60,7 +60,9 @@ public struct ThumbnailGenerator: Sendable {
         let image = try await generator.image(at: time).image
 
         let cache = package.url(PackageLayout.cacheDirectory)
-        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: cache.path) {
+            try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: false)
+        }
         if try write(image, to: package.url(PackageLayout.thumbnail), type: .heic) {
             try? FileManager.default.removeItem(at: package.url(PackageLayout.thumbnailFallback))
             return package.url(PackageLayout.thumbnail)

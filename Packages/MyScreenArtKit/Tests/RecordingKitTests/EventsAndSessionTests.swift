@@ -7,6 +7,14 @@ import Testing
 
 @testable import RecordingKit
 
+@Test func firstFrameGatePropagatesStartupFailure() async throws {
+    let gate = FirstFrameGate()
+    gate.fail(RecordingError.writerFailed(.screen, "encoder stopped"))
+    await #expect(throws: RecordingError.self) {
+        try await gate.wait(timeout: 1, timeoutError: RecordingError.noFirstFrame)
+    }
+}
+
 struct EventLogTests {
     @Test func buffersInMemoryAndFlushesOnClose() async throws {
         let root = try TestPackages.root()

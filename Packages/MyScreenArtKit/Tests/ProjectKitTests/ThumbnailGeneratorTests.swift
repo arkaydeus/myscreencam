@@ -5,6 +5,17 @@ import Testing
 @testable import ProjectKit
 
 struct ThumbnailGeneratorTests {
+    @Test func cachedThumbnailFallsBackToJPEG() throws {
+        let dir = try TempDirectory()
+        let package = try Fixtures.package(in: dir.url, meta: Fixtures.meta())
+        let fallback = package.url(PackageLayout.thumbnailFallback)
+        try Data([1]).write(to: fallback)
+        #expect(ThumbnailGenerator.cachedThumbnailURL(for: package) == fallback)
+        let preferred = package.url(PackageLayout.thumbnail)
+        try Data([2]).write(to: preferred)
+        #expect(ThumbnailGenerator.cachedThumbnailURL(for: package) == preferred)
+    }
+
     /// Decodes the centre pixel of an image file as (r, g, b) 0…255.
     func centrePixel(of url: URL) throws -> (width: Int, height: Int, rgb: [Int]) {
         let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))

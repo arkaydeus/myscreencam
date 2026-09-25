@@ -93,7 +93,7 @@ struct BackgroundPanel: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            if !FileManager.default.fileExists(atPath: path) {
+            if !FileManager.default.fileExists(atPath: model.package.containedURL(path)?.path ?? "") {
                 Label("The image file is missing.", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             }
@@ -118,6 +118,17 @@ struct BackgroundPanel: View {
         panel.canChooseDirectories = false
         panel.message = "Choose a background image"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.update("Background Image") { $0.background.fill = .image(path: url.path) }
+        let relative = "\(PackageLayout.backgroundsDirectory)/\(UUID().uuidString).\(url.pathExtension)"
+        do {
+            let destination = model.package.url(relative)
+            let directory = destination.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: directory.path) {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            }
+            try FileManager.default.copyItem(at: url, to: destination)
+            model.update("Background Image") { $0.background.fill = .image(path: relative) }
+        } catch {
+            model.flash("Couldn't copy the background image: \(error.localizedDescription)")
+        }
     }
 }

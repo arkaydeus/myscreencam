@@ -46,6 +46,8 @@ final class StreamWriter: @unchecked Sendable {
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
     private var firstSessionTime: Double?
+    private var hasAppended = false
+    private var sessionStarted = false
     private var lastPresentationTime = CMTime.negativeInfinity
     private var failure: String?
 
@@ -96,9 +98,14 @@ final class StreamWriter: @unchecked Sendable {
             count { $0.droppedAfterFailure += 1 }
             return
         }
+        guard let format = buffer.formatDescription,
+            CMFormatDescriptionGetMediaType(format) == (videoSettings == nil ? kCMMediaType_Audio : kCMMediaType_Video)
+        else {
+            fail("Unexpected sample media type")
+            return
+        }
         do {
             if writer == nil {
-                guard let format = buffer.formatDescription else { return }
                 let channels = format.audioStreamBasicDescription.map { Int($0.mChannelsPerFrame) } ?? 2
                 try makeWriter(
                     settings: EncoderSettings.aac(sourceChannels: channels), mediaType: .audio, formatHint: format)
@@ -116,19 +123,21 @@ final class StreamWriter: @unchecked Sendable {
             count { $0.droppedOutOfOrder += 1 }
             return
         }
-        if firstSessionTime == nil {
-            writer.startSession(atSourceTime: time)
-            firstSessionTime = placement.sessionTime
-        }
         guard input.isReadyForMoreMediaData else {
             count { $0.droppedNotReady += 1 }
             return
+        }
+        if !sessionStarted {
+            writer.startSession(atSourceTime: time)
+            sessionStarted = true
         }
         let signpost = Log.signposter.beginInterval(
             "append", id: Log.signposter.makeSignpostID(), "\(self.kind.rawValue)")
         let appended = input.append(sample)
         Log.signposter.endInterval("append", signpost)
         if appended {
+            hasAppended = true
+            if firstSessionTime == nil { firstSessionTime = placement.sessionTime }
             lastPresentationTime = time
             count { $0.appended += 1 }
         } else {
@@ -157,11 +166,19 @@ final class StreamWriter: @unchecked Sendable {
 
     private func finishOnQueue(endFileTime: CMTime?, completion: @escaping @Sendable (Result) -> Void) {
         let kind = kind
-        guard let writer, let input, writer.status == .writing, firstSessionTime != nil else {
-            // Nothing (valid) was written: leave no file behind.
+        guard let writer, let input, hasAppended else {
+            // No samples were appended, so this file cannot be salvaged.
             writer?.cancelWriting()
             try? FileManager.default.removeItem(at: url)
             completion(Result(kind: kind, startOffset: nil, statistics: statistics, error: failure))
+            return
+        }
+        guard writer.status == .writing else {
+            // A fragmented file may already contain playable samples. Keep it for recovery.
+            completion(
+                Result(
+                    kind: kind, startOffset: nil, statistics: statistics,
+                    error: failure ?? writer.error?.localizedDescription ?? "Writer failed"))
             return
         }
         if let endFileTime {
@@ -172,7 +189,8 @@ final class StreamWriter: @unchecked Sendable {
         let transfer = UncheckedSendable(writer)
         writer.finishWriting { [self] in
             let writer = transfer.value
-            let error = writer.status == .completed ? nil : (writer.error?.localizedDescription ?? "finish failed")
+            let error =
+                failure ?? (writer.status == .completed ? nil : (writer.error?.localizedDescription ?? "finish failed"))
             completion(
                 Result(
                     kind: kind, startOffset: error == nil ? startOffset : nil, statistics: statistics,

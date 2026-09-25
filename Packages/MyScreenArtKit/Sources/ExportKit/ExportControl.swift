@@ -33,7 +33,8 @@ final class ExportControl: Sendable {
     /// Records a failure (the first one wins) and aborts the running pipeline.
     func fail(_ error: ExportError) {
         let handler: (@Sendable () -> Void)? = state.withLock { state in
-            guard state.failure == nil, !state.cancelled else { return nil }
+            // A stalled reader must still release the waiting continuation after cancellation.
+            guard state.failure == nil, (!state.cancelled || error.isStall) else { return nil }
             state.failure = error
             return state.abortHandler
         }
