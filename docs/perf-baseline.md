@@ -130,5 +130,4 @@ Notes:
   | H.264 @30, 50% | 31.7 s | 36.6 s | **1.8 GB** ⚠︎ being fixed |
 
 - **Visual check of exported frames:** the zoom, webcam overlay (rounded corners, shadow) and recorded-cursor overlay are all correct, and the recording HUD is not captured.
-- **Follow-ups:**
-  - The same cursor kind was sometimes stored twice (`resizeUpDown` ×2 in a 33 s recording), so de-duplication is too strict.
+- **Cursor de-duplication is correct:** two `resizeUpDown` entries in one recording turned out to be different system cursors (bidirectional vs "resize down only" with a greyed-out up arrow). Both classify to the same kind, which is what the stylised style needs.
