@@ -84,6 +84,11 @@ enum EncoderConfiguration {
             compression[AVVideoMaxKeyFrameIntervalKey] = fps * 2
             compression[AVVideoMaxKeyFrameIntervalDurationKey] = 2.0
             compression[AVVideoAllowFrameReorderingKey] = true
+            // The bitrate already bounds quality; letting the media engine favour speed makes HEVC ~1.7× faster
+            // (52 s 3008×1692 clip: 7.9 s → 4.7 s on M5 Max). `.max` keeps the slower, higher-effort path.
+            if settings.quality != .max {
+                compression[kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality as String] = true
+            }
         }
         switch settings.format {
         case .h264:

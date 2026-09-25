@@ -34,6 +34,8 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "ExportKit", dependencies: ["MyScreenArtCore"]),
+        // Developer tool (import legacy recordings, export benchmark); not shipped in the app.
+        .executableTarget(name: "msa-tool", dependencies: ["ProjectKit", "RenderKit", "ExportKit"]),
 
         .testTarget(name: "MyScreenArtCoreTests", dependencies: ["MyScreenArtCore"]),
         .testTarget(name: "ProjectKitTests", dependencies: ["ProjectKit"]),

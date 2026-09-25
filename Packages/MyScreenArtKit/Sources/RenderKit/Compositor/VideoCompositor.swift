@@ -52,14 +52,18 @@ public enum RenderContext {
 
     /// Renders `image` into `buffer` (BGRA or 420v, IOSurface-backed) on the GPU and waits for completion.
     static func render(_ image: CIImage, into buffer: CVPixelBuffer) throws {
+        _ = try startRender(image, into: buffer).waitUntilCompleted()
+    }
+
+    /// Submits the GPU work to render `image` into `buffer` and returns without waiting.
+    static func startRender(_ image: CIImage, into buffer: CVPixelBuffer) throws -> CIRenderTask {
         for (key, value) in outputAttachments {
             CVBufferSetAttachment(buffer, key, value, .shouldPropagate)
         }
         let destination = CIRenderDestination(pixelBuffer: buffer)
         destination.colorSpace = outputColorSpace
         destination.alphaMode = .none
-        let task = try shared.startTask(toRender: image, to: destination)
-        _ = try task.waitUntilCompleted()
+        return try shared.startTask(toRender: image, to: destination)
     }
 }
 
@@ -107,7 +111,11 @@ final class RenderInstruction: NSObject, AVVideoCompositionInstructionProtocol, 
 /// AVFoundation creates it by class and calls it on its own queues. It holds no edit state: every request's
 /// instruction carries the `RenderSnapshot` to draw with, so swapping a video composition is race-free.
 public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
+    /// Builds each frame's Core Image graph and submits it to the GPU, one request at a time.
     private let queue = DispatchQueue(label: "com.myscreenart.renderkit.compositor", qos: .userInteractive)
+    /// Waits for submitted GPU work and finishes requests, so building frame N+1 overlaps rendering frame N.
+    private let completionQueue = DispatchQueue(
+        label: "com.myscreenart.renderkit.compositor.completion", qos: .userInteractive, attributes: .concurrent)
     private let generation = Atomic<Int>(0)
 
     override public init() {
@@ -132,10 +140,20 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
                 return
             }
             let state = Log.signposter.beginInterval("composite")
-            defer { Log.signposter.endInterval("composite", state) }
             do {
-                request.finish(withComposedVideoFrame: try compose(request))
+                let (output, task) = try compose(request)
+                let pending = PendingRender(task: task, output: output)
+                completionQueue.async {
+                    defer { Log.signposter.endInterval("composite", state) }
+                    do {
+                        _ = try pending.task.waitUntilCompleted()
+                        request.finish(withComposedVideoFrame: pending.output)
+                    } catch {
+                        request.finish(with: error)
+                    }
+                }
             } catch {
+                Log.signposter.endInterval("composite", state)
                 request.finish(with: error)
             }
         }
@@ -145,7 +163,8 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
         generation.add(1, ordering: .releasing)
     }
 
-    private func compose(_ request: AVAsynchronousVideoCompositionRequest) throws -> CVPixelBuffer {
+    /// Builds the frame and submits it to the GPU; the caller waits on the returned task.
+    private func compose(_ request: AVAsynchronousVideoCompositionRequest) throws -> (CVPixelBuffer, CIRenderTask) {
         guard let instruction = request.videoCompositionInstruction as? RenderInstruction else {
             throw RenderError.unexpectedInstruction
         }
@@ -160,9 +179,15 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
         let image = FrameRenderer.compose(
             screen: screen, webcam: webcam, snapshot: snapshot, sourceTime: sourceTime, canvasSize: size,
             highQuality: true)
-        try RenderContext.render(image, into: output)
-        return output
+        return (output, try RenderContext.startRender(image, into: output))
     }
+}
+
+/// `CIRenderTask` and `CVPixelBuffer` aren't marked Sendable; the pair is handed to the completion queue once
+/// and never touched again by the submitting queue.
+private struct PendingRender: @unchecked Sendable {
+    let task: CIRenderTask
+    let output: CVPixelBuffer
 }
 
 /// Errors from building or rendering a composition.
