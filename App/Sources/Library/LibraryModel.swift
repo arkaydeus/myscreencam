@@ -3,11 +3,6 @@ import MyScreenArtCore
 import Observation
 import ProjectKit
 
-extension Notification.Name {
-    /// Posted by the Recorder when a recording package is complete. `object` is the package URL.
-    static let recordingFinished = Notification.Name("MyScreenArtRecordingFinished")
-}
-
 /// The Library window's state: the scanned recordings, the search filter and the selection.
 ///
 /// Scans run off the main actor. It rescans when the recordings folder changes (FSEvents via
