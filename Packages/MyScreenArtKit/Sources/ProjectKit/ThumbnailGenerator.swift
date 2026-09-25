@@ -9,6 +9,15 @@ extension PackageLayout {
     public static let thumbnailFallback = "cache/thumbnail.jpg"
 }
 
+/// Aspect-fit dimensions shared by Finder's thumbnail extension and package thumbnail tests.
+public enum ThumbnailGeometry {
+    public static func fit(_ size: CGSize, in bounds: CGSize) -> CGSize {
+        guard size.width > 0, size.height > 0 else { return bounds }
+        let ratio = min(bounds.width / size.width, bounds.height / size.height)
+        return CGSize(width: (size.width * ratio).rounded(), height: (size.height * ratio).rounded())
+    }
+}
+
 /// Renders the library still for a recording into `cache/thumbnail.heic` (or `cache/thumbnail.jpg` where HEIC
 /// encoding isn't available), decoding a single frame of `screen.mov`.
 public struct ThumbnailGenerator: Sendable {

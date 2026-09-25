@@ -23,7 +23,7 @@ final class LibraryModel {
     }
 
     let library: RecordingLibrary
-    @ObservationIgnored private let editors: EditorSessions
+    @ObservationIgnored private let isOpenInEditor: @MainActor (URL) -> Bool
     private(set) var phase: Phase = .loading
     private(set) var items: [ProjectKit.LibraryItem] = []
     private(set) var failures: [LibraryFailure] = []
@@ -33,9 +33,9 @@ final class LibraryModel {
     @ObservationIgnored private var isScanning = false
     @ObservationIgnored private var rescanRequested = false
 
-    init(root: URL, editors: EditorSessions) {
+    init(root: URL, isOpenInEditor: @escaping @MainActor (URL) -> Bool) {
         library = RecordingLibrary(root: root)
-        self.editors = editors
+        self.isOpenInEditor = isOpenInEditor
     }
 
     /// Items matching the search text (by name), newest first.
@@ -104,7 +104,7 @@ final class LibraryModel {
 
     /// Moves the recording to the Trash (restorable from Finder; there's no in-app undo).
     func moveToTrash(_ item: ProjectKit.LibraryItem) throws {
-        guard editors.session(for: item.package.url) == nil else { throw LibraryActionError.openInEditor }
+        guard !isOpenInEditor(item.package.url) else { throw LibraryActionError.openInEditor }
         try library.delete(item.package)
         items.removeAll { $0.id == item.id }
         if selection == item.id { selection = nil }

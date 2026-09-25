@@ -4,6 +4,23 @@ import Testing
 
 @testable import ProjectKit
 
+@MainActor
+@Test func orderedFlushCannotBeOverwrittenByQueuedSnapshot() async throws {
+    let directory = try TempDirectory()
+    let meta = Fixtures.meta()
+    let package = try Fixtures.package(in: directory.url, meta: meta)
+    var older = EditConfig.initial(for: meta)
+    older.cursor.enabled = false
+    var newest = older
+    newest.cursor.enabled = true
+    let queue = EditSaveQueue(autosaver: EditAutosaver(package: package, debounce: .milliseconds(25)))
+    queue.schedule(older)
+    try await queue.flush(newest)
+    try await Task.sleep(for: .milliseconds(75))
+    #expect(try package.loadEdit() == newest)
+    queue.finish()
+}
+
 /// Records writes; can be told to fail.
 final class WriteLog: Sendable {
     private let state = Mutex<(writes: [EditConfig], failing: Bool, errors: Int)>(([], false, 0))

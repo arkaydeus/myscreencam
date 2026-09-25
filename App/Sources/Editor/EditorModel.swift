@@ -48,10 +48,6 @@ enum InspectorTab: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class EditorModel {
-    private enum SaveCommand: Sendable {
-        case schedule(EditConfig)
-        case flush(EditConfig, CheckedContinuation<Result<Void, any Error>, Never>)
-    }
     static let autoZoomDefaultsKey = "autoZoomFromClicks"
 
     let package: RecordingPackage
@@ -89,8 +85,7 @@ final class EditorModel {
 
     @ObservationIgnored weak var undoManager: UndoManager?
     @ObservationIgnored private let autosaver: EditAutosaver
-    @ObservationIgnored private let saveQueue: AsyncStream<SaveCommand>.Continuation
-    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private let saveQueue: EditSaveQueue
     @ObservationIgnored private let presetStore = PresetStore(directory: PresetStore.defaultDirectory())
 
     // Undo coalescing.
@@ -135,28 +130,11 @@ final class EditorModel {
         player = AVPlayer(playerItem: renderer.makePlayerItem())
         player.actionAtItemEnd = .pause
 
-        let (stream, continuation) = AsyncStream<SaveCommand>.makeStream()
-        saveQueue = continuation
         let saver = EditAutosaver(package: project.package) { edit, package in
             try package.saveEdit(edit)
         }
         autosaver = saver
-        // One consumer keeps the snapshots in order on their way to the autosaver actor.
-        saveTask = Task {
-            for await command in stream {
-                switch command {
-                case .schedule(let config): await saver.schedule(config)
-                case .flush(let config, let continuation):
-                    await saver.schedule(config)
-                    do {
-                        try await saver.flush()
-                        continuation.resume(returning: .success(()))
-                    } catch {
-                        continuation.resume(returning: .failure(error))
-                    }
-                }
-            }
-        }
+        saveQueue = EditSaveQueue(autosaver: saver)
         startObservingPlayer()
         loadWaveforms()
         reloadPresets()
@@ -242,7 +220,7 @@ final class EditorModel {
         validateSelection()
         hasUnsavedChanges = true
         saveError = nil
-        saveQueue.yield(.schedule(next))
+        saveQueue.schedule(next)
         scheduleSaveConfirmation(for: next)
         scheduleRender()
     }
@@ -271,13 +249,10 @@ final class EditorModel {
         saveConfirmTask?.cancel()
         guard hasUnsavedChanges else { return }
         let latest = edit
-        let result = await withCheckedContinuation { continuation in
-            saveQueue.yield(.flush(latest, continuation))
-        }
-        switch result {
-        case .success:
+        do {
+            try await saveQueue.flush(latest)
             if latest == edit { hasUnsavedChanges = false }
-        case .failure(let error):
+        } catch {
             saveError = "Couldn't save edits: \(error.localizedDescription)"
         }
     }

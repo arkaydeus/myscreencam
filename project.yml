@@ -105,6 +105,26 @@ targets:
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.thumbnail
 
+  MyScreenArtAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - App/Tests
+    dependencies:
+      - target: MyScreenArt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.tests
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: QWD87G9T3P
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyScreenArt Dev.app/Contents/MacOS/MyScreenArt Dev"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        SWIFT_VERSION: "6.0"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_STRICT_CONCURRENCY: complete
+
 schemes:
   MyScreenArt:
     build:
@@ -114,3 +134,7 @@ schemes:
       config: Debug
     archive:
       config: Release
+    test:
+      config: Debug
+      targets:
+        - MyScreenArtAppTests

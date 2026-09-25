@@ -5,6 +5,15 @@ import Testing
 @testable import ProjectKit
 
 struct ThumbnailGeneratorTests {
+    @Test func thumbnailAspectFitHandlesLandscapeAndPortrait() {
+        #expect(
+            ThumbnailGeometry.fit(CGSize(width: 1920, height: 1080), in: CGSize(width: 400, height: 400))
+                == CGSize(width: 400, height: 225))
+        #expect(
+            ThumbnailGeometry.fit(CGSize(width: 1080, height: 1920), in: CGSize(width: 400, height: 400))
+                == CGSize(width: 225, height: 400))
+    }
+
     @Test func cachedThumbnailFallsBackToJPEG() throws {
         let dir = try TempDirectory()
         let package = try Fixtures.package(in: dir.url, meta: Fixtures.meta())

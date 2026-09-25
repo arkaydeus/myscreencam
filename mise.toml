@@ -37,6 +37,11 @@ run = "scripts/dev/run.sh"
 description = "Run the engine package tests"
 run = "swift test --package-path Packages/MyScreenArtKit"
 
+[tasks."test:app"]
+description = "Run app-target state and lifecycle tests"
+depends = ["build"]
+run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet test"
+
 [tasks.format]
 description = "Format Swift sources in place"
 run = "xcrun swift-format format --in-place --recursive --parallel App Packages QuickLookThumbnail"
@@ -67,7 +72,7 @@ run = "scripts/release/release.sh --no-notarize --no-appcast"
 
 [tasks.check]
 description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
-depends = ["lint", "test", "build"]
+depends = ["lint", "test", "test:app"]
 run = "echo 'All checks passed.'"
 
 [tasks.clean]

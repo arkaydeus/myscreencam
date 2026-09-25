@@ -35,7 +35,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
                 let image = try await Self.frame(
                     of: movie,
                     maximumPixelSize: CGSize(width: maximumSize.width * scale, height: maximumSize.height * scale))
-                let size = Self.fit(CGSize(width: image.width, height: image.height), in: maximumSize)
+                let size = ThumbnailGeometry.fit(CGSize(width: image.width, height: image.height), in: maximumSize)
                 reply.send(
                     QLThumbnailReply(contextSize: size) { context in
                         context.interpolationQuality = .high
@@ -63,12 +63,6 @@ final class ThumbnailProvider: QLThumbnailProvider {
         return image
     }
 
-    /// Aspect-fit `size` inside `bounds` (points).
-    static func fit(_ size: CGSize, in bounds: CGSize) -> CGSize {
-        guard size.width > 0, size.height > 0 else { return bounds }
-        let ratio = min(bounds.width / size.width, bounds.height / size.height)
-        return CGSize(width: (size.width * ratio).rounded(), height: (size.height * ratio).rounded())
-    }
 }
 
 /// Quick Look's completion handler isn't `Sendable`; it may be called from any thread, exactly once.

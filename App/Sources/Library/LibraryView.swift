@@ -52,7 +52,7 @@ private struct LibraryContent: View {
 
     init(root: URL, editors: EditorSessions) {
         self.root = root
-        _model = State(initialValue: LibraryModel(root: root, editors: editors))
+        _model = State(initialValue: LibraryModel(root: root) { editors.session(for: $0) != nil })
     }
 
     var body: some View {

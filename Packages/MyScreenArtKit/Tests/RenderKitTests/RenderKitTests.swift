@@ -335,6 +335,26 @@ struct PreviewGeometryTests {
         let p = padded.sourcePoint(fromCanvas: CGPoint(x: 10, y: 10))
         #expect(p.x < 0 && p.y < 0)
     }
+
+    @Test func blurAndWebcamDragCoordinatesRespectLetterboxing() {
+        let viewSize = CGSize(width: 960, height: 800)
+        let mask = NormRect(x: 0.2, y: 0.3, w: 0.15, h: 0.2)
+        let viewRect = geometry.viewRect(
+            fromCanvas: geometry.canvasRect(fromSource: mask), viewSize: viewSize)
+        let sourceRect = geometry.sourceRect(
+            fromCanvas: CGRect(
+                origin: geometry.canvasPoint(fromView: viewRect.origin, viewSize: viewSize),
+                size: CGSize(width: viewRect.width * 2, height: viewRect.height * 2)))
+        #expect(abs(sourceRect.x - mask.x) < 1e-9)
+        #expect(abs(sourceRect.y - mask.y) < 1e-9)
+        let webcam = WebcamSettings(origin: NormPoint(x: 0.6, y: 0.6), width: 0.2)
+        let webcamView = geometry.viewRect(
+            fromCanvas: geometry.webcamRect(for: webcam, cameraSize: CGSize(width: 640, height: 480)),
+            viewSize: viewSize)
+        let video = geometry.videoRect(inViewOfSize: viewSize)
+        #expect(abs(webcamView.minX - video.minX - 0.6 * video.width) < 1e-9)
+        #expect(abs((webcamView.minX + 0.1 * video.width - video.minX) / video.width - 0.7) < 1e-9)
+    }
 }
 
 struct AudioMathTests {
