@@ -75,6 +75,30 @@ Other things observed while measuring:
 
 ## Native app
 
+### Export (RenderKit + ExportKit), measured 2026-09-25
+
+**Method:** `msa-tool import-legacy` wraps the same legacy recording (`123dc5953d43/…130609`: 52.4 s, 3008×1692 @60, webcam, system + mic audio) as a `.msarec`. Auto-zoom seeding produced the same **10 zooms**, and the webcam overlay is on. Then `msa-tool export`, sampled with `sample.py`. Hardware VideoToolbox encoders; Core Image compositor on the GPU.
+
+| Export | Wall | CPU time (process) | Memory peak | vs legacy |
+|---|---:|---:|---:|---|
+| HEVC @30, full size | **4.8 s** | **6.3 s** | **370 MB** | legacy H.264 @30: 6.0 s / 73.8 CPU-s / 2.5 GB → **1.25× faster, 8.5% of the CPU, 15% of the memory** |
+| HEVC @60, full size | **9.9 s** | **8.9 s** | **400 MB** | legacy @60: 10.0 s / 133 CPU-s / 2.5 GB → same speed, 6.7% of the CPU |
+| H.264 @30, full size | 8.0 s | 4.7 s | 383 MB | H.264 is limited by the hardware encoder at ~196 fps for 3008×1692 |
+| H.264 @30, 50% | 5.5 s | 8.2 s | 866 MB ⚠︎ | memory above the 400 MB target; to investigate |
+| GIF @15 fps, 50% | 7.6 s | 12.7 s | 633 MB | ImageIO |
+| ProRes 422, full size | 4.9 s | 5.6 s | – | 1.39 GB file |
+
+Findings:
+- **Decode:** the source decodes at ~950 fps (3.3 s), so it isn't the bottleneck.
+- **Encode:**
+  - A single H.264/HEVC encode session tops out at ~200 fps at this size.
+  - Two sessions in parallel only reach ~225 fps combined, so chunked parallel encoding isn't worth it.
+  - `PrioritizeEncodingSpeedOverQuality`, now on except at "max" quality, makes HEVC 1.7× faster.
+- **Composition:** pipelining GPU completion in the compositor made no measurable difference, because the encoder is the limit.
+- **Caveat:** the H.264 legacy comparison is from a software encoder (x264, CRF 18). The native H.264/HEVC files are larger at "high" quality (38–48 MB vs 16 MB), so the bitrate model could be tuned down.
+
+### App
+
 | Scenario | Date | CPU avg | Memory | Notes |
 |---|---|---|---|---|
 | Idle, empty library window (phase 0 shell) | 2026-09-25 | 0.0% | 42 MB footprint | SwiftUI shell only, so it will grow |
