@@ -163,10 +163,18 @@ func runExport(package: RecordingPackage, to output: URL, args: [String]) async 
     let wallStart = Date()
     let cpuStart = cpuSeconds()
     let project = try RenderProject.load(package)
-    let built = try await CompositionBuilder.build(
-        project: project, options: .export(scale: scale.rawValue, frameRate: fps.framesPerSecond))
     let natural = try await CompositionBuilder.build(project: project, options: .export(scale: 1, frameRate: 30))
     let expected = settings.outputSize(forSource: natural.renderSize)
+    var built = try await CompositionBuilder.build(
+        project: project, options: .export(scale: scale.rawValue, frameRate: fps.framesPerSecond))
+    if expected != built.renderSize {
+        // A preset cap (e.g. GIF's size limit) shrank the output below the plain scale: fit the canvas to it.
+        built = try await CompositionBuilder.build(
+            project: project,
+            options: RenderOptions(
+                purpose: .export, frameRate: fps.framesPerSecond,
+                sizing: .fit(width: expected.width, height: expected.height)))
+    }
     guard expected == built.renderSize else { throw ToolError.sizeMismatch(built.renderSize, expected) }
     print(
         "Rendering \(Int(built.renderSize.width))×\(Int(built.renderSize.height)) @\(fps.framesPerSecond) fps, "
