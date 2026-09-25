@@ -62,7 +62,14 @@ mise run perf:sample -- --match 'MyScreenArt Dev.app/Contents/MacOS' --duration 
 mise run release:dmg    # local Developer ID build + DMG (no notarisation / appcast)
 mise run release        # full release pipeline; see docs/release.md
 mise run clean
+mise run build:perf     # optimised Dev build (same bundle ID/TCC) for measurements
 ```
+Engine benchmarks without the app: `swift build -c release --product msa-tool` (in `Packages/MyScreenArtKit`), then:
+- `msa-tool import-legacy <old Recording_…> <dir>` wraps an old-app recording as a `.msarec`.
+- `msa-tool export <pkg> <out> [--format hevc|h264|prores|gif] [--fps] [--scale] [--raw]` benchmarks an export.
+- `msa-tool play <pkg> [--seconds N] [--size WxH]` is a headless editor-playback benchmark.
+
+`scripts/dev/make-sample-recording.swift <dir>` creates a synthetic `.msarec`.
 mise sets `DEVELOPER_DIR` to full Xcode, because `xcode-select` on this machine points at the Command Line Tools. Don't run `sudo xcode-select`.
 
 ## Builds, identity and permissions

@@ -103,6 +103,50 @@ Findings:
 |---|---|---|---|---|
 | Idle, empty library window (phase 0 shell) | 2026-09-25 | 0.0% | 42 MB footprint | SwiftUI shell only, so it will grow |
 
+## After the perf pass (2026-09-25): current numbers
+
+**Changes:**
+- Video is scaled with affine transforms instead of Lanczos. Lanczos needed full-resolution half-float intermediates every frame, and that caused the IOSurface blow-up.
+- Static layers (background, masks, shadows, cursor sprites) are rasterised once and cached.
+- Compositor frames in flight are capped at 3.
+- Audio taps for metering are installed only while the Audio panel is visible.
+- The time label is an AppKit label, so SwiftUI doesn't re-render during playback.
+- `PrioritizeEncodingSpeedOverQuality` is on for exports below "max" quality.
+- **Text is still crisp at 50%:** checked visually on a real 4112×2658 recording.
+
+### Export: legacy clip (52 s, 3008×1692 @60, webcam, 2 audio tracks, 10 zooms)
+
+| Export | Wall | CPU time | Memory peak | Legacy (FFmpeg) |
+|---|---:|---:|---:|---|
+| **HEVC @30** | **4.7 s** | **2.4 s** | **332 MB** | 6.0 s / 73.8 s / 2.5 GB → 1.3× faster, **3% of the CPU**, 13% of the memory |
+| **HEVC @60** | **9.1 s** | **4.2 s** | **337 MB** | 10.0 s / 133 s / 2.5 GB → 1.1× faster, **3% of the CPU** |
+| H.264 @30 | 8.1 s | 2.6 s | 324 MB | hardware H.264 encoder limit ~196 fps at this size |
+| H.264 @30, 50% | 3.4 s | 2.7 s | 205 MB | (was 866 MB before the pass) |
+| GIF 50% | 5.9 s | 8.0 s | 232 MB | (was 633 MB) |
+
+### Export: real 227 s recording (4112×2658 HEVC VFR, webcam, 2 audio tracks, 16 zooms, cursor overlay)
+
+| Export | Wall | CPU time | Memory peak |
+|---|---:|---:|---:|
+| HEVC @30, full | 36.8 s (6.2× realtime) | 13.9 s | 537 MB (11 MP frames; 16 MB per buffer) |
+| H.264 @30, 50% | 23.6 s | 13.8 s | **236 MB** (was 1.8 GB) |
+
+### Editor playback
+
+| Measurement | CPU (1 core = 100%) | Memory | Legacy |
+|---|---:|---:|---|
+| Headless (`msa-tool play`, 1938×1090 preview), legacy clip | 16.3% | 240 MB | – |
+| Headless, real 4112×2658 recording | 19.9% | 275 MB | – |
+| **In the app** (optimised Dev build, legacy clip, 4 editor windows open) | **20.6%** | **358 MB** avg / 538 MB peak | 50.6% / 767 MB |
+| In the app, idle with 4 editors open (paused) | 0.1% | 150 MB | 0.2% / 387 MB |
+
+**Against the targets:**
+- Memory meets the < 400 MB target.
+- CPU is 2.5× below legacy but still above the 15% goal. The remainder is AVFoundation decode of a 60 fps Retina source, Core Image composition at display rate, and display.
+- Ideas not yet taken:
+  - render the preview at the source's frame rate when nothing animates;
+  - a lower-resolution decode (`preferredMaximumResolution`) for small preview windows.
+
 ## Live recording (real capture, permissions granted), measured 2026-09-25
 
 **Setup:** optimised Dev build (`mise run build:perf`). Recorder with the Built-in Retina Display (4112×2658 px, primary) @60 fps, MacBook Pro Camera (1280×720 @30), MacBook Pro Microphone, system audio and custom cursor. Two editor windows were also open, and they count towards memory.
