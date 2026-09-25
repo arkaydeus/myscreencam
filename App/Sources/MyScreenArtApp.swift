@@ -35,6 +35,8 @@ struct MyScreenArtApp: App {
                 .bindRouter(model.router)
         }
         .windowResizability(.contentSize)
+        // Never reopen the recorder at launch: it would start the camera preview unasked.
+        .restorationBehavior(.disabled)
 
         WindowGroup("Editor", id: AppRouter.SceneID.editor, for: URL.self) { $packageURL in
             EditorWindow(packageURL: packageURL)
