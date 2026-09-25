@@ -116,6 +116,9 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
     /// Waits for submitted GPU work and finishes requests, so building frame N+1 overlaps rendering frame N.
     private let completionQueue = DispatchQueue(
         label: "com.myscreenart.renderkit.compositor.completion", qos: .userInteractive, attributes: .concurrent)
+    /// Bounds frames in flight on the GPU. Each holds its decoded source frames (7–30 MB at Retina sizes), so an
+    /// unbounded pipeline lets memory grow whenever the GPU is slower than decoding.
+    private let inFlight = DispatchSemaphore(value: 3)
     private let generation = Atomic<Int>(0)
 
     override public init() {
@@ -140,11 +143,15 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
                 return
             }
             let state = Log.signposter.beginInterval("composite")
+            inFlight.wait()
             do {
                 let (output, task) = try compose(request)
                 let pending = PendingRender(task: task, output: output)
-                completionQueue.async {
-                    defer { Log.signposter.endInterval("composite", state) }
+                completionQueue.async { [inFlight] in
+                    defer {
+                        inFlight.signal()
+                        Log.signposter.endInterval("composite", state)
+                    }
                     do {
                         _ = try pending.task.waitUntilCompleted()
                         request.finish(withComposedVideoFrame: pending.output)
@@ -153,6 +160,7 @@ public final class VideoCompositor: NSObject, AVVideoCompositing, Sendable {
                     }
                 }
             } catch {
+                inFlight.signal()
                 Log.signposter.endInterval("composite", state)
                 request.finish(with: error)
             }
