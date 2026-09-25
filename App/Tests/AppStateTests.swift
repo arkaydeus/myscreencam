@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import ExportKit
 import Foundation
 import ProjectKit
@@ -142,6 +143,29 @@ struct AppStateTests {
         await model.flush()
         #expect(try model.package.loadEdit() == model.edit)
         #expect(!model.hasUnsavedChanges)
+        await model.close()
+    }
+
+    @Test func handledEditorShortcutIsConsumedByMonitorRoute() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let window = NSWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        let hooks = EditorWindowHooks.HooksView(model: model, holder: WindowHolder())
+        window.contentView = hooks
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            hooks.teardown()
+            window.close()
+        }
+        let space = try #require(
+            NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: " ", charactersIgnoringModifiers: " ",
+                isARepeat: false, keyCode: 49))
+        #expect(EditorWindowHooks.HooksView.route(space, through: hooks) == nil)
+        #expect(EditorWindowHooks.HooksView.route(space, through: nil) === space)
         await model.close()
     }
 }

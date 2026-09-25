@@ -83,8 +83,7 @@ struct EditorWindowHooks: NSViewRepresentable {
             guard let window else { return }
             holder.window = window
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self else { return event }
-                return self.handle(event)
+                Self.route(event, through: self)
             }
             occlusionObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
@@ -101,6 +100,11 @@ struct EditorWindowHooks: NSViewRepresentable {
             keyMonitor = nil
             if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
             occlusionObserver = nil
+        }
+
+        static func route(_ event: NSEvent, through hooks: HooksView?) -> NSEvent? {
+            guard let hooks else { return event }
+            return hooks.handle(event)
         }
 
         /// Returns nil when the key was handled.
