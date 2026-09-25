@@ -46,9 +46,11 @@ struct MyScreenArtApp: App {
         // URL-scheme and document opens go to `AppDelegate.application(_:open:)`, never to a new editor.
         .handlesExternalEvents(matching: [])
 
-        MenuBarExtra("MyScreenArt", systemImage: "record.circle") {
+        MenuBarExtra {
             RecorderMenuBarContent()
                 .environment(model)
+        } label: {
+            RecorderMenuBarLabel(recording: model.recording)
         }
 
         Settings {
