@@ -20,7 +20,7 @@ settings:
     CODE_SIGN_STYLE: Manual
     # Sparkle EdDSA public key (base64, from `generate_keys`; see docs/release.md). Until it's set the app
     # doesn't start its updater and "Check for Updates…" stays disabled.
-    SPARKLE_PUBLIC_ED_KEY: SPARKLE_PUBLIC_ED_KEY_NOT_SET
+    SPARKLE_PUBLIC_ED_KEY: "SFrWmZbsFPcOp0DLhXi0inL1895NkukUehmnXjIez9E="
   configs:
     Debug:
       # A stable identity + bundle ID keeps TCC grants across rebuilds and worktrees.
