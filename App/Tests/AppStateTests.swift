@@ -48,4 +48,23 @@ struct AppStateTests {
         if case .failed = first.state {} else { Issue.record("Missing screen should fail preparation") }
         #expect(!center.isExporting)
     }
+
+    @Test func cancelDuringPreparationStopsTheJob() async throws {
+        let (root, package, meta) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let center = ExportCenter { _, _, _ in
+            try await Task.sleep(for: .seconds(30))
+            throw CancellationError()
+        }
+        let job = center.start(
+            package: package, name: "Preparing", edit: EditConfig.initial(for: meta),
+            settings: ExportSettings(format: .h264), destination: root.appending(path: "out.mp4"))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(job.state == .preparing)
+        let started = ContinuousClock.now
+        job.cancel()
+        await center.waitUntilIdle()
+        #expect(job.state == .cancelled)
+        #expect(ContinuousClock.now - started < .seconds(2))
+    }
 }

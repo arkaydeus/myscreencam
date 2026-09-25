@@ -96,6 +96,16 @@ final class ExportCenter {
     @ObservationIgnored private let dockProgress = ExportDockProgress()
     @ObservationIgnored private let notifier = ExportNotifier()
     private let exporter = VideoExporter()
+    private let prepare: @Sendable (RecordingPackage, EditConfig, ExportSettings) async throws -> PreparedExport
+
+    init(
+        prepare: @escaping @Sendable (RecordingPackage, EditConfig, ExportSettings) async throws -> PreparedExport = {
+            package, edit, settings in
+            try await ExportPipeline.prepare(package: package, edit: edit, settings: settings)
+        }
+    ) {
+        self.prepare = prepare
+    }
 
     var isExporting: Bool { jobs.contains { $0.isActive } }
 
@@ -151,7 +161,7 @@ final class ExportCenter {
         let prepared: PreparedExport
         do {
             let task = Task {
-                try await ExportPipeline.prepare(package: job.package, edit: job.edit, settings: job.settings)
+                try await prepare(job.package, job.edit, job.settings)
             }
             job.prepareTask = task
             if job.cancelRequested { task.cancel() }
