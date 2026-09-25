@@ -102,3 +102,33 @@ Findings:
 | Scenario | Date | CPU avg | Memory | Notes |
 |---|---|---|---|---|
 | Idle, empty library window (phase 0 shell) | 2026-09-25 | 0.0% | 42 MB footprint | SwiftUI shell only, so it will grow |
+
+## Live recording (real capture, permissions granted), measured 2026-09-25
+
+**Setup:** optimised Dev build (`mise run build:perf`). Recorder with the Built-in Retina Display (4112×2658 px, primary) @60 fps, MacBook Pro Camera (1280×720 @30), MacBook Pro Microphone, system audio and custom cursor. Two editor windows were also open, and they count towards memory.
+
+| Scenario | CPU avg / max (1 core = 100%) | Memory avg / max | Legacy |
+|---|---:|---:|---|
+| Recorder window: live camera preview + mic meter | **5.3%** / 7.4% | 262 MB | 33% / 779 MB |
+| **Recording, busy screen** (motion window + normal use), 60 s sample | **17.8%** / 26.3% | **296 MB** / 473 MB | 151% / 2.13 GB (and legacy captured at a smaller 3008×1692) |
+| Recording, static screen | not measured | – | 144% / 2.10 GB |
+
+The static-screen run was cut short: the recording was finished from the menu bar after 21 s while the machine was in use.
+
+Notes:
+- **Where the work runs:** encoding is in-process on the media engine. The VideoToolbox XPC encoder services stayed at 0%. `replayd` (the ScreenCaptureKit server) adds ~4% of a core; the legacy app paid that too.
+- **Output of a 227 s real recording:** `screen.mov` is HEVC at 4112×2658, **VFR** (12,385 frames ≈ 54.6 fps average), 352 MB (~12.4 Mbit/s).
+  - `webcam.mov` is HEVC 1280×720; both AAC tracks are present.
+  - Stream start offsets are all < 0.11 s.
+  - 2,275 pointer events.
+  - 7 cursor kinds captured (arrow, iBeam, pointingHand, openHand, closedHand, resizeLeftRight, other).
+- **Export of that recording:**
+
+  | Export | Wall | CPU time | Memory peak |
+  |---|---:|---:|---:|
+  | HEVC @30, full size | 36.6 s (6.2× realtime) | 19.8 s | 563 MB |
+  | H.264 @30, 50% | 31.7 s | 36.6 s | **1.8 GB** ⚠︎ being fixed |
+
+- **Visual check of exported frames:** the zoom, webcam overlay (rounded corners, shadow) and recorded-cursor overlay are all correct, and the recording HUD is not captured.
+- **Follow-ups:**
+  - The same cursor kind was sometimes stored twice (`resizeUpDown` ×2 in a 33 s recording), so de-duplication is too strict.
