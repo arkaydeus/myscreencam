@@ -36,11 +36,11 @@ run = "swift test --package-path Packages/MyScreenArtKit"
 
 [tasks.format]
 description = "Format Swift sources in place"
-run = "xcrun swift-format format --in-place --recursive --parallel App Packages"
+run = "xcrun swift-format format --in-place --recursive --parallel App Packages QuickLookThumbnail"
 
 [tasks.lint]
 description = "Check Swift formatting and lint rules"
-run = "xcrun swift-format lint --strict --recursive --parallel App Packages"
+run = "xcrun swift-format lint --strict --recursive --parallel App Packages QuickLookThumbnail"
 
 [tasks.doctor]
 description = "Report toolchain, signing and build diagnostics"
@@ -49,6 +49,14 @@ run = "scripts/dev/doctor.sh"
 [tasks."perf:sample"]
 description = "Sample CPU and memory of a process tree (see scripts/perf/sample.py --help)"
 run = "python3 scripts/perf/sample.py"
+
+[tasks.release]
+description = "Archive, notarise, DMG, notarise DMG and refresh the Sparkle appcast (see docs/release.md)"
+run = "scripts/release/release.sh"
+
+[tasks."release:dmg"]
+description = "Local Developer ID build + signed DMG, without notarisation or appcast"
+run = "scripts/release/release.sh --no-notarize --no-appcast"
 
 [tasks.clean]
 description = "Remove build artifacts and the generated project"

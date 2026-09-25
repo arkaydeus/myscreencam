@@ -20,4 +20,5 @@ On first use, grant **Screen & System Audio Recording**, **Input Monitoring**, *
 ## Docs
 - [Rewrite plan](docs/native-rewrite-plan.md): architecture, phases, decisions
 - [Performance baseline](docs/perf-baseline.md): legacy numbers and native targets
+- [Releasing](docs/release.md): Developer ID signing, notarisation, DMG, Sparkle updates
 - [CLAUDE.md](CLAUDE.md): contributor and agent guide
