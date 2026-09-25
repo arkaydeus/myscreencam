@@ -19,7 +19,7 @@ depends = ["generate"]
 run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet build"
 
 [tasks."build:unsigned"]
-description = "Build the Debug app without code signing (CI); separate DerivedData so it never replaces the signed dev app"
+description = "Build the Debug app without code signing; separate DerivedData so it never replaces the signed dev app"
 depends = ["generate"]
 run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' -quiet CODE_SIGNING_ALLOWED=NO build"
 
@@ -64,6 +64,11 @@ run = "scripts/release/release.sh --publish"
 [tasks."release:dmg"]
 description = "Local Developer ID build + signed DMG, without notarisation or appcast"
 run = "scripts/release/release.sh --no-notarize --no-appcast"
+
+[tasks.check]
+description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
+depends = ["lint", "test", "build"]
+run = "echo 'All checks passed.'"
 
 [tasks.clean]
 description = "Remove build artifacts and the generated project"

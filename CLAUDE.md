@@ -55,7 +55,8 @@ mise install            # once: installs XcodeGen
 mise run build          # generate project + Debug build (signed, Apple Development)
 mise run run            # build + launch this worktree's app via LaunchServices
 mise run test           # engine package tests (Swift Testing)
-mise run lint           # swift-format lint --strict (CI gate)
+mise run lint           # swift-format lint --strict
+mise run check          # lint + test + build: the local gate before pushing (no GitHub CI)
 mise run format         # swift-format in place
 mise run doctor         # toolchain/signing/build diagnostics
 mise run perf:sample -- --match 'MyScreenArt Dev.app/Contents/MacOS' --duration 60
@@ -79,6 +80,9 @@ mise sets `DEVELOPER_DIR` to full Xcode, because `xcode-select` on this machine 
 - Sparkle stays off until `SPARKLE_PUBLIC_ED_KEY` in `project.yml` holds a real key; Debug builds never check automatically.
 - Always launch through `mise run run` (it uses `open`). If the app is started from a terminal, TCC charges the terminal instead of the app.
 - Recordings: release uses `~/Movies/MyScreenArt/`. `mise run run` sets `MYSCREENART_RECORDINGS_DIR=~/Movies/MyScreenArt Dev/<worktree-hash>/`, so worktrees don't share data.
+
+## Checks and CI
+No GitHub CI: macOS runners are too expensive for this project. Run `mise run check` locally before pushing or opening a PR. Releases are also built locally (`docs/release.md`).
 
 ## Conventions
 - Tests: Swift Testing (`import Testing`, `@Test`, `#expect`). Put pure logic (time mapping, easing, layout, config decoding) in engine modules and test it there.

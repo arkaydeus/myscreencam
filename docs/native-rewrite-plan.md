@@ -110,7 +110,7 @@ Guiding rules:
   - SwiftUI for the app shell, forms and panels. These use native controls: `Slider`, `Picker`, `Toggle`, `ColorPicker`, `Table`/`LazyVGrid`.
   - AppKit for the parts where SwiftUI costs too much: the timeline, the recording HUD panel, and the global hotkey.
 - **Build:**
-  - Engine modules are a local SwiftPM package, so `swift build` / `swift test` work from the CLI for agents and CI.
+  - Engine modules are a local SwiftPM package, so `swift build` / `swift test` work from the CLI for agents and local checks (no GitHub CI; `mise run check`).
   - The app target is an Xcode project generated from an **XcodeGen `project.yml`**. That keeps it reproducible and avoids `.pbxproj` merge conflicts.
   - `mise` tasks wrap everything (`mise run build|test|run|release`) and set `DEVELOPER_DIR=/Applications/Xcode.app/...`. This machine currently has `xcode-select` pointing at Command Line Tools, and setting `DEVELOPER_DIR` avoids needing sudo.
 - **Dependencies:** Sparkle 2 (updates) only. No FFmpeg, no Rust, no Node.
