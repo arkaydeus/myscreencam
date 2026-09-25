@@ -16,13 +16,18 @@ public enum PackageLayout {
 
     public static func waveformCache(for kind: StreamKind) -> String { "cache/waveform-\(kind.rawValue).bin" }
 
-    /// `Recording_YYYYMMDD_HHMMSS_xxxxxxxx` (local time).
+    /// Folder extension. Declared by the app as the `com.myscreenart.recording` package type (conforms to
+    /// `com.apple.package`), so Finder shows a recording as one document and Quick Look can thumbnail it.
+    public static let packageExtension = "msarec"
+    public static let packageUTType = "com.myscreenart.recording"
+
+    /// `Recording_YYYYMMDD_HHMMSS_xxxxxxxx.msarec` (local time).
     public static func folderName(for date: Date, id: UUID) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd_HHmmss"
         let suffix = id.uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased()
-        return "Recording_\(formatter.string(from: date))_\(suffix)"
+        return "Recording_\(formatter.string(from: date))_\(suffix).\(packageExtension)"
     }
 }
 
@@ -54,8 +59,10 @@ public struct RecordingPackage: Sendable, Hashable {
         return RecordingPackage(url: folder)
     }
 
+    /// A `.msarec` folder that contains `meta.json`.
     public static func isPackage(_ url: URL) -> Bool {
-        FileManager.default.fileExists(atPath: url.appending(path: PackageLayout.meta).path)
+        url.pathExtension == PackageLayout.packageExtension
+            && FileManager.default.fileExists(atPath: url.appending(path: PackageLayout.meta).path)
     }
 
     // MARK: meta

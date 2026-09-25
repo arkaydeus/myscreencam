@@ -29,6 +29,7 @@ struct ProjectModelTests {
         let meta = sampleMeta()
         try package.saveMeta(meta)
         #expect(RecordingPackage.isPackage(package.url))
+        #expect(package.url.pathExtension == "msarec")
         #expect(try package.loadMeta() == meta)
         #expect(try package.loadEdit() == nil)
 
