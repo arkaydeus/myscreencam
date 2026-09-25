@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Arrow cursor - macOS style -->
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <!-- White fill -->
+    <path d="M4 4 L4 26 L10 20 L14 28 L18 26 L14 18 L22 18 Z" fill="white"/>
+    <!-- Black outline -->
+    <path d="M4 4 L4 26 L10 20 L14 28 L18 26 L14 18 L22 18 Z" fill="none" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+  </g>
+</svg>

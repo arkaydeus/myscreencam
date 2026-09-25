@@ -24,6 +24,21 @@ docs/                        plan, perf baseline
 ```
 Engine modules are added as their phase starts. The layering is in the comment at the top of `Packages/MyScreenArtKit/Package.swift`. A module may only depend on modules above it.
 
+## Areas and contracts
+- **The shared contract is `ProjectKit`'s model** (`RecordingMeta`, `EditConfig`, `InputEvent`, `CursorIndex`, `RecordingPackage`).
+  - All effect times are session (source) seconds.
+  - Normalised coordinates are 0…1 with the origin top-left, y down.
+  - Change the model only when it's genuinely needed, and update every user of it.
+- **App areas** each own one directory under `App/Sources/`:
+  - `Recorder/`: `RecordingController`, recorder window, HUD, menu-bar content, region overlay.
+  - `Editor/`: `EditorSessions`, editor window, preview, timeline, panels.
+  - `Library/`: the library window.
+  - `Export/`: `ExportCenter`, `ExportSheet`.
+  - `Shell/`: `AppRouter`, app delegate, commands, URL scheme, intents, updates, settings.
+- **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`.
+- **Legacy behaviour and defaults** are specified in `docs/legacy-inventory.md`, including the bugs not to copy.
+- **GPU work uses Core Image** (on Metal) and built-in CI filters. Don't add `.metal` files: SwiftPM command-line builds don't compile them. If a custom kernel is unavoidable, compile Metal source at runtime with `MTLDevice.makeLibrary(source:options:)`.
+
 ## Tasks
 ```bash
 mise install            # once: installs XcodeGen

@@ -38,6 +38,16 @@ targets:
     dependencies:
       - package: MyScreenArtKit
         product: MyScreenArtCore
+      - package: MyScreenArtKit
+        product: ProjectKit
+      - package: MyScreenArtKit
+        product: CaptureKit
+      - package: MyScreenArtKit
+        product: RecordingKit
+      - package: MyScreenArtKit
+        product: RenderKit
+      - package: MyScreenArtKit
+        product: ExportKit
     settings:
       base:
         INFOPLIST_FILE: App/Info.plist
