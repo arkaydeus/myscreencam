@@ -1,6 +1,6 @@
 # MyScreenArt Native — Rewrite Plan
 
-Status: **decisions agreed 2026-09-25** (see §9). Phase 0 (scaffold + export baseline) done; measured numbers in `docs/perf-baseline.md`.
+Status: **phases 0–6 implemented (2026-09-25)**. Engine: ProjectKit, CaptureKit, RecordingKit, RenderKit, ExportKit. App: Recorder, Library, Editor, Export, Shell (Sparkle, Quick Look, App Intents, release pipeline). Live capture awaits permission-based validation (`docs/live-test-checklist.md`). Measurements are in `docs/perf-baseline.md`.
 Source app: `/Users/arkaydeus/project/apps/myscreenart` (Electron + React + Rust daemon + FFmpeg). It was never released, so the rewrite needs no compatibility with its files, bundle ID or update feed.
 
 ---
