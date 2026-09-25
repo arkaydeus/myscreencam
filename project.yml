@@ -1,0 +1,140 @@
+# XcodeGen spec. The .xcodeproj is generated (`mise run generate`) and not committed.
+name: MyScreenArt
+
+options:
+  bundleIdPrefix: com.myscreenart
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: QWD87G9T3P
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    CODE_SIGN_STYLE: Manual
+    # Sparkle EdDSA public key (base64, from `generate_keys`; see docs/release.md). Until it's set the app
+    # doesn't start its updater and "Check for Updates…" stays disabled.
+    SPARKLE_PUBLIC_ED_KEY: "SFrWmZbsFPcOp0DLhXi0inL1895NkukUehmnXjIez9E="
+  configs:
+    Debug:
+      # A stable identity + bundle ID keeps TCC grants across rebuilds and worktrees.
+      CODE_SIGN_IDENTITY: "Apple Development"
+    Release:
+      CODE_SIGN_IDENTITY: "Developer ID Application"
+      # Apple silicon only (see README); also keeps Float16 and other arm64-only APIs available.
+      ARCHS: arm64
+
+packages:
+  MyScreenArtKit:
+    path: Packages/MyScreenArtKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    majorVersion: 2.7.0
+
+targets:
+  MyScreenArt:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+    dependencies:
+      - package: MyScreenArtKit
+        product: MyScreenArtCore
+      - package: MyScreenArtKit
+        product: ProjectKit
+      - package: MyScreenArtKit
+        product: CaptureKit
+      - package: MyScreenArtKit
+        product: RecordingKit
+      - package: MyScreenArtKit
+        product: RenderKit
+      - package: MyScreenArtKit
+        product: ExportKit
+      - package: Sparkle
+        product: Sparkle
+      - target: MyScreenArtThumbnail
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/MyScreenArt.entitlements
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+      configs:
+        Debug:
+          PRODUCT_NAME: MyScreenArt Dev
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev
+          MSA_URL_SCHEME: myscreenart-dev
+          MSA_SPARKLE_AUTOMATIC_CHECKS: "NO"
+        Release:
+          PRODUCT_NAME: MyScreenArt
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app
+          MSA_URL_SCHEME: myscreenart
+          MSA_SPARKLE_AUTOMATIC_CHECKS: "YES"
+
+  # Finder / Quick Look thumbnails for .msarec packages. Embedded in the app's PlugIns folder and signed
+  # with the same identity as the app in each configuration.
+  MyScreenArtThumbnail:
+    type: app-extension
+    platform: macOS
+    sources:
+      - QuickLookThumbnail
+    dependencies:
+      - package: MyScreenArtKit
+        product: ProjectKit
+      - sdk: QuickLookThumbnailing.framework
+    settings:
+      base:
+        INFOPLIST_FILE: QuickLookThumbnail/Info.plist
+        CODE_SIGN_ENTITLEMENTS: QuickLookThumbnail/QuickLookThumbnail.entitlements
+        SWIFT_STRICT_CONCURRENCY: complete
+        SKIP_INSTALL: YES
+        # One product name for both configs: the app's embed phase references the .appex by name.
+        PRODUCT_NAME: MyScreenArtThumbnail
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.thumbnail
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.thumbnail
+
+  MyScreenArtAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - App/Tests
+    dependencies:
+      - target: MyScreenArt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.tests
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: QWD87G9T3P
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MyScreenArt Dev.app/Contents/MacOS/MyScreenArt Dev"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        SWIFT_VERSION: "6.0"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_STRICT_CONCURRENCY: complete
+
+schemes:
+  MyScreenArt:
+    build:
+      targets:
+        MyScreenArt: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+    test:
+      config: Debug
+      targets:
+        - MyScreenArtAppTests
