@@ -12,8 +12,6 @@ MSA_DERIVED_DATA = "{{config_root}}/build/DerivedData"
 [tasks.generate]
 description = "Generate MyScreenArt.xcodeproj from project.yml"
 run = "xcodegen generate --quiet"
-sources = ["project.yml"]
-outputs = ["MyScreenArt.xcodeproj/project.pbxproj"]
 
 [tasks.build]
 description = "Build the Debug app (signed with the Apple Development identity)"
