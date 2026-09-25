@@ -54,8 +54,12 @@ description = "Sample CPU and memory of a process tree (see scripts/perf/sample.
 run = "python3 scripts/perf/sample.py"
 
 [tasks.release]
-description = "Archive, notarise, DMG, notarise DMG and refresh the Sparkle appcast (see docs/release.md)"
+description = "Archive, notarise, DMG, notarise DMG and refresh the Sparkle appcast, locally (see docs/release.md)"
 run = "scripts/release/release.sh"
+
+[tasks."release:publish"]
+description = "Full local release, then upload DMG + appcast to the public releases repo"
+run = "scripts/release/release.sh --publish"
 
 [tasks."release:dmg"]
 description = "Local Developer ID build + signed DMG, without notarisation or appcast"

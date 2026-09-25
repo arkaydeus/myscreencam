@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# Builds a Developer ID signed, notarised MyScreenArt.app, wraps it in a signed + notarised DMG and
-# refreshes the Sparkle appcast. See docs/release.md.
+# Builds a Developer ID signed, notarised MyScreenArt.app, wraps it in a signed + notarised DMG, refreshes the
+# Sparkle appcast and (with --publish) uploads both to the public releases repo. Runs entirely on this Mac.
+# See docs/release.md.
 #
-#   scripts/release/release.sh [--no-notarize] [--no-appcast] [--output DIR]
+#   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--output DIR]
 #
 # Environment:
-#   NOTARY_PROFILE       notarytool keychain profile (default: myscreenart-notary)
-#   MSA_VERSION          CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
-#   MSA_BUILD            CFBundleVersion override (default: number of commits on HEAD; must increase per release)
-#   SPARKLE_ED_KEY_FILE  private EdDSA key file for generate_appcast (default: the login Keychain)
-#   SPARKLE_PRIVATE_KEY  private EdDSA key itself (CI); piped to generate_appcast on stdin
-#   MSA_PREVIOUS_APPCAST path or URL of the current appcast.xml, merged so older versions stay listed
-#   MSA_DOWNLOAD_URL_PREFIX  where the DMG will be downloadable
-#                        (default: https://github.com/arkaydeus/myscreenart-native/releases/download/v<version>/)
+#   NOTARY_PROFILE        notarytool keychain profile (default: myscreenart-notary)
+#   MSA_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
+#   MSA_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
+#   MSA_RELEASES_REPO     public GitHub repo that hosts DMGs + appcast (default: arkaydeustech/myscreenart-releases)
+#   MSA_SPARKLE_ACCOUNT   Keychain account of the Sparkle private key (default: Sparkle's default, "ed25519")
+#   MSA_PREVIOUS_APPCAST  path or URL of the current appcast.xml, merged so older versions stay listed
+#                         (default: the latest release's appcast.xml in MSA_RELEASES_REPO)
 set -euo pipefail
 
 notarize=1
 appcast=1
+publish=0
+notes=""
 root="$(git rev-parse --show-toplevel)"
 out="$root/build/release"
+releases_repo="${MSA_RELEASES_REPO:-arkaydeustech/myscreenart-releases}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-notarize) notarize=0 ;;
     --no-appcast) appcast=0 ;;
+    --publish) publish=1 ;;
+    --notes) notes="$2"; shift ;;
     --output) out="$2"; shift ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -40,6 +45,14 @@ export_dir="$out/export"
 app="$export_dir/MyScreenArt.app"
 
 step() { printf '\n==> %s\n' "$*"; }
+
+if [[ $publish -eq 1 ]]; then
+  [[ $notarize -eq 1 && $appcast -eq 1 ]] || { echo "--publish needs notarisation and the appcast" >&2; exit 2; }
+  [[ -z "$notes" || -f "$notes" ]] || { echo "Release notes file not found: $notes" >&2; exit 2; }
+  gh repo view "$releases_repo" --json visibility --jq .visibility | grep -qx PUBLIC \
+    || { echo "$releases_repo must exist and be public (Sparkle downloads from it)" >&2; exit 2; }
+  [[ -z "$(git status --porcelain)" ]] || { echo "Commit or stash your changes before publishing" >&2; exit 2; }
+fi
 
 notarize_file() {
   local file="$1"
@@ -111,31 +124,42 @@ fi
 if [[ $appcast -eq 1 ]]; then
   generate_appcast="$(find "$derived/SourcePackages/artifacts" -path '*/Sparkle/bin/generate_appcast' -type f | head -1)"
   [[ -x "$generate_appcast" ]] || { echo "generate_appcast not found under $derived/SourcePackages/artifacts" >&2; exit 1; }
-  prefix="${MSA_DOWNLOAD_URL_PREFIX:-https://github.com/arkaydeus/myscreenart-native/releases/download/v$version/}"
+  prefix="https://github.com/$releases_repo/releases/download/v$version/"
+  previous="${MSA_PREVIOUS_APPCAST:-https://github.com/$releases_repo/releases/latest/download/appcast.xml}"
   updates="$out/updates"
   rm -rf "$updates"
   mkdir -p "$updates"
   cp "$dmg" "$updates/"
-  if [[ -n "${MSA_PREVIOUS_APPCAST:-}" ]]; then
-    step "Merging the previous appcast ($MSA_PREVIOUS_APPCAST)"
-    if [[ "$MSA_PREVIOUS_APPCAST" == http* ]]; then
-      curl -fsSL "$MSA_PREVIOUS_APPCAST" -o "$updates/appcast.xml" || echo "No previous appcast; starting a new one."
-    else
-      cp "$MSA_PREVIOUS_APPCAST" "$updates/appcast.xml"
-    fi
+  step "Merging the previous appcast ($previous)"
+  if [[ "$previous" == http* ]]; then
+    curl -fsSL "$previous" -o "$updates/appcast.xml" || { rm -f "$updates/appcast.xml"; echo "No previous appcast; starting a new one."; }
+  else
+    cp "$previous" "$updates/appcast.xml"
   fi
   step "Generating the Sparkle appcast (download prefix $prefix)"
+  # The private key is read from the login Keychain (it never leaves this Mac).
   appcast_args=(--download-url-prefix "$prefix" -o "$updates/appcast.xml")
-  if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
-    printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" --ed-key-file - "${appcast_args[@]}" "$updates"
-  elif [[ -n "${SPARKLE_ED_KEY_FILE:-}" ]]; then
-    "$generate_appcast" --ed-key-file "$SPARKLE_ED_KEY_FILE" "${appcast_args[@]}" "$updates"
-  else
-    "$generate_appcast" "${appcast_args[@]}" "$updates"
-  fi
+  [[ -n "${MSA_SPARKLE_ACCOUNT:-}" ]] && appcast_args+=(--account "$MSA_SPARKLE_ACCOUNT")
+  "$generate_appcast" "${appcast_args[@]}" "$updates"
   cp "$updates/appcast.xml" "$out/appcast.xml"
 else
   echo "Skipping the appcast (--no-appcast)."
+fi
+
+if [[ $publish -eq 1 ]]; then
+  tag="v$version"
+  if gh release view "$tag" --repo "$releases_repo" >/dev/null 2>&1; then
+    echo "$releases_repo already has a $tag release; bump MARKETING_VERSION (or MSA_VERSION) first" >&2
+    exit 1
+  fi
+  step "Publishing $tag to $releases_repo"
+  notes_args=(--notes "MyScreenArt $version (build $build)")
+  [[ -n "$notes" ]] && notes_args=(--notes-file "$notes")
+  gh release create "$tag" --repo "$releases_repo" --title "MyScreenArt $version" "${notes_args[@]}" \
+    "$dmg" "$out/appcast.xml"
+  git tag -a "$tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $tag already exists"
+  echo "Published: https://github.com/$releases_repo/releases/tag/$tag"
+  echo "Push the source tag when ready: git push origin $tag"
 fi
 
 step "Done: MyScreenArt $version ($build)"

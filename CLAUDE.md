@@ -74,7 +74,7 @@ mise sets `DEVELOPER_DIR` to full Xcode, because `xcode-select` on this machine 
 
 ## Builds, identity and permissions
 - Debug: product **MyScreenArt Dev**, bundle ID `com.myscreenart.app.dev`, URL scheme `myscreenart-dev`, signed with the stable `Apple Development` identity (team `QWD87G9T3P`). TCC grants therefore survive rebuilds and are shared by all worktrees.
-- Release: product **MyScreenArt**, `com.myscreenart.app`, scheme `myscreenart`, `Developer ID Application`, arm64 only. Notarised DMG + Sparkle appcast via `scripts/release/release.sh` / `.github/workflows/release.yml` (see `docs/release.md`).
+- Release: product **MyScreenArt**, `com.myscreenart.app`, scheme `myscreenart`, `Developer ID Application`, arm64 only. Built, notarised and published locally with `scripts/release/release.sh` (`mise run release:publish`) to the public `arkaydeustech/myscreenart-releases` repo (see `docs/release.md`).
 - The Quick Look extension is `<app id>.thumbnail`. It is sandboxed (required for Quick Look extensions) and signed with the app's identity.
 - Sparkle stays off until `SPARKLE_PUBLIC_ED_KEY` in `project.yml` holds a real key; Debug builds never check automatically.
 - Always launch through `mise run run` (it uses `open`). If the app is started from a terminal, TCC charges the terminal instead of the app.
