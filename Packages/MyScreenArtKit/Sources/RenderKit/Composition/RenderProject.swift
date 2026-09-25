@@ -38,7 +38,7 @@ public struct RenderProject: Sendable {
 /// What a composition is built for.
 public struct RenderOptions: Sendable, Equatable {
     public enum Purpose: Sendable, Equatable {
-        /// Editor playback: audio taps always installed so `AudioLevels` meters work.
+        /// Editor playback: audio taps on every track while metering (see `ProjectRenderer.isMetering`).
         case preview
         /// File export: taps only where gain exceeds 0 dB.
         case export

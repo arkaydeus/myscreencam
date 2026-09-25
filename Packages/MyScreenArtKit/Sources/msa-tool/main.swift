@@ -5,6 +5,8 @@
 //   msa-tool export <package.msarec> <output file> [--format h264|hevc|prores|gif] [--fps 24|30|60]
 //       [--scale 1|0.75|0.5] [--quality low|medium|high|max]
 //       Renders + exports with RenderKit/ExportKit and prints wall time and this process's CPU time.
+//   msa-tool play <package.msarec> [--seconds N] [--size WxH] [--fps N] [--display-fps N] [--mute] [--meter]
+//       Headless editor-playback benchmark: plays the preview composition, pulling frames at display rate.
 
 import AVFoundation
 import ExportKit
@@ -199,8 +201,12 @@ do {
         try await runExport(
             package: RecordingPackage(url: URL(filePath: args[1], directoryHint: .isDirectory)),
             to: URL(filePath: args[2]), args: args)
+    case "play" where args.count >= 2:
+        try await runPlay(
+            package: RecordingPackage(url: URL(filePath: args[1], directoryHint: .isDirectory)), args: args)
     default:
-        throw ToolError.usage("usage: msa-tool import-legacy <legacy dir> <root> | export <pkg> <out> [options]")
+        throw ToolError.usage(
+            "usage: msa-tool import-legacy <legacy dir> <root> | export <pkg> <out> [options] | play <pkg> [options]")
     }
 } catch {
     FileHandle.standardError.write(Data("error: \(error)\n".utf8))

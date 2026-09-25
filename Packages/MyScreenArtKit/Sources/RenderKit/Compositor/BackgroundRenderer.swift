@@ -78,10 +78,13 @@ struct BackgroundRenderer {
     private var canvasRect: CGRect { CGRect(origin: .zero, size: layout.canvasSize) }
     private var contentRectCI: CGRect { CIHelpers.flip(layout.contentRect, height: layout.canvasSize.height) }
 
-    /// Fill plus the content's drop shadow, cached as a GPU intermediate. Nil when the background is off.
+    /// Fill plus the content's drop shadow. Nil when the background is off. A shadow or an image fill is rendered
+    /// once into a texture (see `RenderContext.rasterize`); a plain fill stays a generator, which costs nothing.
     func backgroundLayer() -> CIImage? {
         guard settings.enabled else { return nil }
         var layer = fill()
+        var isStatic = false
+        if case .image = settings.fill { isStatic = true }
         let strength = min(max(settings.shadow, 0), 1)
         if strength > 0 {
             let unit = layout.outputUnit
@@ -90,16 +93,18 @@ struct BackgroundRenderer {
             let shadow = CIHelpers.shadow(
                 of: shape, sigma: 28 * unit * (0.5 + strength), offsetDown: 12 * unit, opacity: 0.65 * strength)
             layer = shadow.composited(over: layer)
+            isStatic = true
         }
-        return layer.cropped(to: canvasRect).insertingIntermediate(cache: true)
+        layer = layer.cropped(to: canvasRect)
+        return isStatic ? RenderContext.rasterize(layer) : layer
     }
 
-    /// Alpha mask for rounded content corners, or nil when they're square.
+    /// Alpha mask for rounded content corners, or nil when they're square. Analytic, so it's evaluated inside the
+    /// frame's render pass.
     func contentMask() -> CIImage? {
         let radius = layout.contentCornerRadius(settings)
         guard settings.enabled, radius >= 0.5 else { return nil }
         return CIHelpers.roundedRect(contentRectCI, radius: radius, color: CIColor(red: 1, green: 1, blue: 1))
-            .insertingIntermediate(cache: true)
     }
 
     private func fill() -> CIImage {

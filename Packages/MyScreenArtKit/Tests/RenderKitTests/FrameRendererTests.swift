@@ -113,6 +113,43 @@ struct FrameRendererTests {
     }
 }
 
+/// Static layers (shadows, backgrounds) are rendered once into textures; composited, they must look the same as
+/// the live filter chain.
+struct RasterizeTests {
+    private func render(_ image: CIImage) throws -> Bitmap {
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(
+            nil, 200, 120, kCVPixelFormatType_32BGRA, [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+            &buffer)
+        let output = try #require(buffer)
+        try RenderContext.render(image, into: output)
+        return Bitmap(pixelBuffer: output)
+    }
+
+    @Test func rasterizedShadowMatchesLiveFilters() throws {
+        let shape = CIHelpers.roundedRect(
+            CGRect(x: 50.3, y: 30.6, width: 90, height: 50), radius: 12, color: CIColor(red: 1, green: 1, blue: 1))
+        let shadow = CIHelpers.shadow(of: shape, sigma: 8, offsetDown: 5, opacity: 0.6)
+        let rasterized = RenderContext.rasterize(shadow)
+        #expect(rasterized.extent == shadow.extent.integral)
+        let base = CIImage(color: CIColor(red: 0.9, green: 0.6, blue: 0.2)).cropped(
+            to: CGRect(x: 0, y: 0, width: 200, height: 120))
+        let live = try render(shadow.composited(over: base))
+        let cached = try render(rasterized.composited(over: base))
+        var worst = 0
+        for y in stride(from: 0, to: 120, by: 3) {
+            for x in stride(from: 0, to: 200, by: 3) {
+                let a = live.pixel(x, y)
+                let b = cached.pixel(x, y)
+                worst = max(worst, abs(a.r - b.r), abs(a.g - b.g), abs(a.b - b.b))
+            }
+        }
+        #expect(worst <= 2)
+        // The shadow really is there (darker under the shape than in the corner).
+        #expect(live.pixel(100, 60).r < live.pixel(2, 2).r - 40)
+    }
+}
+
 extension Bitmap {
     /// Mean R, G, B over a rect.
     func mean(x0: Int, y0: Int, x1: Int, y1: Int) -> [Double] {

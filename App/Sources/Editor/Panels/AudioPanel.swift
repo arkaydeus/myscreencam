@@ -16,6 +16,9 @@ struct AudioPanel: View {
                 "Microphone", stream: .microphone, meter: .microphone, keyPath: \.audio.microphone,
                 missing: "No microphone was recorded.")
         }
+        // The meters' audio taps run only while this panel is on screen.
+        .onAppear { model.setMetersVisible(true) }
+        .onDisappear { model.setMetersVisible(false) }
     }
 
     @ViewBuilder

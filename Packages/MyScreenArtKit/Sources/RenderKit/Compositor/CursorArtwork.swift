@@ -232,3 +232,19 @@ final class LockedDictionary<Key: Hashable & Sendable, Value>: @unchecked Sendab
         set { lock.withLock { storage[key] = newValue } }
     }
 }
+
+/// A value computed once on first use, thread-safe (for render caches built lazily on the compositor's queue).
+final class LockedLazy<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: Value?
+
+    /// The stored value, computing it with `make` (under the lock) the first time.
+    func value(_ make: () -> Value) -> Value {
+        lock.withLock {
+            if let storage { return storage }
+            let value = make()
+            storage = value
+            return value
+        }
+    }
+}

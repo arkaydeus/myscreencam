@@ -209,7 +209,7 @@ public enum CompositionBuilder {
             let parameters = AVMutableAudioMixInputParameters()
             parameters.trackID = id
             let gain = Float(settings.isAudible ? settings.linearGain : 0)
-            let wantsTap = purpose == .preview ? levels != nil : gain > 1
+            let wantsTap = (purpose == .preview && levels != nil) || gain > 1
             if wantsTap,
                 let tap = AudioTap.make(
                     gain: gain, limit: gain > 1, meter: purpose == .preview ? levels.map { ($0, kind) } : nil)

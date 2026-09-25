@@ -324,6 +324,13 @@ final class EditorModel {
         }
     }
 
+    /// The Audio panel's level meters appeared or disappeared: install the metering audio taps only while they're
+    /// visible (each tap runs on the audio thread for every block played).
+    func setMetersVisible(_ visible: Bool) {
+        guard !isClosed else { return }
+        renderer.apply(renderer.setMetering(visible), to: player)
+    }
+
     // MARK: - Playback
 
     private func startObservingPlayer() {
