@@ -31,6 +31,52 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>MyScreenArt Recording</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSTypeIsPackage</key>
+			<true/>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.myscreenart.recording</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.myscreenart.recording</string>
+			<key>UTTypeDescription</key>
+			<string>MyScreenArt Recording</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+				<string>public.composite-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>msarec</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>SUFeedURL</key>
+	<string>https://github.com/arkaydeus/myscreenart-native/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
+	<key>SUEnableAutomaticChecks</key>
+	<string>$(MSA_SPARKLE_AUTOMATIC_CHECKS)</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>21600</integer>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.video</string>
 	<key>LSMinimumSystemVersion</key>

@@ -18,16 +18,24 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEAD_CODE_STRIPPING: YES
     CODE_SIGN_STYLE: Manual
+    # Sparkle EdDSA public key (base64, from `generate_keys`; see docs/release.md). Until it's set the app
+    # doesn't start its updater and "Check for Updates…" stays disabled.
+    SPARKLE_PUBLIC_ED_KEY: SPARKLE_PUBLIC_ED_KEY_NOT_SET
   configs:
     Debug:
       # A stable identity + bundle ID keeps TCC grants across rebuilds and worktrees.
       CODE_SIGN_IDENTITY: "Apple Development"
     Release:
       CODE_SIGN_IDENTITY: "Developer ID Application"
+      # Apple silicon only (see README); also keeps Float16 and other arm64-only APIs available.
+      ARCHS: arm64
 
 packages:
   MyScreenArtKit:
     path: Packages/MyScreenArtKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    majorVersion: 2.7.0
 
 targets:
   MyScreenArt:
@@ -48,6 +56,11 @@ targets:
         product: RenderKit
       - package: MyScreenArtKit
         product: ExportKit
+      - package: Sparkle
+        product: Sparkle
+      - target: MyScreenArtThumbnail
+        embed: true
+        codeSign: true
     settings:
       base:
         INFOPLIST_FILE: App/Info.plist
@@ -60,10 +73,37 @@ targets:
           PRODUCT_NAME: MyScreenArt Dev
           PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev
           MSA_URL_SCHEME: myscreenart-dev
+          MSA_SPARKLE_AUTOMATIC_CHECKS: "NO"
         Release:
           PRODUCT_NAME: MyScreenArt
           PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app
           MSA_URL_SCHEME: myscreenart
+          MSA_SPARKLE_AUTOMATIC_CHECKS: "YES"
+
+  # Finder / Quick Look thumbnails for .msarec packages. Embedded in the app's PlugIns folder and signed
+  # with the same identity as the app in each configuration.
+  MyScreenArtThumbnail:
+    type: app-extension
+    platform: macOS
+    sources:
+      - QuickLookThumbnail
+    dependencies:
+      - package: MyScreenArtKit
+        product: ProjectKit
+      - sdk: QuickLookThumbnailing.framework
+    settings:
+      base:
+        INFOPLIST_FILE: QuickLookThumbnail/Info.plist
+        CODE_SIGN_ENTITLEMENTS: QuickLookThumbnail/QuickLookThumbnail.entitlements
+        SWIFT_STRICT_CONCURRENCY: complete
+        SKIP_INSTALL: YES
+        # One product name for both configs: the app's embed phase references the .appex by name.
+        PRODUCT_NAME: MyScreenArtThumbnail
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.thumbnail
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.thumbnail
 
 schemes:
   MyScreenArt:
