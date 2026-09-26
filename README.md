@@ -16,8 +16,9 @@ This monorepo contains:
 ## Getting started
 ```bash
 mise run setup               # install every project's tools and JS dependencies
-mise //apps/macos:run        # build and launch "MyScreenArt Dev"
-mise //apps/web:dev          # run the site at http://localhost:3000
+mise run app                 # build and launch "MyScreenArt Dev"
+mise run web                 # run the site at http://localhost:3000
+mise run start               # both of the above
 mise run check               # lint, test and build everything before pushing
 ```
 `mise tasks ls --all` lists every task. See [CLAUDE.md](CLAUDE.md) for the contributor and agent guide.
