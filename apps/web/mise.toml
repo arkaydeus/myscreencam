@@ -41,9 +41,14 @@ description = "Type-check with tsc"
 depends = ["install"]
 run = "bun run typecheck"
 
+[tasks.test]
+description = "Check the download and hero timeline contracts"
+depends = ["install"]
+run = "bun run test"
+
 [tasks.check]
 description = "Local gate before pushing: format check, lint, typecheck, production build"
-depends = ["format:check", "lint", "typecheck", "build"]
+depends = ["format:check", "lint", "typecheck", "test", "build"]
 run = "echo 'Web checks passed.'"
 
 [tasks.clean]

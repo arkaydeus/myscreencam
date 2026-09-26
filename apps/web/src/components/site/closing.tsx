@@ -32,7 +32,7 @@ export function SiteFooter() {
         </span>
       </div>
       <nav aria-label="Footer" className="flex gap-6">
-        <a href={site.downloadUrl} className="rounded-sm hover:text-foreground">
+        <a href={site.releasesUrl} className="rounded-sm hover:text-foreground">
           Releases
         </a>
         <a href="#faq" className="rounded-sm hover:text-foreground">

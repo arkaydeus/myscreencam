@@ -272,6 +272,9 @@
 
 /* Reduced motion: a still frame of the first zoom, with the click already made. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .demo-camera,
   .demo-cursor,
   .demo-click-publish,

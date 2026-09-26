@@ -4,7 +4,9 @@ export const site = {
   url: "https://myscreenart.com",
   description:
     "A native macOS screen recorder that turns raw recordings into finished videos: zooms that follow your cursor, painted backgrounds, webcam framing and hardware-accelerated export.",
-  /** Signed, notarised DMGs are published here by apps/macos/scripts/release/release.sh. */
-  downloadUrl: "https://github.com/arkaydeustech/myscreenart-releases/releases/latest",
+  /** Stable DMG asset uploaded by apps/macos/scripts/release/release.sh. */
+  downloadUrl:
+    "https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/MyScreenArt.dmg",
+  releasesUrl: "https://github.com/arkaydeustech/myscreenart-releases/releases/latest",
   requirements: "macOS 15 Sequoia or later, Apple silicon",
 } as const;
