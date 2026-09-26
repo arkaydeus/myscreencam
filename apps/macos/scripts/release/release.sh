@@ -19,7 +19,8 @@ notarize=1
 appcast=1
 publish=0
 notes=""
-root="$(git rev-parse --show-toplevel)"
+# The macOS app root (apps/macos in the monorepo), not the git top level.
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="$root/build/release"
 releases_repo="${MSA_RELEASES_REPO:-arkaydeustech/myscreenart-releases}"
 
@@ -157,9 +158,11 @@ if [[ $publish -eq 1 ]]; then
   [[ -n "$notes" ]] && notes_args=(--notes-file "$notes")
   gh release create "$tag" --repo "$releases_repo" --title "MyScreenArt $version" "${notes_args[@]}" \
     "$dmg" "$out/appcast.xml"
-  git tag -a "$tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $tag already exists"
+  # The source repo is a monorepo, so the app's source tag is namespaced.
+  source_tag="macos/$tag"
+  git tag -a "$source_tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $source_tag already exists"
   echo "Published: https://github.com/$releases_repo/releases/tag/$tag"
-  echo "Push the source tag when ready: git push origin $tag"
+  echo "Push the source tag when ready: git push origin $source_tag"
 fi
 
 step "Done: MyScreenArt $version ($build)"

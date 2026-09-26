@@ -1,0 +1,5 @@
+{
+  "name": "myscreenart",
+  "private": true,
+  "workspaces": ["apps/web"]
+}

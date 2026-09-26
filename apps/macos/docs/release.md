@@ -53,7 +53,7 @@ xcrun notarytool store-credentials myscreenart-notary \
    4. Downloads the current `appcast.xml` from the latest release, adds the new version to it, and signs the new version with your Keychain key.
    5. Creates release `v<version>` in the releases repo, with the DMG and the merged `appcast.xml` attached.
    6. Tags the source repo locally.
-4. Push the source tag when you're happy: `git push origin v<version>`.
+4. Push the source tag when you're happy: `git push origin macos/v<version>` (namespaced because the source repo is a monorepo).
 
 Installed copies pick the new version up on their next check: every 6 h in Release builds, or via "Check for Updates…".
 

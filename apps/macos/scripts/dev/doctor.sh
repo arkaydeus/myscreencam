@@ -2,7 +2,8 @@
 # Toolchain, signing and build diagnostics.
 set -uo pipefail
 
-root="$(git rev-parse --show-toplevel)"
+# The macOS app root (apps/macos in the monorepo), not the git top level.
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 app="${MSA_DERIVED_DATA:-$root/build/DerivedData}/Build/Products/Debug/MyScreenArt Dev.app"
 
 section() { printf '\n== %s ==\n' "$1"; }

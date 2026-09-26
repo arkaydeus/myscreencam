@@ -1,80 +1,28 @@
-# Tool versions and developer tasks for MyScreenArt (native).
-# Run `mise install` once, then `mise run <task>` (`mise tasks` lists them).
+# MyScreenArt monorepo root. Each project under apps/ has its own mise.toml with its tools and tasks.
+#   mise run setup                 # once: installs every project's tools and the bun workspace
+#   mise //apps/macos:<task>       # macOS app (build, run, test, lint, release, ...)
+#   mise //apps/web:<task>         # marketing site (dev, build, lint, format, ...)
+#   mise run check                 # every project's local gate
+# Inside a project directory, `mise run <task>` resolves to that project's tasks.
+monorepo_root = true
+
+[monorepo]
+config_roots = ["apps/macos", "apps/web"]
 
 [tools]
-"aqua:yonaskolb/XcodeGen" = "2.46.0"
+# JavaScript toolchain for the bun workspace (apps/web).
+bun = "1.4.2"
+node = "24.21.0"
 
-[env]
-# Use full Xcode even when xcode-select points at the Command Line Tools. Override by exporting DEVELOPER_DIR.
-DEVELOPER_DIR = "{{ get_env(name='DEVELOPER_DIR', default='/Applications/Xcode.app/Contents/Developer') }}"
-MSA_DERIVED_DATA = "{{config_root}}/build/DerivedData"
+[tasks.setup]
+description = "Install every project's tools (a plain `mise install` here only covers the root) and the bun workspace"
+run = ["mise install", "mise -C apps/macos install", "mise -C apps/web install", "bun install"]
 
-[tasks.generate]
-description = "Generate MyScreenArt.xcodeproj from project.yml"
-run = "xcodegen generate --quiet"
-
-[tasks.build]
-description = "Build the Debug app (signed with the Apple Development identity)"
-depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet build"
-
-[tasks."build:unsigned"]
-description = "Build the Debug app without code signing; separate DerivedData so it never replaces the signed dev app"
-depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' -quiet CODE_SIGNING_ALLOWED=NO build"
-
-[tasks."build:perf"]
-description = "Build the Dev app (same bundle ID/signing/TCC grants) with full optimisation, for perf measurements"
-depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO build"
-
-[tasks.run]
-description = "Build and launch this worktree's Debug app via LaunchServices"
-depends = ["build"]
-run = "scripts/dev/run.sh"
-
-[tasks.test]
-description = "Run the engine package tests"
-run = "swift test --package-path Packages/MyScreenArtKit"
-
-[tasks."test:app"]
-description = "Run app-target state and lifecycle tests"
-depends = ["build"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet test"
-
-[tasks.format]
-description = "Format Swift sources in place"
-run = "xcrun swift-format format --in-place --recursive --parallel App Packages QuickLookThumbnail"
-
-[tasks.lint]
-description = "Check Swift formatting and lint rules"
-run = "xcrun swift-format lint --strict --recursive --parallel App Packages QuickLookThumbnail"
-
-[tasks.doctor]
-description = "Report toolchain, signing and build diagnostics"
-run = "scripts/dev/doctor.sh"
-
-[tasks."perf:sample"]
-description = "Sample CPU and memory of a process tree (see scripts/perf/sample.py --help)"
-run = "python3 scripts/perf/sample.py"
-
-[tasks.release]
-description = "Archive, notarise, DMG, notarise DMG and refresh the Sparkle appcast, locally (see docs/release.md)"
-run = "scripts/release/release.sh"
-
-[tasks."release:publish"]
-description = "Full local release, then upload DMG + appcast to the public releases repo"
-run = "scripts/release/release.sh --publish"
-
-[tasks."release:dmg"]
-description = "Local Developer ID build + signed DMG, without notarisation or appcast"
-run = "scripts/release/release.sh --no-notarize --no-appcast"
+[tasks.install]
+description = "Install bun workspace dependencies"
+run = "bun install"
 
 [tasks.check]
-description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
-depends = ["lint", "test", "test:app"]
-run = "echo 'All checks passed.'"
-
-[tasks.clean]
-description = "Remove build artifacts and the generated project"
-run = "rm -rf build MyScreenArt.xcodeproj Packages/MyScreenArtKit/.build"
+description = "Local gate before pushing (there is no GitHub CI): every project's check"
+depends = ["//apps/macos:check", "//apps/web:check"]
+run = "echo 'All projects passed.'"

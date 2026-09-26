@@ -18,3 +18,16 @@ mise.local.toml
 *.swp
 xcuserdata/
 .swiftpm/
+
+# JavaScript (bun workspace)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.env*
+!.env.example
+.vercel
+
+# Playwright MCP screenshots
+.playwright-mcp/
