@@ -4,6 +4,7 @@
 # See docs/release.md.
 #
 #   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--output DIR]
+#   MSA_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and source tag
 #
 # Environment:
 #   NOTARY_PROFILE        notarytool keychain profile (default: myscreenart-notary)
@@ -18,8 +19,10 @@ set -euo pipefail
 notarize=1
 appcast=1
 publish=0
+print_config=0
 notes=""
-root="$(git rev-parse --show-toplevel)"
+# The macOS app root (apps/macos in the monorepo), not the git top level.
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="$root/build/release"
 releases_repo="${MSA_RELEASES_REPO:-arkaydeustech/myscreenart-releases}"
 
@@ -28,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --no-notarize) notarize=0 ;;
     --no-appcast) appcast=0 ;;
     --publish) publish=1 ;;
+    --print-config) print_config=1 ;;
     --notes) notes="$2"; shift ;;
     --output) out="$2"; shift ;;
     -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
@@ -43,6 +47,16 @@ derived="$out/DerivedData"
 archive="$out/MyScreenArt.xcarchive"
 export_dir="$out/export"
 app="$export_dir/MyScreenArt.app"
+stable_dmg="$out/MyScreenArt.dmg"
+
+source_tag_for_version() { printf 'macos/v%s' "$1"; }
+
+if [[ $print_config -eq 1 ]]; then
+  [[ -n "${MSA_VERSION:-}" ]] || { echo "--print-config needs MSA_VERSION" >&2; exit 2; }
+  printf 'Root: %s\nDerivedData: %s\nArchive: %s\nApp: %s\nDMG asset: %s\nSource tag: %s\n' \
+    "$root" "$derived" "$archive" "$app" "$stable_dmg" "$(source_tag_for_version "$MSA_VERSION")"
+  exit 0
+fi
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -155,11 +169,15 @@ if [[ $publish -eq 1 ]]; then
   step "Publishing $tag to $releases_repo"
   notes_args=(--notes "MyScreenArt $version (build $build)")
   [[ -n "$notes" ]] && notes_args=(--notes-file "$notes")
+  # The site links to this stable asset name; retain the versioned DMG for Sparkle's appcast.
+  cp "$dmg" "$stable_dmg"
   gh release create "$tag" --repo "$releases_repo" --title "MyScreenArt $version" "${notes_args[@]}" \
-    "$dmg" "$out/appcast.xml"
-  git tag -a "$tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $tag already exists"
+    "$dmg" "$stable_dmg" "$out/appcast.xml"
+  # The source repo is a monorepo, so the app's source tag is namespaced.
+  source_tag="$(source_tag_for_version "$version")"
+  git tag -a "$source_tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $source_tag already exists"
   echo "Published: https://github.com/$releases_repo/releases/tag/$tag"
-  echo "Push the source tag when ready: git push origin $tag"
+  echo "Push the source tag when ready: git push origin $source_tag"
 fi
 
 step "Done: MyScreenArt $version ($build)"

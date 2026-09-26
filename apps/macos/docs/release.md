@@ -13,6 +13,7 @@ The source repo is private, so the DMG and appcast are published to a separate *
 | Export options | `scripts/release/ExportOptions.plist` (`developer-id`, manual signing) |
 | Releases repo | `arkaydeustech/myscreenart-releases` (public; override with `MSA_RELEASES_REPO`) |
 | Feed URL | `SUFeedURL` in `App/Info.plist`: `https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/appcast.xml` |
+| Website download | `https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/MyScreenArt.dmg` (stable asset name uploaded with each release) |
 | Public EdDSA key | `SPARKLE_PUBLIC_ED_KEY` build setting in `project.yml` → `SUPublicEDKey` |
 | Private EdDSA key | your login Keychain; `generate_appcast` reads it directly, so it's never exported |
 | Output | `build/release/`: `MyScreenArt-<version>.dmg`, `appcast.xml`, `export/MyScreenArt.app` |
@@ -51,9 +52,9 @@ xcrun notarytool store-credentials myscreenart-notary \
    2. Notarises and staples the app.
    3. Builds the DMG, then signs, notarises and staples it.
    4. Downloads the current `appcast.xml` from the latest release, adds the new version to it, and signs the new version with your Keychain key.
-   5. Creates release `v<version>` in the releases repo, with the DMG and the merged `appcast.xml` attached.
+   5. Creates release `v<version>` in the releases repo, with the versioned DMG, a `MyScreenArt.dmg` copy for the website, and the merged `appcast.xml` attached.
    6. Tags the source repo locally.
-4. Push the source tag when you're happy: `git push origin v<version>`.
+4. Push the source tag when you're happy: `git push origin macos/v<version>` (namespaced because the source repo is a monorepo).
 
 Installed copies pick the new version up on their next check: every 6 h in Release builds, or via "Check for Updates…".
 
@@ -69,6 +70,8 @@ Installed copies pick the new version up on their next check: every 6 h in Relea
 
 Flags: `--publish`, `--notes FILE`, `--no-notarize`, `--no-appcast`, `--output DIR`.
 
+Use `MSA_VERSION=1.2.3 scripts/release/release.sh --print-config` to inspect the resolved build paths, website DMG asset and source tag without building or publishing.
+
 Environment: `MSA_VERSION`, `MSA_BUILD`, `NOTARY_PROFILE`, `MSA_RELEASES_REPO`, `MSA_SPARKLE_ACCOUNT`, `MSA_PREVIOUS_APPCAST` (path or URL).
 
 ## Verifying a release
@@ -76,6 +79,7 @@ Environment: `MSA_VERSION`, `MSA_BUILD`, `NOTARY_PROFILE`, `MSA_RELEASES_REPO`, 
 spctl --assess --type execute --verbose=2 build/release/export/MyScreenArt.app   # "accepted, source=Notarized Developer ID"
 xcrun stapler validate build/release/MyScreenArt-<version>.dmg
 curl -fsSL https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/appcast.xml | head
+curl -fIL https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/MyScreenArt.dmg
 ```
 To test an update end to end:
 1. Install the previous DMG.

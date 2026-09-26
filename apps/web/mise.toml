@@ -1,0 +1,56 @@
+# Tasks for the MyScreenArt marketing site (//apps/web in the monorepo): Next.js, Tailwind, shadcn/ui, bun, oxc.
+# bun and node are pinned in the root mise.toml. From this directory run `mise run <task>`; from anywhere
+# else run `mise //apps/web:<task>`.
+
+[tasks.install]
+description = "Install bun workspace dependencies"
+run = "bun install"
+
+[tasks.dev]
+description = "Start the Next.js dev server (http://localhost:3000)"
+depends = ["install"]
+run = "bun run dev"
+
+[tasks.build]
+description = "Production build"
+depends = ["install"]
+run = "bun run build"
+
+[tasks.start]
+description = "Serve the production build"
+depends = ["build"]
+run = "bun run start"
+
+[tasks.lint]
+description = "Lint with oxlint (warnings fail)"
+depends = ["install"]
+run = "bun run lint"
+
+[tasks.format]
+description = "Format with oxfmt in place"
+depends = ["install"]
+run = "bun run format"
+
+[tasks."format:check"]
+description = "Check formatting with oxfmt"
+depends = ["install"]
+run = "bun run format:check"
+
+[tasks.typecheck]
+description = "Type-check with tsc"
+depends = ["install"]
+run = "bun run typecheck"
+
+[tasks.test]
+description = "Check the download and hero timeline contracts"
+depends = ["install"]
+run = "bun run test"
+
+[tasks.check]
+description = "Local gate before pushing: format check, lint, typecheck, production build"
+depends = ["format:check", "lint", "typecheck", "test", "build"]
+run = "echo 'Web checks passed.'"
+
+[tasks.clean]
+description = "Remove the Next.js build output"
+run = "rm -rf .next"

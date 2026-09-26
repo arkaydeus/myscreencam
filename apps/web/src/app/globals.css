@@ -1,0 +1,305 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * MyScreenArt palette. The page itself is a cool gallery wall in indigo ink; the saturated pigments only
+ * appear inside "canvases", the way the app frames a recording on a painted background.
+ */
+@theme {
+  --color-paper: #eceef2;
+  --color-ink: #1b1e45;
+  --color-ultramarine: #2f46e8;
+  --color-cadmium: #ffc23a;
+  --color-rose: #f0668f;
+  --color-viridian: #16876f;
+  --color-rule: #cdd1da;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-mona);
+  --font-heading: var(--font-hubot);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #eceef2;
+  --foreground: #1b1e45;
+  --card: #f7f8fa;
+  --card-foreground: #1b1e45;
+  --popover: #f7f8fa;
+  --popover-foreground: #1b1e45;
+  --primary: #2f46e8;
+  --primary-foreground: #ffffff;
+  --secondary: #dfe2e9;
+  --secondary-foreground: #1b1e45;
+  --muted: #dfe2e9;
+  --muted-foreground: #4f5374;
+  --accent: #dfe2e9;
+  --accent-foreground: #1b1e45;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #cdd1da;
+  --input: #cdd1da;
+  --ring: #2f46e8;
+  --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply scroll-smooth font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Headings use Hubot Sans at its widest, heaviest setting: the wordmark's voice. */
+@utility font-display {
+  font-family: var(--font-hubot);
+  font-stretch: 125%;
+  font-variation-settings: "wdth" 125;
+}
+
+/* Wide figures in Mona Sans: Hubot's zero carries a dot that reads as a theta at display sizes. */
+@utility font-figures {
+  font-family: var(--font-mona);
+  font-stretch: 125%;
+  font-variation-settings: "wdth" 125;
+}
+
+/* The painted background the hero recording sits on (the app's gradient/image canvas). */
+@utility canvas-paint {
+  background:
+    radial-gradient(55% 75% at 8% 10%, var(--color-cadmium) 0%, transparent 70%),
+    radial-gradient(60% 80% at 96% 100%, var(--color-viridian) 0%, transparent 70%),
+    linear-gradient(
+      135deg,
+      #ff8a5c 0%,
+      var(--color-rose) 30%,
+      #7b3fd6 62%,
+      var(--color-ultramarine) 100%
+    );
+}
+
+/*
+ * Hero demo: one 12 s loop shared by the camera (zoom), cursor, click rings and timeline playhead, so the
+ * zoom blocks on the timeline line up with what the preview does.
+ */
+@keyframes msa-camera {
+  0%,
+  14% {
+    transform: scale(1);
+    transform-origin: 76% 73%;
+  }
+  24%,
+  46% {
+    transform: scale(1.85);
+    transform-origin: 76% 73%;
+  }
+  56%,
+  64% {
+    transform: scale(1);
+    transform-origin: 76% 73%;
+  }
+  65%,
+  73% {
+    transform: scale(1);
+    transform-origin: 30% 44%;
+  }
+  81%,
+  90% {
+    transform: scale(1.7);
+    transform-origin: 30% 44%;
+  }
+  98%,
+  100% {
+    transform: scale(1);
+    transform-origin: 30% 44%;
+  }
+}
+
+@keyframes msa-cursor {
+  0% {
+    left: 46%;
+    top: 30%;
+  }
+  12%,
+  40% {
+    left: 76%;
+    top: 73%;
+  }
+  48%,
+  60% {
+    left: 58%;
+    top: 58%;
+  }
+  70%,
+  92% {
+    left: 30%;
+    top: 44%;
+  }
+  100% {
+    left: 46%;
+    top: 30%;
+  }
+}
+
+@keyframes msa-click-publish {
+  0%,
+  13% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  13.5% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  20%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+}
+
+@keyframes msa-click-check {
+  0%,
+  72% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  72.5% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  79%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+}
+
+@keyframes msa-published {
+  0%,
+  13.5% {
+    opacity: 0;
+  }
+  14%,
+  97% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes msa-checked {
+  0%,
+  72.5% {
+    opacity: 0;
+  }
+  73%,
+  97% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes msa-playhead {
+  from {
+    left: 0%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@utility demo-camera {
+  animation: msa-camera 12s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@utility demo-cursor {
+  animation: msa-cursor 12s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@utility demo-click-publish {
+  animation: msa-click-publish 12s linear infinite;
+}
+@utility demo-click-check {
+  animation: msa-click-check 12s linear infinite;
+}
+@utility demo-published {
+  animation: msa-published 12s linear infinite;
+}
+@utility demo-checked {
+  animation: msa-checked 12s linear infinite;
+}
+@utility demo-playhead {
+  animation: msa-playhead 12s linear infinite;
+}
+
+/* Reduced motion: a still frame of the first zoom, with the click already made. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .demo-camera,
+  .demo-cursor,
+  .demo-click-publish,
+  .demo-click-check,
+  .demo-playhead,
+  .demo-published,
+  .demo-checked {
+    animation: none;
+  }
+  .demo-camera {
+    transform: scale(1.4);
+    transform-origin: 76% 73%;
+  }
+  .demo-cursor {
+    left: 76%;
+    top: 73%;
+  }
+  .demo-click-publish,
+  .demo-click-check {
+    opacity: 0;
+  }
+  .demo-published {
+    opacity: 1;
+  }
+  .demo-playhead {
+    left: 30%;
+  }
+}
