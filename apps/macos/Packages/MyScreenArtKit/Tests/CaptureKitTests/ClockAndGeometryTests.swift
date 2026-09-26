@@ -130,6 +130,66 @@ struct CameraFormatSelectorTests {
     }
 }
 
+struct CameraFrameDurationTests {
+    /// A discrete rate as a UVC camera reports it, e.g. 30.00003 fps is 1000000/30000030.
+    func discrete(_ timescale: CMTimeScale) -> CameraFrameDurationRange {
+        let duration = CMTime(value: 1_000_000, timescale: timescale)
+        return CameraFrameDurationRange(min: duration, max: duration)
+    }
+
+    /// A USB webcam's 1280x720 420v format (VID 1133, PID 2083).
+    var uvc: [CameraFrameDurationRange] {
+        [discrete(30_000_030), discrete(24_000_038), discrete(20_000_000), discrete(15_000_015)]
+    }
+
+    /// The built-in camera's continuous 15-30 fps range.
+    let builtIn = [
+        CameraFrameDurationRange(
+            min: CMTime(value: 1_000_000, timescale: 30_000_000), max: CMTime(value: 1_000_000, timescale: 15_000_000))
+    ]
+
+    @Test func usesTheDevicesExactDurationForANearMatchingDiscreteRate() {
+        let duration = CameraFormatSelector.frameDuration(for: 30, in: uvc)
+        #expect(duration.map { CMTimeCompare($0, uvc[0].min) } == 0)
+        #expect(duration != CMTime(value: 1, timescale: 30))
+    }
+
+    @Test func fallsBackToTheFastestSlowerRateBetweenDiscreteRates() {
+        let duration = CameraFormatSelector.frameDuration(for: 25, in: uvc)
+        #expect(duration.map { CMTimeCompare($0, uvc[1].min) } == 0)
+    }
+
+    @Test func usesTheSlowestRateWhenEveryRateIsFaster() {
+        let duration = CameraFormatSelector.frameDuration(for: 10, in: uvc)
+        #expect(duration.map { CMTimeCompare($0, uvc[3].max) } == 0)
+    }
+
+    @Test func usesTheRequestedRateInsideAContinuousRange() {
+        let duration = CameraFormatSelector.frameDuration(for: 24, in: builtIn)
+        #expect(duration.map { CMTimeCompare($0, CMTime(value: 1, timescale: 24)) } == 0)
+    }
+
+    @Test func clampsToTheFastestRateOfAContinuousRange() {
+        let duration = CameraFormatSelector.frameDuration(for: 60, in: builtIn)
+        #expect(duration.map { CMTimeCompare($0, builtIn[0].min) } == 0)
+    }
+
+    @Test func everyChoiceLiesWithinARange() {
+        for rate in [1, 5, 15, 24, 25, 29, 30, 31, 60, 120] {
+            for ranges in [uvc, builtIn] {
+                let duration = try! #require(CameraFormatSelector.frameDuration(for: rate, in: ranges))
+                #expect(
+                    ranges.contains { CMTimeCompare(duration, $0.min) >= 0 && CMTimeCompare(duration, $0.max) <= 0 })
+            }
+        }
+    }
+
+    @Test func noRangesOrRateMeansNoDuration() {
+        #expect(CameraFormatSelector.frameDuration(for: 30, in: []) == nil)
+        #expect(CameraFormatSelector.frameDuration(for: 0, in: uvc) == nil)
+    }
+}
+
 struct PermissionTests {
     @Test func settingsURLsPointAtPrivacyPanes() {
         for kind in PermissionKind.allCases {

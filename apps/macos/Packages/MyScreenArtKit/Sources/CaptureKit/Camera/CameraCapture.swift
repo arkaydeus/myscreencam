@@ -133,16 +133,16 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
             throw CaptureError.deviceUnavailable("no video formats")
         }
         let chosen = formats[index]
-        let rate = min(Double(configuration.frameRate), candidates[index].maxFrameRate)
+        let duration = CameraFormatSelector.frameDuration(
+            for: configuration.frameRate,
+            in: chosen.videoSupportedFrameRateRanges.map {
+                CameraFrameDurationRange(min: $0.minFrameDuration, max: $0.maxFrameDuration)
+            })
+        let rate = duration.map { 1 / $0.seconds } ?? candidates[index].maxFrameRate
         do {
             try device.lockForConfiguration()
             device.activeFormat = chosen
-            if rate > 0,
-                chosen.videoSupportedFrameRateRanges.contains(where: {
-                    $0.minFrameRate - 0.01 <= rate && rate <= $0.maxFrameRate + 0.01
-                })
-            {
-                let duration = CMTime(value: 1, timescale: CMTimeScale(rate.rounded()))
+            if let duration {
                 device.activeVideoMinFrameDuration = duration
                 device.activeVideoMaxFrameDuration = duration
             }
