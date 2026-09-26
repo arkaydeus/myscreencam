@@ -1,40 +1,28 @@
 import ProjectKit
 import SwiftUI
 
-/// The right-hand panel: a tab strip and the selected tab's controls.
+/// The right-hand panel: an icon tab switcher, the selected tab's title and its controls.
 struct InspectorView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 2) {
-                ForEach(InspectorTab.allCases) { tab in
-                    Button {
-                        model.inspectorTab = tab
-                    } label: {
-                        VStack(spacing: 3) {
-                            Image(systemName: tab.systemImage)
-                                .font(.system(size: 14))
-                                .frame(height: 16)
-                            Text(tab.title)
-                                .font(.system(size: 9.5))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
-                        .contentShape(Rectangle())
-                        .foregroundStyle(model.inspectorTab == tab ? Color.accentColor : Color.secondary)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(model.inspectorTab == tab ? Color.accentColor.opacity(0.14) : .clear))
+            VStack(alignment: .leading, spacing: 14) {
+                tabSwitcher
+                HStack(alignment: .firstTextBaseline) {
+                    Text(model.inspectorTab.title)
+                        .font(.system(size: 20, weight: .bold))
+                    Spacer()
+                    if let summary {
+                        Text(summary)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Color.editorTertiaryText)
                     }
-                    .buttonStyle(.plain)
-                    .help(tab.title)
                 }
             }
-            .padding(6)
-            Divider()
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 2)
             Group {
                 switch model.inspectorTab {
                 case .zoom: ZoomPanel(model: model)
@@ -46,9 +34,59 @@ struct InspectorView: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .toggleStyle(.switch)
             .controlSize(.small)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var tabSwitcher: some View {
+        HStack(spacing: 2) {
+            ForEach(InspectorTab.allCases) { tab in
+                let selected = model.inspectorTab == tab
+                Button {
+                    model.inspectorTab = tab
+                } label: {
+                    Image(systemName: tab.systemImage)
+                        .font(.system(size: 14))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                        .foregroundStyle(selected ? Color.editorOnAccent : Color.editorSecondaryText)
+                        .background(
+                            selected ? Color.editorAccent : .clear,
+                            in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius - 1, style: .continuous)
+                        )
+                        .shadow(color: selected ? Color.editorAccent.opacity(0.35) : .clear, radius: 7, y: 3)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(tab.title)
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(
+            Color.editorControlFill,
+            in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius + 2, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: EditorTheme.controlRadius + 2, style: .continuous)
+                .strokeBorder(Color.editorControlBorder))
+    }
+
+    /// A count shown beside the tab title, where the tab holds a list.
+    private var summary: String? {
+        switch model.inspectorTab {
+        case .zoom:
+            let count = model.edit.zoom.keyframes.count
+            return count == 1 ? "1 zoom" : "\(count) zooms"
+        case .blur:
+            let count = model.edit.blur.count
+            return count == 1 ? "1 mask" : "\(count) masks"
+        default:
+            return nil
+        }
     }
 }
 
@@ -68,7 +106,7 @@ struct ValueSlider: View {
                 Spacer()
                 Text(format(value))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.editorSecondaryText)
             }
             if let step {
                 Slider(value: $value, in: range, step: step) { model.editingChanged($0) }
