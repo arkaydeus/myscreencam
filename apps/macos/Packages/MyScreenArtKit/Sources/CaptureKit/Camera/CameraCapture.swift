@@ -115,7 +115,7 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
     }
 
     /// Chooses the device format closest to the configuration and locks the frame rate.
-    private static func applyFormat(
+    static func applyFormat(
         device: AVCaptureDevice, configuration: CameraConfiguration
     ) throws -> CameraFormatInfo {
         let formats = device.formats
