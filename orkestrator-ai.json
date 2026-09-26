@@ -1,0 +1,7 @@
+{
+  "setupLocal": [
+    "mise trust --yes . && mise trust --yes apps/macos && mise trust --yes apps/web",
+    "mise run setup"
+  ],
+  "run": ["mise run start"]
+}
