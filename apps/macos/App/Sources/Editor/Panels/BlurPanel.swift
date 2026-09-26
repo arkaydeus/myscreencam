@@ -18,12 +18,12 @@ struct BlurPanel: View {
                         Text("\(TimeFormat.clock(mask.start)) – \(TimeFormat.clock(mask.end))")
                             .monospacedDigit()
                             .fontWeight(selected ? .semibold : .regular)
-                            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                            .foregroundStyle(selected ? Color.editorAccent : Color.primary)
                         Spacer()
                         Text("source").font(.caption).foregroundStyle(.tertiary)
                     }
                     .contentShape(Rectangle())
-                    .listRowBackground(selected ? Color.accentColor.opacity(0.18) : nil)
+                    .listRowBackground(selected ? Color.editorAccent.opacity(0.16) : nil)
                     .onTapGesture {
                         model.selection = .blur(mask.id)
                         model.pause()

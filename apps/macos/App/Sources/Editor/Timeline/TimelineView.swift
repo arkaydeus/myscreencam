@@ -77,6 +77,7 @@ final class TimelineNSView: NSView {
     // Layers.
     private let rulerBackground = CALayer()
     private let rulerTicks = CAShapeLayer()
+    private let rulerRule = CALayer()
     private var tickLabels: [CATextLayer] = []
     private var rowBackgrounds: [Row: CALayer] = [:]
     private var rowLabels: [Row: CATextLayer] = [:]
@@ -112,7 +113,9 @@ final class TimelineNSView: NSView {
         wantsLayer = true
         guard let root = layer else { return }
         root.masksToBounds = true
+        root.backgroundColor = EditorTheme.panelBackground.cgColor
         root.addSublayer(rulerBackground)
+        root.addSublayer(rulerRule)
         root.addSublayer(rulerTicks)
         for row in Row.allCases {
             let background = CALayer()
@@ -315,9 +318,9 @@ final class TimelineNSView: NSView {
     private func layoutChrome(_ frames: [Row: CGRect]) {
         let scale = window?.backingScaleFactor ?? 2
         rulerBackground.frame = CGRect(x: 0, y: 0, width: bounds.width, height: TimelineMetrics.rulerHeight)
-        rulerBackground.backgroundColor =
-            NSColor.windowBackgroundColor.blended(withFraction: 0.04, of: .labelColor)?
-            .cgColor
+        rulerBackground.backgroundColor = EditorTheme.panelBackground.cgColor
+        rulerRule.frame = CGRect(x: 0, y: TimelineMetrics.rulerHeight - 1, width: bounds.width, height: 1)
+        rulerRule.backgroundColor = EditorTheme.panelBorder.cgColor
         for row in Row.allCases {
             guard let background = rowBackgrounds[row], let label = rowLabels[row] else { continue }
             guard let frame = frames[row] else {
@@ -328,9 +331,9 @@ final class TimelineNSView: NSView {
             background.isHidden = false
             label.isHidden = false
             background.frame = frame
-            background.backgroundColor = NSColor.labelColor.withAlphaComponent(0.035).cgColor
+            background.backgroundColor = EditorTheme.rowBackground.cgColor
             label.contentsScale = scale
-            label.foregroundColor = NSColor.secondaryLabelColor.cgColor
+            label.foregroundColor = EditorTheme.secondaryText.cgColor
             label.frame = CGRect(x: 10, y: frame.midY - 7, width: TimelineMetrics.gutter - 14, height: 16)
         }
     }
@@ -353,7 +356,7 @@ final class TimelineNSView: NSView {
         }
         rulerTicks.frame = bounds
         rulerTicks.path = path
-        rulerTicks.strokeColor = NSColor.tertiaryLabelColor.cgColor
+        rulerTicks.strokeColor = EditorTheme.tertiaryText.cgColor
         // Tick labels live on the root layer, clipped to the ruler right of the gutter.
         while tickLabels.count < labels.count {
             let text = makeText(size: 10)
@@ -369,7 +372,7 @@ final class TimelineNSView: NSView {
             text.isHidden = false
             text.contentsScale = scale
             text.string = labels[i].1
-            text.foregroundColor = NSColor.secondaryLabelColor.cgColor
+            text.foregroundColor = EditorTheme.secondaryText.cgColor
             text.frame = CGRect(x: labels[i].0 + 3, y: 2, width: 60, height: 13)
         }
     }
@@ -379,7 +382,10 @@ final class TimelineNSView: NSView {
         let pieces = model.timeline.pieces
         pool(&segmentLayers, count: pieces.count) {
             let layer = CALayer()
-            layer.cornerRadius = 4
+            layer.cornerRadius = 6
+            layer.shadowColor = EditorTheme.screenTrack.cgColor
+            layer.shadowOffset = .zero
+            layer.shadowRadius = 8
             return layer
         }
         for (i, piece) in pieces.enumerated() {
@@ -388,15 +394,20 @@ final class TimelineNSView: NSView {
             let x1 = x(piece.editedEnd)
             layer.frame = CGRect(x: x0 + 1, y: frame.minY + 2, width: max(1, x1 - x0 - 2), height: frame.height - 4)
             let selected = data.selection == .segment(piece.segment.id)
-            layer.backgroundColor = NSColor.systemBlue.withAlphaComponent(selected ? 0.75 : 0.45).cgColor
-            layer.borderColor = selected ? NSColor.white.cgColor : NSColor.systemBlue.withAlphaComponent(0.8).cgColor
+            let track = EditorTheme.screenTrack
+            layer.backgroundColor = track.withAlphaComponent(selected ? 0.55 : 0.28).cgColor
+            layer.borderColor = selected ? NSColor.white.cgColor : track.withAlphaComponent(0.6).cgColor
             layer.borderWidth = selected ? 2 : 1
+            // The glow is only on the selected segment; an explicit path keeps the shadow cheap.
+            layer.shadowOpacity = selected ? 0.45 : 0
+            layer.shadowPath =
+                selected ? CGPath(roundedRect: layer.bounds, cornerWidth: 6, cornerHeight: 6, transform: nil) : nil
         }
         let edges = [x(0), x(model.timeline.duration)]
         for (i, handle) in trimHandles.enumerated() {
             handle.isHidden = pieces.isEmpty
             handle.backgroundColor = NSColor.white.withAlphaComponent(0.9).cgColor
-            handle.borderColor = NSColor.systemBlue.cgColor
+            handle.borderColor = EditorTheme.screenTrack.cgColor
             handle.borderWidth = 1
             let hx = i == 0 ? edges[0] + 1 : edges[1] - 7
             handle.frame = CGRect(x: hx, y: frame.minY + 6, width: 6, height: frame.height - 12)
@@ -412,7 +423,7 @@ final class TimelineNSView: NSView {
         let pieces = model.timeline.pieces
         pool(&webcamLayers, count: pieces.count) {
             let layer = CALayer()
-            layer.cornerRadius = 3
+            layer.cornerRadius = 5
             return layer
         }
         let shift = data.syncOffset * pps
@@ -422,13 +433,13 @@ final class TimelineNSView: NSView {
             let x1 = x(piece.editedEnd) + shift
             webcamLayers[i].frame = CGRect(
                 x: x0 + 1, y: frame.minY + 3, width: max(1, x1 - x0 - 2), height: frame.height - 6)
-            webcamLayers[i].backgroundColor = NSColor.systemTeal.withAlphaComponent(alpha).cgColor
+            webcamLayers[i].backgroundColor = EditorTheme.webcamTrack.withAlphaComponent(alpha).cgColor
         }
         if abs(data.syncOffset) > 0.0005 {
             webcamLabel.isHidden = false
             webcamLabel.contentsScale = window?.backingScaleFactor ?? 2
             webcamLabel.string = String(format: "sync %+.2f s", data.syncOffset)
-            webcamLabel.foregroundColor = NSColor.labelColor.cgColor
+            webcamLabel.foregroundColor = EditorTheme.primaryText.cgColor
             webcamLabel.frame = CGRect(x: max(4, x(0) + shift + 6), y: frame.minY + 4, width: 90, height: 14)
             webcamLabel.zPosition = 2
         } else {
@@ -445,7 +456,7 @@ final class TimelineNSView: NSView {
         }
         shape.isHidden = false
         let audio = row == .systemAudio ? model.edit.audio.system : model.edit.audio.microphone
-        let color = row == .systemAudio ? NSColor.systemPurple : NSColor.systemGreen
+        let color = row == .systemAudio ? EditorTheme.systemAudioTrack : EditorTheme.microphoneTrack
         shape.fillColor = color.withAlphaComponent(audio.isAudible ? 0.75 : 0.25).cgColor
         shape.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
         let path = CGMutablePath()
@@ -505,7 +516,7 @@ final class TimelineNSView: NSView {
             shape.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
             shape.path = keyframeShape(k, editedStart: e, frame: frame)
             let selected = data.selection == .keyframe(k.id)
-            let base = k.enabled && data.zoomEnabled ? NSColor.systemOrange : NSColor.systemGray
+            let base = k.enabled && data.zoomEnabled ? EditorTheme.zoomTrack : EditorTheme.tertiaryText
             shape.fillColor = base.withAlphaComponent(selected ? 0.85 : 0.5).cgColor
             shape.strokeColor = selected ? NSColor.white.cgColor : base.cgColor
             shape.zPosition = selected ? 3 : 1
@@ -522,7 +533,7 @@ final class TimelineNSView: NSView {
         guard let frame else { return }
         pool(&blurLayers, count: data.blur.count) {
             let layer = CALayer()
-            layer.cornerRadius = 3
+            layer.cornerRadius = 5
             return layer
         }
         for (i, mask) in data.blur.enumerated() {
@@ -533,8 +544,8 @@ final class TimelineNSView: NSView {
             }
             let selected = data.selection == .blur(mask.id)
             layer.frame = CGRect(x: x(e0), y: frame.minY + 3, width: max(2, x(e1) - x(e0)), height: frame.height - 6)
-            layer.backgroundColor = NSColor.systemPink.withAlphaComponent(selected ? 0.8 : 0.45).cgColor
-            layer.borderColor = selected ? NSColor.white.cgColor : NSColor.systemPink.cgColor
+            layer.backgroundColor = EditorTheme.blurTrack.withAlphaComponent(selected ? 0.7 : 0.35).cgColor
+            layer.borderColor = selected ? NSColor.white.cgColor : EditorTheme.blurTrack.cgColor
             layer.borderWidth = selected ? 2 : 1
             layer.zPosition = selected ? 3 : 1
         }
@@ -543,7 +554,7 @@ final class TimelineNSView: NSView {
     private func layoutClicks(_ model: EditorModel, _ frame: CGRect?) {
         guard let frame else { return }
         clickDots.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
-        clickDots.fillColor = NSColor.systemYellow.withAlphaComponent(0.9).cgColor
+        clickDots.fillColor = EditorTheme.clickMarker.withAlphaComponent(0.9).cgColor
         let path = CGMutablePath()
         var lastX = -CGFloat.infinity
         for t in model.clickTimes {
@@ -558,7 +569,7 @@ final class TimelineNSView: NSView {
 
     private func layoutPauses(_ model: EditorModel, _ frames: [Row: CGRect]) {
         pauseMarkers.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
-        pauseMarkers.strokeColor = NSColor.systemYellow.cgColor
+        pauseMarkers.strokeColor = EditorTheme.clickMarker.cgColor
         let path = CGMutablePath()
         let bottom = frames[.screen]?.maxY ?? TimelineMetrics.rulerHeight
         for pause in model.meta.pauses {
@@ -570,10 +581,10 @@ final class TimelineNSView: NSView {
     }
 
     private func layoutPlayhead() {
-        playhead.backgroundColor = NSColor.systemRed.cgColor
+        playhead.backgroundColor = EditorTheme.playhead.cgColor
         playhead.bounds = CGRect(x: 0, y: 0, width: 2, height: bounds.height)
         playhead.anchorPoint = CGPoint(x: 0.5, y: 0)
-        playheadKnob.fillColor = NSColor.systemRed.cgColor
+        playheadKnob.fillColor = EditorTheme.playhead.cgColor
         let knob = CGMutablePath()
         knob.move(to: CGPoint(x: -6, y: 0))
         knob.addLine(to: CGPoint(x: 6, y: 0))

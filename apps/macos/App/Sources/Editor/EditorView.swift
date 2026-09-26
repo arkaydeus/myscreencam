@@ -1,7 +1,8 @@
 import ProjectKit
 import SwiftUI
 
-/// The editor layout: header, preview, transport and timeline on the left, the 320 pt inspector on the right.
+/// The editor layout: header, preview, transport and timeline on the left, the 320 pt inspector on the right. Each
+/// region is a floating ``EditorTheme`` panel.
 struct EditorView: View {
     @Bindable var model: EditorModel
     @Environment(\.undoManager) private var undoManager
@@ -10,22 +11,25 @@ struct EditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             EditorHeader(model: model) { windowHolder.window?.close() }
-            Divider()
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
+            HStack(spacing: EditorTheme.panelGap) {
+                VStack(spacing: EditorTheme.panelGap) {
                     PreviewContainer(model: model)
                         .frame(minHeight: 240)
-                    Divider()
+                        .editorPanel(.editorStage)
                     TransportBar(model: model)
-                    Divider()
+                        .editorPanel()
                     TimelineContainer(model: model)
                         .frame(height: TimelineMetrics.preferredHeight(for: model.recordedStreams))
+                        .editorPanel()
                 }
-                Divider()
                 InspectorView(model: model)
                     .frame(width: 320)
+                    .editorPanel()
             }
+            .padding([.horizontal, .bottom], EditorTheme.panelGap)
         }
+        .foregroundStyle(Color.editorPrimaryText)
+        .tint(.editorAccent)
         .background(EditorWindowHooks(model: model, holder: windowHolder))
         .onAppear { model.undoManager = undoManager }
         .onChange(of: undoManager) { _, manager in model.undoManager = manager }
@@ -82,6 +86,9 @@ struct EditorWindowHooks: NSViewRepresentable {
             teardown()
             guard let window else { return }
             holder.window = window
+            // The navy runs up under the title bar.
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = EditorTheme.windowBackground
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 Self.route(event, through: self)
             }

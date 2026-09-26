@@ -66,11 +66,11 @@ private struct KeyframeRow: View {
         let edited = model.timeline.editedTime(forSource: keyframe.time)
         HStack {
             Image(systemName: keyframe.mode == .followMouse ? "cursorarrow.motionlines" : "plus.magnifyingglass")
-                .foregroundStyle(keyframe.enabled ? Color.orange : Color.secondary)
+                .foregroundStyle(keyframe.enabled ? Color.editorZoom : Color.secondary)
             Text(edited.map(TimeFormat.clock) ?? "cut")
                 .monospacedDigit()
                 .fontWeight(selected ? .semibold : .regular)
-                .foregroundStyle(edited == nil ? Color.secondary : (selected ? Color.accentColor : Color.primary))
+                .foregroundStyle(edited == nil ? Color.secondary : (selected ? Color.editorAccent : Color.primary))
             Text(String(format: "%.2f×", keyframe.scale))
                 .foregroundStyle(.secondary)
             Spacer()
@@ -79,7 +79,7 @@ private struct KeyframeRow: View {
             }
         }
         .contentShape(Rectangle())
-        .listRowBackground(selected ? Color.accentColor.opacity(0.18) : nil)
+        .listRowBackground(selected ? Color.editorAccent.opacity(0.16) : nil)
         .onTapGesture {
             model.selection = .keyframe(keyframe.id)
             if let edited { model.seek(to: edited) }
