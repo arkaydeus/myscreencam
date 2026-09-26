@@ -146,6 +146,34 @@ struct AppStateTests {
         await model.close()
     }
 
+    @Test func steppedSliderKeyboardAndDragKeepSeparateUndoSteps() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let undo = UndoManager()
+        model.undoManager = undo
+        let original = model.edit.background.padding
+        let stepped = SteppedSliderValue.binding(
+            model.binding(\.background.padding, "Padding"), in: EditLimits.backgroundPadding, step: 0.05)
+
+        // A keyboard change arrives without an editing gesture.
+        stepped.wrappedValue = 0.25
+        #expect(abs(model.edit.background.padding - 0.25) < 1e-10)
+        undo.undo()
+        #expect(model.edit.background.padding == original)
+
+        // A drag sends several values between Slider's editing callbacks.
+        model.editingChanged(true)
+        stepped.wrappedValue = 0.11
+        stepped.wrappedValue = 0.16
+        stepped.wrappedValue = 0.17
+        #expect(abs(model.edit.background.padding - 0.15) < 1e-10)
+        model.editingChanged(false)
+        undo.undo()
+        #expect(model.edit.background.padding == original)
+        #expect(!undo.canUndo)
+        await model.close()
+    }
+
     @Test func handledEditorShortcutIsConsumedByMonitorRoute() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

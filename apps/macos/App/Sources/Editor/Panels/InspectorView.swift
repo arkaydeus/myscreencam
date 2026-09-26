@@ -108,12 +108,35 @@ struct ValueSlider: View {
                     .monospacedDigit()
                     .foregroundStyle(Color.editorSecondaryText)
             }
-            if let step {
-                Slider(value: $value, in: range, step: step) { model.editingChanged($0) }
-            } else {
-                Slider(value: $value, in: range) { model.editingChanged($0) }
-            }
+            Slider(value: steppedValue, in: range) { model.editingChanged($0) }
         }
+    }
+
+    /// Snaps to `step` itself: `Slider(value:in:step:)` draws a tick mark per step, which fine steps pack into a dotted line.
+    private var steppedValue: Binding<Double> {
+        guard let step else { return $value }
+        return SteppedSliderValue.binding($value, in: range, step: step)
+    }
+}
+
+enum SteppedSliderValue {
+    /// Keep the grid anchored to the lower bound, while allowing both slider endpoints even when the range
+    /// is not an exact multiple of the step.
+    static func snap(_ proposed: Double, in range: ClosedRange<Double>, step: Double) -> Double {
+        precondition(step > 0 && step.isFinite)
+        if proposed <= range.lowerBound { return range.lowerBound }
+        if proposed >= range.upperBound { return range.upperBound }
+        let snapped = range.lowerBound + ((proposed - range.lowerBound) / step).rounded() * step
+        return min(max(snapped, range.lowerBound), range.upperBound)
+    }
+
+    static func binding(_ value: Binding<Double>, in range: ClosedRange<Double>, step: Double) -> Binding<Double> {
+        Binding(
+            get: { value.wrappedValue },
+            set: { proposed in
+                let snapped = snap(proposed, in: range, step: step)
+                if snapped != value.wrappedValue { value.wrappedValue = snapped }
+            })
     }
 }
 
