@@ -16,10 +16,12 @@ mise runs everything. The root is a mise monorepo (`monorepo_root = true`), and 
 ```bash
 mise run setup               # once: every project's tools (XcodeGen, bun, node) + bun install
 mise tasks ls --all          # every task in every project
-mise //apps/macos:run        # build and launch the Dev app
-mise //apps/web:dev          # marketing site on http://localhost:3000
+mise run app                 # build and launch the Dev app (same as mise //apps/macos:run)
+mise run web                 # marketing site on http://localhost:3000 (same as mise //apps/web:dev)
+mise run start               # both of the above
 mise run check               # every project's local gate
 ```
+At the root, `build`, `test`, `lint`, `format` and `clean` run that task in both projects.
 Inside a project directory, `mise run <task>` runs that project's task (for example `cd apps/macos && mise run build`).
 
 ## Checks

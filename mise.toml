@@ -2,7 +2,11 @@
 #   mise run setup                 # once: installs every project's tools and the bun workspace
 #   mise //apps/macos:<task>       # macOS app (build, run, test, lint, release, ...)
 #   mise //apps/web:<task>         # marketing site (dev, build, lint, format, ...)
+#   mise run app                   # build and launch the Dev app
+#   mise run web                   # the site's dev server
+#   mise run start                 # both of the above
 #   mise run check                 # every project's local gate
+# build, test, lint, format and clean at the root run that task in both projects.
 # Inside a project directory, `mise run <task>` resolves to that project's tasks.
 monorepo_root = true
 
@@ -21,6 +25,38 @@ run = ["mise install", "mise -C apps/macos install", "mise -C apps/web install",
 [tasks.install]
 description = "Install bun workspace dependencies"
 run = "bun install"
+
+[tasks.start]
+description = "Build and launch the Dev app, and run the site's dev server"
+depends = ["//apps/macos:run", "//apps/web:dev"]
+
+[tasks.app]
+description = "Build and launch this worktree's Debug app (same as //apps/macos:run)"
+depends = ["//apps/macos:run"]
+
+[tasks.web]
+description = "Start the site's Next.js dev server (same as //apps/web:dev)"
+depends = ["//apps/web:dev"]
+
+[tasks.build]
+description = "Build every project: the signed Debug app and the production site"
+depends = ["//apps/macos:build", "//apps/web:build"]
+
+[tasks.test]
+description = "Run every project's tests"
+depends = ["//apps/macos:test", "//apps/web:test"]
+
+[tasks.lint]
+description = "Lint every project"
+depends = ["//apps/macos:lint", "//apps/web:lint"]
+
+[tasks.format]
+description = "Format every project in place"
+depends = ["//apps/macos:format", "//apps/web:format"]
+
+[tasks.clean]
+description = "Remove every project's build output"
+depends = ["//apps/macos:clean", "//apps/web:clean"]
 
 [tasks.check]
 description = "Local gate before pushing (there is no GitHub CI): every project's check"
