@@ -115,12 +115,27 @@ struct ValueSlider: View {
     /// Snaps to `step` itself: `Slider(value:in:step:)` draws a tick mark per step, which fine steps pack into a dotted line.
     private var steppedValue: Binding<Double> {
         guard let step else { return $value }
-        return Binding(
-            get: { value },
-            set: { newValue in
-                let snapped = range.lowerBound + ((newValue - range.lowerBound) / step).rounded() * step
-                let clamped = min(max(snapped, range.lowerBound), range.upperBound)
-                if clamped != value { value = clamped }
+        return SteppedSliderValue.binding($value, in: range, step: step)
+    }
+}
+
+enum SteppedSliderValue {
+    /// Keep the grid anchored to the lower bound, while allowing both slider endpoints even when the range
+    /// is not an exact multiple of the step.
+    static func snap(_ proposed: Double, in range: ClosedRange<Double>, step: Double) -> Double {
+        precondition(step > 0 && step.isFinite)
+        if proposed <= range.lowerBound { return range.lowerBound }
+        if proposed >= range.upperBound { return range.upperBound }
+        let snapped = range.lowerBound + ((proposed - range.lowerBound) / step).rounded() * step
+        return min(max(snapped, range.lowerBound), range.upperBound)
+    }
+
+    static func binding(_ value: Binding<Double>, in range: ClosedRange<Double>, step: Double) -> Binding<Double> {
+        Binding(
+            get: { value.wrappedValue },
+            set: { proposed in
+                let snapped = snap(proposed, in: range, step: step)
+                if snapped != value.wrappedValue { value.wrappedValue = snapped }
             })
     }
 }
