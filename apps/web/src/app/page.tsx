@@ -1,7 +1,7 @@
 import { Closing, SiteFooter } from "@/components/site/closing";
 import { Faq } from "@/components/site/faq";
-import { Features } from "@/components/site/features";
 import { Hero } from "@/components/site/hero";
+import { Highlights } from "@/components/site/highlights";
 import { HowItWorks } from "@/components/site/how-it-works";
 import { MacDetails } from "@/components/site/mac-details";
 import { Performance } from "@/components/site/performance";
@@ -13,8 +13,8 @@ export default function Home() {
       <SiteHeader />
       <main>
         <Hero />
+        <Highlights />
         <HowItWorks />
-        <Features />
         <Performance />
         <MacDetails />
         <Faq />

@@ -8,25 +8,32 @@ const nav = [
   { href: "#faq", label: "FAQ" },
 ];
 
+/** The product bar: translucent, pinned to the top, with the download always in reach. */
 export function SiteHeader() {
   return (
-    <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-6 px-5 py-5 sm:px-8">
-      <a href="#top" className="flex items-center gap-2.5 rounded-md">
-        <LogoMark />
-        <span className="font-display text-lg font-extrabold tracking-tight">{site.name}</span>
-      </a>
-      <nav aria-label="Sections" className="hidden items-center gap-7 text-sm font-medium md:flex">
-        {nav.map((item) => (
-          <a
-            key={item.href}
-            href={item.href}
-            className="rounded-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {item.label}
-          </a>
-        ))}
-      </nav>
-      <DownloadButton size="default" className="hidden sm:inline-flex" />
+    <header className="sticky top-0 z-50 border-b border-black/8 bg-white/80 backdrop-blur-xl backdrop-saturate-150">
+      <div className="page-width flex h-12 items-center justify-between gap-6 sm:h-13">
+        <a href="#top" className="flex items-center gap-2.5 rounded-md">
+          <LogoMark className="size-[22px] rounded-[6px] sm:size-[26px] sm:rounded-[7px]" />
+          <span className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[21px]">
+            {site.name}
+          </span>
+        </a>
+        <div className="flex items-center gap-7">
+          <nav aria-label="Sections" className="hidden items-center gap-7 text-xs md:flex">
+            {nav.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="rounded-sm text-ink/80 transition-colors hover:text-ink"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+          <DownloadButton size="sm" />
+        </div>
+      </div>
     </header>
   );
 }

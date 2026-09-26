@@ -1,3 +1,6 @@
+import { Plus } from "lucide-react";
+
+import { sectionTitle } from "@/components/site/brand";
 import {
   Accordion,
   AccordionContent,
@@ -35,19 +38,22 @@ const questions = [
 
 export function Faq() {
   return (
-    <section id="faq" className="scroll-mt-8 border-t border-rule">
-      <div className="mx-auto grid w-full max-w-7xl gap-10 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[minmax(0,26rem)_1fr]">
-        <h2 className="font-display text-4xl leading-none font-extrabold tracking-[-0.03em] sm:text-5xl">
-          Questions
-        </h2>
-        <Accordion className="border-t border-rule">
+    <section id="faq" className="scroll-mt-13 py-18 sm:py-30">
+      <div className="page-width-narrow">
+        <h2 className={sectionTitle}>Questions? Answers.</h2>
+        <Accordion defaultValue={[questions[0].q]} className="mt-7 border-b border-rule sm:mt-12">
           {questions.map((item) => (
-            <AccordionItem key={item.q} value={item.q} className="border-b border-rule">
-              <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline sm:text-lg">
+            <AccordionItem key={item.q} value={item.q} className="border-t border-rule">
+              <AccordionTrigger className="min-h-16 items-center gap-6 rounded-none py-3.5 text-[17px] font-semibold hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden sm:min-h-19 sm:text-[21px]">
                 {item.q}
+                <Plus
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="ml-auto size-5 shrink-0 transition-transform duration-300 group-aria-expanded/accordion-trigger:rotate-45 sm:size-[22px]"
+                />
               </AccordionTrigger>
-              <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
-                <p className="max-w-[62ch]">{item.a}</p>
+              <AccordionContent className="pb-5 text-[15px] leading-[1.47] text-muted-foreground sm:pb-7 sm:text-[17px]">
+                <p className="max-w-[760px]">{item.a}</p>
               </AccordionContent>
             </AccordionItem>
           ))}

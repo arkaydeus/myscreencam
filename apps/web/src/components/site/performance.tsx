@@ -1,6 +1,8 @@
+import { FootnoteRef } from "@/components/site/brand";
+
 /**
  * Numbers measured on the optimised build; sources in apps/macos/docs/perf-baseline.md. Update both
- * together.
+ * together, and the footnote in the site footer.
  */
 const measurements = [
   {
@@ -27,52 +29,55 @@ const measurements = [
   },
 ];
 
+const frameworks = [
+  { name: "ScreenCaptureKit", role: "Captures screen and sound" },
+  { name: "VideoToolbox", role: "Encodes on the media engine" },
+  { name: "Core Image", role: "Composites every frame" },
+  { name: "Metal", role: "Keeps it all on the GPU" },
+];
+
 export function Performance() {
   return (
-    <section id="performance" className="scroll-mt-8 bg-ink text-white">
-      <div className="mx-auto grid w-full max-w-7xl gap-14 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[minmax(0,26rem)_1fr]">
-        <div>
-          <h2 className="font-display text-4xl leading-none font-extrabold tracking-[-0.03em] sm:text-5xl">
-            Light enough to leave running.
-          </h2>
-          <div className="mt-6 space-y-4 text-lg leading-relaxed text-white/70">
-            <p>
-              MyScreenArt is built only on Apple’s own frameworks. ScreenCaptureKit captures,
-              VideoToolbox encodes on the media engine, and Core Image composites on the GPU with
-              Metal.
-            </p>
-            <p>
-              Frames stay on the GPU from capture to export, and a screen that isn’t changing isn’t
-              re-encoded frame after frame. Your fans stay quiet and your battery lasts.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <table className="w-full text-left">
-            <caption className="sr-only">Measured resource use</caption>
-            <tbody>
-              {measurements.map((m) => (
-                <tr
-                  key={m.unit}
-                  className="flex flex-col border-b border-white/15 py-6 first:border-t sm:table-row sm:py-0 sm:align-baseline"
-                >
-                  <th scope="row" className="pr-6 font-normal whitespace-nowrap sm:py-6 sm:pr-10">
-                    <span className="block font-figures text-4xl font-extrabold tracking-tight text-cadmium sm:text-5xl">
-                      {m.figure}
-                    </span>
-                    <span className="mt-1 block text-sm text-white/60">{m.unit}</span>
-                  </th>
-                  <td className="pt-3 leading-relaxed text-white/80 sm:py-6">{m.scenario}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-6 text-sm text-white/50">
-            Measured on a MacBook Pro with M5 Max in September 2026. Your results depend on your
-            Mac, your display and what’s on screen.
-          </p>
-        </div>
+    <section id="performance" className="scroll-mt-13 bg-black text-[#f5f5f7]">
+      <div className="page-width py-22 text-center sm:pt-35 sm:pb-32">
+        <p className="text-[17px] font-semibold text-cadmium sm:text-[21px]">Performance</p>
+        <h2 className="mx-auto mt-2 max-w-[900px] text-[40px] leading-[1.1] font-semibold tracking-[-0.01em] text-balance sm:mt-3 sm:text-[56px] lg:text-[72px] lg:leading-[1.05] lg:tracking-[-0.015em]">
+          Light enough to leave running.
+        </h2>
+        <p className="mx-auto mt-4 max-w-[720px] text-[17px] leading-[1.47] text-pretty text-[#a1a1a6] sm:mt-6 sm:text-[21px] sm:leading-[1.43]">
+          Frames stay on the GPU from capture to export, and a screen that isn’t changing isn’t
+          re-encoded frame after frame. Your fans stay quiet and your battery lasts.
+        </p>
+        <dl className="mt-12 grid grid-cols-2 gap-x-5 gap-y-9 text-left sm:mt-20 lg:grid-cols-4 lg:gap-0">
+          {measurements.map((m) => (
+            <div
+              key={m.unit}
+              className="flex flex-col border-t border-[#333336] pt-4 lg:border-t-0 lg:border-l lg:px-7 lg:pt-0"
+            >
+              <dt className="order-2 mt-2 text-[15px] font-semibold sm:mt-2.5 sm:text-[17px]">
+                {m.unit}
+                <FootnoteRef />
+              </dt>
+              <dd className="order-1 text-[40px] leading-none font-semibold tracking-[-0.02em] text-white sm:text-[64px]">
+                {m.figure}
+              </dd>
+              <dd className="order-3 mt-1.5 text-xs leading-[1.4] text-[#a1a1a6] sm:mt-2.5 sm:text-sm sm:leading-[1.43]">
+                {m.scenario}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <ul className="mt-12 grid grid-cols-2 gap-2.5 text-left sm:mt-22 sm:gap-4 lg:grid-cols-4">
+          {frameworks.map((f) => (
+            <li key={f.name} className="rounded-2xl bg-ink p-4.5 sm:rounded-[22px] sm:p-7">
+              <p className="text-[15px] font-semibold sm:text-[19px]">{f.name}</p>
+              <p className="mt-1 text-xs text-[#a1a1a6] sm:mt-1.5 sm:text-sm">{f.role}</p>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-5 text-[15px] text-[#a1a1a6] sm:mt-7 sm:text-[17px]">
+          Built only on Apple’s own frameworks.
+        </p>
       </div>
     </section>
   );

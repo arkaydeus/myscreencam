@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 
+import { Portrait } from "@/components/site/brand";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 export function CanvasDemo({ className }: { className?: string }) {
   return (
     <figure className={cn("w-full", className)}>
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[clamp(14px,2.4vw,32px)] p-[5.5%] canvas-paint">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[clamp(18px,3.2vw,36px)] p-[5.5%] canvas-paint">
         <div className="@container relative h-full w-full overflow-hidden rounded-[1.6cqw] bg-white shadow-[0_2.5cqw_6cqw_-1cqw_rgb(20_16_70/0.55)]">
           <div className="absolute inset-0 demo-camera will-change-transform">
             <MockWindow />
@@ -110,10 +111,7 @@ function WebcamBubble() {
       aria-hidden
       className="absolute top-[4%] right-[2.5%] aspect-square w-[15%] overflow-hidden rounded-full border-[0.35vw] border-white/85 bg-[linear-gradient(160deg,#ffd9a8,#f39a7a)] shadow-[0_1vw_2.5vw_-0.5vw_rgb(20_16_70/0.5)]"
     >
-      <svg viewBox="0 0 100 100" className="size-full">
-        <circle cx="50" cy="42" r="17" fill="#6a3b2a" />
-        <path d="M18 100c2-22 15-34 32-34s30 12 32 34z" fill="#2f46e8" />
-      </svg>
+      <Portrait />
     </div>
   );
 }
@@ -134,7 +132,7 @@ function Timeline() {
   return (
     <div
       aria-hidden
-      className="mt-4 rounded-[clamp(12px,1.6vw,20px)] bg-ink p-3 text-[11px] text-white/60 sm:p-4"
+      className="mt-2.5 rounded-[clamp(14px,2vw,22px)] bg-ink p-3 text-[11px] text-white/60 sm:mt-4 sm:p-4"
     >
       <div className="flex gap-3">
         <div className="hidden w-14 shrink-0 sm:block">

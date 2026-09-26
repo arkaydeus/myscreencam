@@ -5,24 +5,27 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * MyScreenArt palette. The page itself is a cool gallery wall in indigo ink; the saturated pigments only
- * appear inside "canvases", the way the app frames a recording on a painted background.
+ * MyScreenArt palette. The page follows the Mac's own neutrals: white and light-grey sections, near-black
+ * text and one blue for actions. The saturated pigments only appear inside "canvases", the way the app
+ * frames a recording on a painted background, and as the yellow of zooms and click rings.
  */
 @theme {
-  --color-paper: #eceef2;
-  --color-ink: #1b1e45;
+  --color-paper: #f5f5f7;
+  --color-ink: #1d1d1f;
+  --color-graphite: #6e6e73;
   --color-ultramarine: #2f46e8;
   --color-cadmium: #ffc23a;
   --color-rose: #f0668f;
   --color-viridian: #16876f;
-  --color-rule: #cdd1da;
+  --color-rule: #d2d2d7;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-mona);
-  --font-heading: var(--font-hubot);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica,
+    Arial, sans-serif;
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -49,23 +52,25 @@
 }
 
 :root {
-  --background: #eceef2;
-  --foreground: #1b1e45;
-  --card: #f7f8fa;
-  --card-foreground: #1b1e45;
-  --popover: #f7f8fa;
-  --popover-foreground: #1b1e45;
+  /* Side margin for every section; the content column is 1160 px wide inside it. */
+  --gutter: clamp(1.5rem, 4vw, 2.5rem);
+  --background: #ffffff;
+  --foreground: #1d1d1f;
+  --card: #f5f5f7;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
   --primary: #2f46e8;
   --primary-foreground: #ffffff;
-  --secondary: #dfe2e9;
-  --secondary-foreground: #1b1e45;
-  --muted: #dfe2e9;
-  --muted-foreground: #4f5374;
-  --accent: #dfe2e9;
-  --accent-foreground: #1b1e45;
+  --secondary: #f5f5f7;
+  --secondary-foreground: #1d1d1f;
+  --muted: #f5f5f7;
+  --muted-foreground: #6e6e73;
+  --accent: #f5f5f7;
+  --accent-foreground: #1d1d1f;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #cdd1da;
-  --input: #cdd1da;
+  --border: #d2d2d7;
+  --input: #d2d2d7;
   --ring: #2f46e8;
   --radius: 0.625rem;
 }
@@ -75,7 +80,7 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply scroll-smooth font-sans;
+    @apply scroll-smooth font-sans antialiased;
   }
   body {
     @apply bg-background text-foreground;
@@ -86,18 +91,26 @@
   }
 }
 
-/* Headings use Hubot Sans at its widest, heaviest setting: the wordmark's voice. */
-@utility font-display {
-  font-family: var(--font-hubot);
-  font-stretch: 125%;
-  font-variation-settings: "wdth" 125;
+/* The page's content column: 1160 px, centred, with the shared side margin. */
+@utility page-width {
+  margin-inline: auto;
+  width: 100%;
+  max-width: calc(1160px + 2 * var(--gutter));
+  padding-inline: var(--gutter);
 }
 
-/* Wide figures in Mona Sans: Hubot's zero carries a dot that reads as a theta at display sizes. */
-@utility font-figures {
-  font-family: var(--font-mona);
-  font-stretch: 125%;
-  font-variation-settings: "wdth" 125;
+/* The narrower reading column (FAQ, footer). */
+@utility page-width-narrow {
+  margin-inline: auto;
+  width: 100%;
+  max-width: calc(980px + 2 * var(--gutter));
+  padding-inline: var(--gutter);
+}
+
+/* Lines a full-bleed scroller's first item up with the content column. */
+@utility gallery-inset {
+  padding-inline: max(var(--gutter), calc((100% - 1160px) / 2));
+  scroll-padding-inline: max(var(--gutter), calc((100% - 1160px) / 2));
 }
 
 /* The painted background the hero recording sits on (the app's gradient/image canvas). */
