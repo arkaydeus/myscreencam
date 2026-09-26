@@ -10,11 +10,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # MyScreenArt marketing site (`apps/web`)
 
-A single-page marketing site for the MyScreenArt Mac app. It's statically rendered and ships no client JavaScript of its own; the hero demo is pure CSS.
+A single-page marketing site for the MyScreenArt Mac app. It's statically rendered. The hero demo is pure CSS; the only client JavaScript of its own is the highlights gallery's paddle buttons (`highlights-gallery.tsx`), and the row still scrolls natively without it.
 
 ## Stack
 
-- Next.js App Router (`src/app`), React Server Components only.
+- Next.js App Router (`src/app`), React Server Components apart from the small `"use client"` gallery.
 - Tailwind CSS v4. Theme tokens and the hero keyframes live in `src/app/globals.css`; there is no `tailwind.config`.
 - shadcn/ui (`components.json`, base-ui primitives) in `src/components/ui`. Add components with `bunx shadcn@latest add <name>`, and don't hand-edit them beyond small fixes.
 - bun for packages and scripts. oxlint (`.oxlintrc.json`) and oxfmt (`.oxfmtrc.json`, sorts Tailwind classes) replace ESLint and Prettier.
@@ -24,11 +24,14 @@ A single-page marketing site for the MyScreenArt Mac app. It's statically render
 - `src/app/page.tsx` composes the sections in `src/components/site/`.
 - `src/components/site/canvas-demo.tsx` is the hero. Its zoom blocks and click times must match the `msa-*` keyframes in `globals.css` (one 12 s loop).
 - `src/lib/site.ts` holds the shared facts: download URL, requirements, description.
+- Measured figures carry a footnote marker (`FootnoteRef`) that links to the numbered note in `SiteFooter`.
 
 ## Design
 
-- Palette: gallery paper `#eceef2`, indigo ink `#1b1e45`, ultramarine `#2f46e8` for actions. Cadmium, rose and viridian appear only inside "canvases" (`canvas-paint`), the way the app frames recordings.
-- Type: Hubot Sans at 125% width (`font-display`) for headings, Mona Sans for body text, and wide Mona Sans (`font-figures`) for large numbers.
+- Modelled on apple.com/mac: a translucent sticky product bar, big centred headlines, sections alternating white, light grey (`paper` `#f5f5f7`) and black, rounded tiles (28 px) and pill buttons.
+- Palette: text `ink` `#1d1d1f`, secondary text `graphite` `#6e6e73`, rules `#d2d2d7`, ultramarine `#2f46e8` for actions and links. Cadmium, rose and viridian appear only inside "canvases" (`canvas-paint`), the way the app frames recordings, plus cadmium for zoom blocks, click rings and the Performance eyebrow.
+- Type: the system font stack (SF Pro on a Mac), semibold for headings. No web fonts are loaded.
+- Layout: `page-width` is the 1160 px content column, `page-width-narrow` the 980 px reading column, and `gallery-inset` lines a full-bleed scroller up with them. Section headings use `sectionTitle` from `brand.tsx`.
 - Motion is limited to the hero loop, and it respects `prefers-reduced-motion`.
 
 ## Content rules

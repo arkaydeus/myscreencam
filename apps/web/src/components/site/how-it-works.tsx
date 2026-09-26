@@ -1,3 +1,7 @@
+import { AudioLines, EyeOff, Layers } from "lucide-react";
+
+import { sectionTitle } from "@/components/site/brand";
+
 /** Presets as shipped in apps/macos (ExportKit/ExportPreset.swift). */
 const presets = [
   { name: "Web", detail: "H.264, up to 1080p, 30 fps" },
@@ -9,8 +13,8 @@ const presets = [
 
 const steps = [
   {
-    title: "Record",
-    lead: "Capture a whole display, a single window, or a region you drag out.",
+    title: "Record.",
+    lead: "A whole display, a single window, or a region you drag out.",
     points: [
       "Webcam, microphone and system audio in the same take, with no audio driver to install.",
       "Pause and resume without starting a new recording.",
@@ -19,8 +23,8 @@ const steps = [
     ],
   },
   {
-    title: "Edit",
-    lead: "The preview is drawn by the same renderer as the export, so what you see is what you get.",
+    title: "Edit.",
+    lead: "The preview is drawn by the same renderer as the export.",
     points: [
       "Cut, trim and delete sections on a timeline with audio waveforms.",
       "Add zooms by hand, on every click, or following the mouse.",
@@ -29,50 +33,70 @@ const steps = [
     ],
   },
   {
-    title: "Export",
-    lead: "Encoding runs on your Mac’s media engine, which leaves the CPU free for other work.",
+    title: "Export.",
+    lead: "Encoded on the media engine, with a preset for every destination.",
     points: [],
+  },
+];
+
+const more = [
+  {
+    icon: EyeOff,
+    title: "Blur",
+    body: "Hide an email address, a token or a customer’s name for just the part of the video where it’s showing.",
+  },
+  {
+    icon: AudioLines,
+    title: "Audio",
+    body: "Microphone and system audio stay on separate tracks, each with its own level and waveform.",
+  },
+  {
+    icon: Layers,
+    title: "Presets",
+    body: "Keep your background, cursor and zoom settings as a preset so every video matches.",
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how" className="scroll-mt-8 border-t border-rule">
-      <div className="mx-auto w-full max-w-7xl px-5 py-20 sm:px-8 sm:py-28">
-        <h2 className="max-w-[20ch] font-display text-4xl leading-none font-extrabold tracking-[-0.03em] sm:text-5xl">
-          From raw take to shareable video in three steps.
+    <section id="how" className="scroll-mt-13 py-18 sm:py-30">
+      <div className="page-width">
+        <h2 className={sectionTitle}>
+          Record. Edit. Export.
+          <br />
+          <span className="text-muted-foreground">Raw take to shareable video.</span>
         </h2>
-        <ol className="mt-14 grid gap-12 md:grid-cols-3 md:gap-10">
+        <ol className="mt-8 grid gap-3 sm:mt-14 sm:gap-5 lg:grid-cols-3">
           {steps.map((step, index) => (
-            <li key={step.title} className="flex flex-col">
-              <div className="flex items-baseline gap-3 border-b-2 border-ink pb-3">
-                <span className="font-display text-2xl font-extrabold text-ultramarine tabular-nums">
-                  {index + 1}
-                </span>
-                <h3 className="font-display text-2xl font-extrabold tracking-tight">
-                  {step.title}
-                </h3>
-              </div>
-              <p className="mt-5 text-lg leading-snug font-medium">{step.lead}</p>
+            <li
+              key={step.title}
+              className="rounded-3xl bg-paper px-6 py-7 sm:rounded-[28px] sm:px-9 sm:py-10"
+            >
+              <p className="text-xs font-semibold text-primary sm:text-sm">Step {index + 1}</p>
+              <h3 className="mt-1 text-[32px] leading-[1.1] font-semibold sm:mt-1.5 sm:text-[40px]">
+                {step.title}
+              </h3>
+              <p className="mt-3 text-[17px] leading-[1.41] font-semibold sm:mt-4 sm:text-[19px] sm:leading-[1.42]">
+                {step.lead}
+              </p>
               {step.points.length > 0 ? (
-                <ul className="mt-5 space-y-3 text-muted-foreground">
+                <ul className="mt-5 text-[15px] leading-[1.47] text-muted-foreground sm:mt-6">
                   {step.points.map((point) => (
-                    <li key={point} className="flex gap-3 leading-relaxed">
-                      <span aria-hidden className="mt-2.5 h-px w-3 shrink-0 bg-ink/40" />
+                    <li key={point} className="border-t border-rule py-3 last:pb-0">
                       {point}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <table className="mt-5 w-full text-left text-sm">
+                <table className="mt-5 w-full text-left text-[15px] leading-[1.47] sm:mt-6">
                   <caption className="sr-only">Export presets</caption>
                   <tbody>
                     {presets.map((preset) => (
-                      <tr key={preset.name} className="border-b border-rule last:border-0">
-                        <th scope="row" className="py-2.5 pr-4 font-semibold">
+                      <tr key={preset.name} className="border-t border-rule">
+                        <th scope="row" className="py-3 pr-3 font-semibold">
                           {preset.name}
                         </th>
-                        <td className="py-2.5 text-muted-foreground">{preset.detail}</td>
+                        <td className="py-3 text-muted-foreground">{preset.detail}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -81,6 +105,26 @@ export function HowItWorks() {
             </li>
           ))}
         </ol>
+        <ul className="mt-3 grid gap-3 sm:mt-5 sm:gap-5 lg:grid-cols-3">
+          {more.map((item) => (
+            <li
+              key={item.title}
+              className="flex gap-4 rounded-3xl bg-paper p-6 sm:gap-4.5 sm:rounded-[28px] sm:px-9 sm:py-8"
+            >
+              <item.icon
+                aria-hidden
+                className="size-6.5 shrink-0 text-primary sm:size-7"
+                strokeWidth={1.75}
+              />
+              <div>
+                <h3 className="text-[17px] font-semibold sm:text-[19px]">{item.title}</h3>
+                <p className="mt-1 text-[15px] leading-[1.47] text-muted-foreground sm:mt-1.5">
+                  {item.body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
