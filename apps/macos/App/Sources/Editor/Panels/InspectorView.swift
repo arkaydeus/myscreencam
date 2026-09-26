@@ -108,12 +108,20 @@ struct ValueSlider: View {
                     .monospacedDigit()
                     .foregroundStyle(Color.editorSecondaryText)
             }
-            if let step {
-                Slider(value: $value, in: range, step: step) { model.editingChanged($0) }
-            } else {
-                Slider(value: $value, in: range) { model.editingChanged($0) }
-            }
+            Slider(value: steppedValue, in: range) { model.editingChanged($0) }
         }
+    }
+
+    /// Snaps to `step` itself: `Slider(value:in:step:)` draws a tick mark per step, which fine steps pack into a dotted line.
+    private var steppedValue: Binding<Double> {
+        guard let step else { return $value }
+        return Binding(
+            get: { value },
+            set: { newValue in
+                let snapped = range.lowerBound + ((newValue - range.lowerBound) / step).rounded() * step
+                let clamped = min(max(snapped, range.lowerBound), range.upperBound)
+                if clamped != value { value = clamped }
+            })
     }
 }
 
