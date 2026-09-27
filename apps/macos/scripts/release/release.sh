@@ -75,6 +75,8 @@ notarize_file() {
 }
 
 cd "$root"
+# Archiving and exporting register their apps with LaunchServices; drop those registrations however the run ends.
+trap '"$root/scripts/dev/unregister-builds.sh" || true' EXIT
 rm -rf "$archive" "$export_dir" "$out/dmg-staging"
 mkdir -p "$out"
 
