@@ -44,6 +44,8 @@ extension EditConfig {
     ///   intensity ``EditLimits/blurIntensity``.
     /// - Audio: gains ``EditLimits/gainDB``.
     /// - Background: padding, corner radius and shadow within their ranges.
+    /// - Subtitles: style within its ``EditLimits``; cue times clamped to 0…duration, cues without `end > start`
+    ///   dropped, positions inside 0…1, cues sorted by start.
     ///
     /// Non-finite numbers are replaced by the nearest sensible value (the range's lower bound, or the default).
     public func normalized(duration: Double) -> EditConfig {
@@ -57,6 +59,7 @@ extension EditConfig {
         config.audio.system.gainDB = clamp(audio.system.gainDB, EditLimits.gainDB, fallback: 0)
         config.audio.microphone.gainDB = clamp(audio.microphone.gainDB, EditLimits.gainDB, fallback: 0)
         config.background = background.normalized()
+        config.subtitles = subtitles.normalized(duration: duration)
         return config
     }
 

@@ -9,6 +9,9 @@
 # Use full Xcode even when xcode-select points at the Command Line Tools. Override by exporting DEVELOPER_DIR.
 DEVELOPER_DIR = "{{ get_env(name='DEVELOPER_DIR', default='/Applications/Xcode.app/Contents/Developer') }}"
 MSA_DERIVED_DATA = "{{config_root}}/build/DerivedData"
+# mlx-swift (speech service) ships a SwiftPM build-tool plugin and swift-syntax macros; command-line xcodebuild
+# refuses unvalidated plugins/macros. They come from the pinned, reviewed revisions in Package.resolved.
+MSA_XCODEBUILD_TRUST = "-skipPackagePluginValidation -skipMacroValidation"
 
 [tasks.generate]
 description = "Generate MyScreenArt.xcodeproj from project.yml"
@@ -17,17 +20,17 @@ run = "xcodegen generate --quiet"
 [tasks.build]
 description = "Build the Debug app (signed with the Apple Development identity)"
 depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet build"
+run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet build"
 
 [tasks."build:unsigned"]
 description = "Build the Debug app without code signing; separate DerivedData so it never replaces the signed dev app"
 depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' -quiet CODE_SIGNING_ALLOWED=NO build"
+run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet CODE_SIGNING_ALLOWED=NO build"
 
 [tasks."build:perf"]
 description = "Build the Dev app (same bundle ID/signing/TCC grants) with full optimisation, for perf measurements"
 depends = ["generate"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO build"
+run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO build"
 
 [tasks.run]
 description = "Build and launch this worktree's Debug app via LaunchServices"
@@ -38,6 +41,10 @@ run = "scripts/dev/run.sh"
 description = "Run the engine package tests"
 run = "swift test --package-path Packages/MyScreenArtKit"
 
+[tasks."test:speech-engines"]
+description = "Run speech worker path and token-mapping tests"
+run = "swift test --package-path Packages/SpeechEngines --filter InferenceEngineTests"
+
 [tasks."test:scripts"]
 description = "Check Dev launch and release paths without side effects"
 run = "bash scripts/test-scripts.sh"
@@ -45,7 +52,7 @@ run = "bash scripts/test-scripts.sh"
 [tasks."test:app"]
 description = "Run app-target state and lifecycle tests"
 depends = ["build"]
-run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' -quiet test"
+run = "xcodebuild -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet test"
 
 [tasks.format]
 description = "Format Swift sources in place"
@@ -77,7 +84,7 @@ run = "scripts/release/release.sh --no-notarize --no-appcast"
 
 [tasks.check]
 description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
-depends = ["lint", "test", "test:app", "test:scripts"]
+depends = ["lint", "test", "test:app", "test:speech-engines", "test:scripts"]
 run = "echo 'All checks passed.'"
 
 [tasks.clean]

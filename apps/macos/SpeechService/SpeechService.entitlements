@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Hardened Runtime with no exceptions: the service reads models and prepared audio from disk and runs Core ML
+	     and Metal. It needs no network, camera or microphone access. -->
+</dict>
+</plist>

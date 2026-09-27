@@ -9,7 +9,7 @@ A native macOS screen recorder and editor. It records the screen, system audio, 
 ## Stack
 - Swift 6 (strict concurrency). The app target defaults to `MainActor` isolation; the engine packages don't.
 - SwiftUI for the shell and panels. AppKit where SwiftUI costs too much (timeline, HUD panel, hotkeys).
-- ScreenCaptureKit, AVFoundation, VideoToolbox, Core Image, Metal, Core Audio, ImageIO. The only planned third-party dependency is Sparkle (phase 6).
+- ScreenCaptureKit, AVFoundation, VideoToolbox, Core Image, Metal, Core Audio, ImageIO. Third-party dependencies: Sparkle, plus the speech recognisers (FluidAudio, MLX Audio Swift and their dependencies), which only the `MyScreenArtSpeech` XPC service links (see `docs/subtitles-plan.md`).
 - Minimum macOS 15. Built with Xcode 27 (`/Applications/Xcode.app`).
 - XcodeGen generates `MyScreenArt.xcodeproj` from `project.yml`. **The project is not committed**; edit `project.yml`, never the pbxproj.
 - mise pins tools and runs every task.
@@ -19,18 +19,23 @@ A native macOS screen recorder and editor. It records the screen, system audio, 
 App/                         app target (SwiftUI/AppKit), Info.plist, entitlements
   Resources/AppIcon.icon     app icon (Icon Composer; actool also emits the pre-Tahoe AppIcon.icns)
 QuickLookThumbnail/          Quick Look thumbnail extension for .msarec packages (embedded in the app)
+SpeechService/               MyScreenArtSpeech.xpc: on-device speech recognition (the one owner of loaded models)
 Packages/MyScreenArtKit/     engine SwiftPM package (testable with `swift test`)
   Sources/MyScreenArtCore    paths, flavor, logging/signposts, URL-command parsing, shell policies
+  Sources/SpeechCore         speech-model catalogue/downloads, audio preparation, worker protocol, transcript pipeline
+Packages/SpeechEngines/      Parakeet (FluidAudio) and Qwen (MLX) adapters + `speech-tool`; build with xcodebuild only
 project.yml                  XcodeGen spec (bundle IDs, signing, settings, Sparkle package)
 scripts/dev/                 run.sh (LaunchServices launch), doctor.sh
 scripts/perf/                sample.py (CPU/memory sampler), legacy baseline driver
+scripts/speech/              make-catalogue.py (pinned model manifests), timing fixtures and reports
 scripts/release/             release.sh (archive → notarise → DMG → appcast), ExportOptions.plist
 docs/                        plan, perf baseline, release.md
 ```
 Engine modules are added as their phase starts. The layering is in the comment at the top of `Packages/MyScreenArtKit/Package.swift`. A module may only depend on modules above it.
 
 ## Areas and contracts
-- **The shared contract is `ProjectKit`'s model** (`RecordingMeta`, `EditConfig`, `InputEvent`, `CursorIndex`, `RecordingPackage`).
+- **The shared contract is `ProjectKit`'s model** (`RecordingMeta`, `EditConfig`, `InputEvent`, `CursorIndex`, `RecordingPackage`, `TranscriptRevision`).
+  - Subtitles live in `EditConfig.subtitles` (style, placement, cues in source seconds). Immutable transcripts are `transcripts/<id>.json` in the package; `cache/transcription/` holds prepared audio and per-window checkpoints (derived, safe to delete).
   - All effect times are session (source) seconds.
   - Normalised coordinates are 0…1 with the origin top-left, y down.
   - Change the model only when it's genuinely needed, and update every user of it.
@@ -39,8 +44,9 @@ Engine modules are added as their phase starts. The layering is in the comment a
   - `Editor/`: `EditorSessions`, editor window, preview, timeline, panels.
   - `Library/`: the library window.
   - `Export/`: `ExportCenter`, `ExportSheet`.
+  - `Transcription/`: `TranscriptionCenter` (the one transcription queue and speech-service owner), `SpeechModels` (downloads), `SpeechSettings`, the XPC client, Settings › Subtitles.
   - `Shell/`: `AppRouter`, app delegate, commands, URL scheme, intents, updates, settings.
-- **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`.
+- **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll/isAnyPlaying/session(for:)`, `EditorModel.receiveTranscript(_:)` (transcription commits through an open editor), `TranscriptionCenter.job(for:)/transcribe/cancel/cancelAll/isAvailable/retime`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`.
 - **Shell hooks for other areas** (`App/Sources/Shell/`):
   - **Export… (⌘E)** is driven by the focused-scene value `\.exportAction: (() -> Void)?` (declared in `Shell/AppCommands.swift`). The editor window publishes it with `.focusedSceneValue(\.exportAction) { showExport = true }`; the menu item is disabled when no focused scene sets it.
   - Opening windows: `AppRouter.showLibrary()`, `showRecorder(source:)` (sets `recorderSourceRequest`, which the recorder reads when it opens), `openEditor(for:)`. Requests made before any scene has appeared are queued and replayed once `bindRouter` binds `openWindowAction`. Every root scene view must use `.bindRouter(model.router)`.
@@ -50,6 +56,7 @@ Engine modules are added as their phase starts. The layering is in the comment a
   - URL scheme `myscreenart://` (Debug `myscreenart-dev://`): `AppURLCommand.parse` in MyScreenArtCore (`record|new-recording`, `display|window|region` or the `record-*` forms, `projects|show-projects|library`, `stop|finish`).
   - Documents: the app exports the UTType `com.myscreenart.recording` (`.msarec`, a package), so double-clicking a recording opens it in the editor.
 - **Legacy behaviour and defaults** are specified in `docs/legacy-inventory.md`, including the bugs not to copy.
+- **Speech** runs only in `MyScreenArtSpeech.xpc` (it exits when released, returning model memory). Models download only after the user picks an engine in Settings › Subtitles; the worker loads them only from verified directories under `~/Library/Application Support/<app id>/Models`. SDK facts, pins, measurements and limitations: `docs/speech-integration.md`.
 - **GPU work uses Core Image** (on Metal) and built-in CI filters. Don't add `.metal` files: SwiftPM command-line builds don't compile them. If a custom kernel is unavoidable, compile Metal source at runtime with `MTLDevice.makeLibrary(source:options:)`.
 
 ## Tasks
@@ -59,6 +66,7 @@ mise install            # once: installs XcodeGen (or `mise run setup` at the re
 mise run build          # generate project + Debug build (signed, Apple Development)
 mise run run            # build + launch this worktree's app via LaunchServices
 mise run test           # engine package tests (Swift Testing)
+mise run test:speech-engines # speech worker path and token-mapping tests
 mise run lint           # swift-format lint --strict
 mise run check          # lint + test + build: the local gate before pushing (no GitHub CI)
 mise run format         # swift-format in place
@@ -76,6 +84,7 @@ Engine benchmarks without the app: `swift build -c release --product msa-tool` (
 
 `scripts/dev/make-sample-recording.swift <dir>` creates a synthetic `.msarec`.
 mise sets `DEVELOPER_DIR` to full Xcode, because `xcode-select` on this machine points at the Command Line Tools. Don't run `sudo xcode-select`.
+Building the speech service needs Xcode's Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`; `mise run doctor` checks). The xcodebuild tasks pass `$MSA_XCODEBUILD_TRUST` (`-skipPackagePluginValidation -skipMacroValidation`) for mlx-swift's build plugin and swift-syntax macros from the pinned `Package.resolved`.
 
 ## Builds, identity and permissions
 - Debug: product **MyScreenArt Dev**, bundle ID `com.myscreenart.app.dev`, URL scheme `myscreenart-dev`, signed with the stable `Apple Development` identity (team `QWD87G9T3P`). TCC grants therefore survive rebuilds and are shared by all worktrees.

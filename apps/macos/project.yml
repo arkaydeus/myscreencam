@@ -33,6 +33,9 @@ settings:
 packages:
   MyScreenArtKit:
     path: Packages/MyScreenArtKit
+  # Speech recognisers (FluidAudio, MLX Audio Swift); linked only by the MyScreenArtSpeech XPC service.
+  SpeechEngines:
+    path: Packages/SpeechEngines
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     majorVersion: 2.7.0
@@ -57,9 +60,14 @@ targets:
         product: RenderKit
       - package: MyScreenArtKit
         product: ExportKit
+      - package: MyScreenArtKit
+        product: SpeechCore
       - package: Sparkle
         product: Sparkle
       - target: MyScreenArtThumbnail
+        embed: true
+        codeSign: true
+      - target: MyScreenArtSpeech
         embed: true
         codeSign: true
     settings:
@@ -107,6 +115,36 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.thumbnail
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.thumbnail
+
+  # On-device speech recognition (Parakeet Ultra via Core ML, Qwen via MLX). Embedded in Contents/XPCServices,
+  # started on demand by the app, and exits when the app lets go of it, returning all model memory. See
+  # docs/subtitles-plan.md and docs/speech-integration.md.
+  MyScreenArtSpeech:
+    type: xpc-service
+    platform: macOS
+    sources:
+      - SpeechService
+    dependencies:
+      - package: MyScreenArtKit
+        product: MyScreenArtCore
+      - package: MyScreenArtKit
+        product: SpeechCore
+      - package: SpeechEngines
+        product: SpeechEngines
+    settings:
+      base:
+        INFOPLIST_FILE: SpeechService/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SpeechService/SpeechService.entitlements
+        SWIFT_STRICT_CONCURRENCY: complete
+        SKIP_INSTALL: YES
+        # One product name for both configs: the app's embed phase references the .xpc by name.
+        PRODUCT_NAME: MyScreenArtSpeech
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.dev.speech
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.myscreenart.app.speech
+          ARCHS: arm64
 
   MyScreenArtAppTests:
     type: bundle.unit-test

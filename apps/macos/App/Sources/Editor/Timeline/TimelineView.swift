@@ -21,6 +21,7 @@ struct TimelineData: Equatable {
     var keyframes: [ZoomKeyframe]
     var zoomEnabled: Bool
     var blur: [BlurMask]
+    var cues: [SubtitleCue]
     var webcamEnabled: Bool
     var syncOffset: Double
     var selection: EditorSelection?
@@ -31,9 +32,17 @@ struct TimelineData: Equatable {
         keyframes = model.edit.zoom.keyframes
         zoomEnabled = model.edit.zoom.enabled
         blur = model.edit.blur
+        cues = model.edit.subtitles.cues
         webcamEnabled = model.edit.webcam.enabled
         syncOffset = model.edit.webcam.syncOffset
         selection = model.selection
+    }
+}
+
+/// Cue gestures start on the edited ruler and cross cuts in that same coordinate space.
+enum CueDragTime {
+    static func sourceTime(editedStart: Double, editedDelta: Double, timeline: EditTimeline) -> Double {
+        timeline.sourceTime(forEdited: editedStart + editedDelta)
     }
 }
 
@@ -57,7 +66,7 @@ struct TimelineRepresentable: NSViewRepresentable {
     }
 }
 
-/// A layer-backed timeline in **edited** time. Items stored in source time (keyframes, blur, clicks, pauses) are
+/// A layer-backed timeline in **edited** time. Items stored in source time (keyframes, blur, subtitles, clicks, pauses) are
 /// mapped with `EditTimeline.editedTime(forSource:)` and hidden when cut. Layers are laid out only when data, zoom,
 /// scroll or size change; while playing, a display link moves just the playhead layer.
 final class TimelineNSView: NSView {
@@ -88,6 +97,7 @@ final class TimelineNSView: NSView {
     private let webcamLabel = CATextLayer()
     private var waveformLayers: [Row: CAShapeLayer] = [:]
     private var blurLayers: [CALayer] = []
+    private var cueLayers: [CATextLayer] = []
     private var keyframeLayers: [CAShapeLayer] = []
     private let clickDots = CAShapeLayer()
     private let pauseMarkers = CAShapeLayer()
@@ -102,6 +112,9 @@ final class TimelineNSView: NSView {
         case blurMove(BlurMask.ID, start: Double, end: Double, x: CGFloat)
         case blurStart(BlurMask.ID, start: Double, x: CGFloat)
         case blurEnd(BlurMask.ID, end: Double, x: CGFloat)
+        case cueMove(SubtitleCue.ID, start: Double, x: CGFloat)
+        case cueStart(SubtitleCue.ID, start: Double, x: CGFloat)
+        case cueEnd(SubtitleCue.ID, end: Double, x: CGFloat)
         case keyframe(ZoomKeyframe.ID, time: Double, x: CGFloat, moving: Bool)
     }
 
@@ -254,7 +267,9 @@ final class TimelineNSView: NSView {
         min(max((vx - TimelineMetrics.gutter + scrollX) / pps, 0), duration)
     }
 
-    private var rows: [Row] { model.map { TimelineMetrics.rows(for: $0.recordedStreams) } ?? [] }
+    private var rows: [Row] {
+        model.map { TimelineMetrics.rows(for: $0.recordedStreams, subtitles: !(data?.cues.isEmpty ?? true)) } ?? []
+    }
 
     private func rowFrames() -> [Row: CGRect] {
         var y = TimelineMetrics.rulerHeight
@@ -308,6 +323,7 @@ final class TimelineNSView: NSView {
             layoutWaveform(model, .microphone, frames[.microphone])
             layoutKeyframes(model, data, frames[.zoom])
             layoutBlur(model, data, frames[.blur])
+            layoutCues(model, data, frames[.subtitles])
             layoutClicks(model, frames[.clicks])
             layoutPauses(model, frames)
             layoutPlayhead()
@@ -551,6 +567,41 @@ final class TimelineNSView: NSView {
         }
     }
 
+    private func layoutCues(_ model: EditorModel, _ data: TimelineData, _ frame: CGRect?) {
+        guard let frame else {
+            for layer in cueLayers { layer.isHidden = true }
+            return
+        }
+        pool(&cueLayers, count: data.cues.count) {
+            let layer = CATextLayer()
+            layer.cornerRadius = 4
+            layer.fontSize = 10
+            layer.truncationMode = .end
+            layer.isWrapped = false
+            layer.alignmentMode = .left
+            layer.contentsScale = window?.backingScaleFactor ?? 2
+            layer.actions = ["contents": NSNull(), "position": NSNull(), "bounds": NSNull()]
+            return layer
+        }
+        for (i, cue) in data.cues.enumerated() {
+            let layer = cueLayers[i]
+            let e0 = model.timeline.editedTimeSnapping(forSource: cue.start)
+            let e1 = model.timeline.editedTimeSnapping(forSource: cue.end)
+            guard e1 - e0 > 0.001 else {
+                layer.isHidden = true
+                continue
+            }
+            let selected = data.selection == .cue(cue.id)
+            layer.frame = CGRect(x: x(e0), y: frame.minY + 3, width: max(2, x(e1) - x(e0)), height: frame.height - 6)
+            layer.backgroundColor = EditorTheme.subtitleTrack.withAlphaComponent(selected ? 0.7 : 0.3).cgColor
+            layer.borderColor = selected ? NSColor.white.cgColor : EditorTheme.subtitleTrack.cgColor
+            layer.borderWidth = selected ? 2 : 1
+            layer.zPosition = selected ? 3 : 1
+            layer.foregroundColor = EditorTheme.primaryText.cgColor
+            layer.string = layer.frame.width > 24 ? " " + cue.text.replacingOccurrences(of: "\n", with: " ") : ""
+        }
+    }
+
     private func layoutClicks(_ model: EditorModel, _ frame: CGRect?) {
         guard let frame else { return }
         clickDots.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
@@ -639,6 +690,23 @@ final class TimelineNSView: NSView {
         return nil
     }
 
+    private func cue(atViewX vx: CGFloat) -> (SubtitleCue, BlurHit)? {
+        guard let model, let data else { return nil }
+        let cx = vx - TimelineMetrics.gutter
+        let ordered = data.cues.sorted { a, _ in data.selection == .cue(a.id) }
+        for cue in ordered {
+            let e0 = model.timeline.editedTimeSnapping(forSource: cue.start)
+            let e1 = model.timeline.editedTimeSnapping(forSource: cue.end)
+            guard e1 - e0 > 0.001 else { continue }
+            let x0 = x(e0)
+            let x1 = x(e1)
+            if abs(cx - x0) <= 4 { return (cue, .start) }
+            if abs(cx - x1) <= 4 { return (cue, .end) }
+            if cx > x0, cx < x1 { return (cue, .body) }
+        }
+        return nil
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea { removeTrackingArea(trackingArea) }
@@ -667,6 +735,8 @@ final class TimelineNSView: NSView {
             return .resizeLeftRight
         case .blur:
             if let (_, hit) = blur(atViewX: p.x) { return hit == .body ? .openHand : .resizeLeftRight }
+        case .subtitles:
+            if let (_, hit) = cue(atViewX: p.x) { return hit == .body ? .openHand : .resizeLeftRight }
         case .zoom:
             if keyframe(atViewX: p.x) != nil { return .openHand }
         default: break
@@ -726,6 +796,22 @@ final class TimelineNSView: NSView {
                 model.selection = nil
                 beginScrub(at: t)
             }
+        case .subtitles:
+            if let (cue, hit) = cue(atViewX: p.x) {
+                model.selection = .cue(cue.id)
+                model.inspectorTab = .subtitles
+                switch hit {
+                case .body:
+                    beginEdit(.cueMove(cue.id, start: model.timeline.editedTimeSnapping(forSource: cue.start), x: p.x))
+                case .start:
+                    beginEdit(.cueStart(cue.id, start: model.timeline.editedTimeSnapping(forSource: cue.start), x: p.x))
+                case .end:
+                    beginEdit(.cueEnd(cue.id, end: model.timeline.editedTimeSnapping(forSource: cue.end), x: p.x))
+                }
+            } else {
+                model.selection = nil
+                beginScrub(at: t)
+            }
         default:
             beginScrub(at: t)
         }
@@ -775,6 +861,18 @@ final class TimelineNSView: NSView {
             model.updateBlur(id, "Resize Blur") { mask in
                 mask.end = max(min(end + seconds(from), model.meta.duration), mask.start + 0.5)
             }
+        case .cueMove(let id, let start, let from):
+            model.moveCue(
+                id,
+                toStart: CueDragTime.sourceTime(
+                    editedStart: start, editedDelta: seconds(from), timeline: model.timeline))
+        case .cueStart(let id, let start, let from):
+            model.setCueTiming(
+                id,
+                start: CueDragTime.sourceTime(editedStart: start, editedDelta: seconds(from), timeline: model.timeline))
+        case .cueEnd(let id, let end, let from):
+            model.setCueTiming(
+                id, end: CueDragTime.sourceTime(editedStart: end, editedDelta: seconds(from), timeline: model.timeline))
         case .keyframe(let id, let time, let from, let moving):
             if !moving {
                 guard abs(p.x - from) >= 3 else { return }

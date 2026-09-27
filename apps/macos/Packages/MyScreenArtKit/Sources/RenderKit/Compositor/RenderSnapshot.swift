@@ -30,6 +30,8 @@ final class ProjectResources: Sendable {
     let meta: RecordingMeta
     let events: [InputEvent]
     let cursorImages: CursorImageCache
+    /// Rasterised subtitle boxes, shared across snapshots so edits elsewhere don't re-render text.
+    let subtitleRasters = SubtitleRasterCache()
     private let tracks = LockedDictionary<CursorSmoothing, CursorTrack>()
     private let followTracks = LockedDictionary<CursorSmoothing, FollowCameraTrack>()
     private let fills = LockedDictionary<String, CIImage>()

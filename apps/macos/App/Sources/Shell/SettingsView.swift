@@ -2,11 +2,12 @@ import AppKit
 import MyScreenArtCore
 import SwiftUI
 
-/// Settings window (⌘,): General and Updates.
+/// Settings window (⌘,): General, Subtitles and Updates.
 struct SettingsView: View {
     var body: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettingsView() }
+            Tab("Subtitles", systemImage: "captions.bubble") { SubtitleSettingsView() }
             Tab("Updates", systemImage: "arrow.triangle.2.circlepath") { UpdateSettingsView() }
         }
         .frame(width: 520)

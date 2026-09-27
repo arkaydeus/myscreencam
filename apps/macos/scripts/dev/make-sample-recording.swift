@@ -3,14 +3,15 @@
 // Usage (full Xcode is needed for AVFoundation's encoders; mise sets DEVELOPER_DIR):
 //   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift scripts/dev/make-sample-recording.swift <folder>
 //     [--duration 20] [--name "Sample Recording"] [--codec hevc|h264]
-//     [--no-webcam] [--no-system-audio] [--no-mic] [--cursor-visible]
+//     [--no-webcam] [--no-system-audio] [--no-mic] [--cursor-visible] [--speech "text" [--voice name]]
 //
 // Creates `<folder>/Recording_YYYYMMDD_HHMMSS_xxxxxxxx.msarec` and prints its path on stdout. Contents:
 // - `screen.mov`   1920×1080 @30 (HEVC by default): moving shapes, a scrolling "document", a running clock and a
 //                  frame counter, so cuts, zooms and sync are easy to see.
 // - `webcam.mov`   1280×720 @30, H.264, starting 0.4 s into the session (a stream start offset), ends early.
 // - `sysaudio.m4a` 48 kHz AAC: a 440 Hz tone whose loudness swells and fades (waveforms look like music).
-// - `mic.m4a`      48 kHz AAC: 180–260 Hz "speech" bursts, starting 0.25 s into the session.
+// - `mic.m4a`      48 kHz AAC: 180–260 Hz "speech" bursts, starting 0.25 s into the session. With `--speech`, the
+//                  text spoken by macOS `say` instead (a redistributable speech fixture with known words).
 // - `events.jsonl` pointer moves along a smooth path, drags and a few left clicks, with cursor image ids.
 // - `cursors/`     `index.json` + PNGs of the arrow and pointing-hand cursors.
 // - `meta.json`    matching ProjectKit's `RecordingMeta` Codable shape, with one pause record.
@@ -35,6 +36,8 @@ struct Options {
     var systemAudio = true
     var microphone = true
     var cursorHidden = true
+    var speech: String?
+    var voice: String?
 }
 
 func parseOptions() -> Options {
@@ -43,7 +46,8 @@ func parseOptions() -> Options {
         FileHandle.standardError.write(
             Data(
                 ("usage: make-sample-recording.swift <folder> [--duration s] [--name n] [--codec hevc|h264] "
-                    + "[--no-webcam] [--no-system-audio] [--no-mic] [--cursor-visible]\n").utf8))
+                    + "[--no-webcam] [--no-system-audio] [--no-mic] [--cursor-visible] [--speech text] "
+                    + "[--voice name]\n").utf8))
         exit(2)
     }
     guard let first = args.first, !first.hasPrefix("-") else { usage() }
@@ -72,6 +76,14 @@ func parseOptions() -> Options {
         case "--no-system-audio": options.systemAudio = false
         case "--no-mic": options.microphone = false
         case "--cursor-visible": options.cursorHidden = false
+        case "--speech":
+            guard let v = args.first else { usage() }
+            args.removeFirst()
+            options.speech = v
+        case "--voice":
+            guard let v = args.first else { usage() }
+            args.removeFirst()
+            options.voice = v
         default: usage()
         }
     }
@@ -426,7 +438,28 @@ if options.systemAudio {
     }
 }
 
-if options.microphone {
+/// Runs a command-line tool and fails loudly.
+func run(_ tool: String, _ arguments: [String]) throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: tool)
+    process.arguments = arguments
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw NSError(domain: "make-sample-recording", code: Int(process.terminationStatus),
+            userInfo: [NSLocalizedDescriptionKey: "\(tool) failed"])
+    }
+}
+
+if options.microphone, let speech = options.speech {
+    // `say` → 48 kHz mono AIFF → AAC m4a.
+    let aiff = FileManager.default.temporaryDirectory.appending(path: "msa-speech-\(UUID().uuidString).aiff")
+    defer { try? FileManager.default.removeItem(at: aiff) }
+    var sayArgs = ["-o", aiff.path, "--data-format=BEI16@48000"]
+    if let voice = options.voice { sayArgs += ["-v", voice] }
+    try run("/usr/bin/say", sayArgs + [speech])
+    try run("/usr/bin/afconvert", ["-f", "m4af", "-d", "aac", "-b", "96000", aiff.path, package.appending(path: "mic.m4a").path])
+} else if options.microphone {
     try writeAudio(to: package.appending(path: "mic.m4a"), seconds: duration - micOffset) { t in
         // Syllable-like bursts: on for ~0.3 s, off for ~0.15 s, with pauses every few seconds.
         let phrase = t.truncatingRemainder(dividingBy: 4.2) < 3.0

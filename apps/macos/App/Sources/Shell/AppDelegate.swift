@@ -102,6 +102,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitWhenExportFinishesPending = false
         switch QuitGuard.resolve(isRecording: model.recording.isActive, isExporting: exportGuardApplies) {
         case .none:
+            if model.transcription.isWorking {
+                isResolvingTermination = true
+                Task { await resolveTranscriptionGuard(model) }
+                return .terminateLater
+            }
+            model.transcription.cancelAll()
             model.editors.flushAll()
             return .terminateNow
         case .recording:
@@ -133,8 +139,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await resolveExportGuard(model)
             return
         }
-        model.editors.flushAll()
-        finishTermination(quit: true)
+        if model.transcription.isWorking {
+            await resolveTranscriptionGuard(model)
+        } else {
+            model.editors.flushAll()
+            finishTermination(quit: true)
+        }
     }
 
     private func resolveExportGuard(_ model: AppModel) async {
@@ -150,8 +160,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .alertFirstButtonReturn:
             model.exports.cancelAll()
             await model.exports.waitUntilIdle()
-            model.editors.flushAll()
-            finishTermination(quit: true)
+            if model.transcription.isWorking {
+                await resolveTranscriptionGuard(model)
+            } else {
+                model.editors.flushAll()
+                finishTermination(quit: true)
+            }
         case .alertSecondButtonReturn:
             // Keep the app usable while the export finishes, then quit without asking again.
             finishTermination(quit: false)
@@ -162,6 +176,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default:
             finishTermination(quit: false)
         }
+    }
+
+    private func resolveTranscriptionGuard(_ model: AppModel) async {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Speech processing is in progress"
+        alert.informativeText =
+            "Quitting stops the current transcription or re-time. Finished windows can be reused when you transcribe again."
+        alert.addButton(withTitle: "Stop Speech Processing and Quit")
+        alert.addButton(withTitle: "Keep App Open")
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            finishTermination(quit: false)
+            return
+        }
+        model.transcription.cancelAll()
+        await model.transcription.waitUntilIdle()
+        model.editors.flushAll()
+        finishTermination(quit: true)
     }
 
     private func finishTermination(quit: Bool) {

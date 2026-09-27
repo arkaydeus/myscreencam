@@ -10,10 +10,11 @@ enum EditorSelection: Hashable {
     case segment(Segment.ID)
     case keyframe(ZoomKeyframe.ID)
     case blur(BlurMask.ID)
+    case cue(SubtitleCue.ID)
 }
 
 enum InspectorTab: String, CaseIterable, Identifiable {
-    case zoom, webcam, audio, blur, cursor, background
+    case zoom, webcam, audio, blur, cursor, background, subtitles
 
     var id: Self { self }
 
@@ -25,6 +26,7 @@ enum InspectorTab: String, CaseIterable, Identifiable {
         case .blur: "Blur"
         case .cursor: "Cursor"
         case .background: "Background"
+        case .subtitles: "Subtitles"
         }
     }
 
@@ -36,6 +38,7 @@ enum InspectorTab: String, CaseIterable, Identifiable {
         case .blur: "drop.halffull"
         case .cursor: "cursorarrow"
         case .background: "rectangle.inset.filled"
+        case .subtitles: "captions.bubble"
         }
     }
 }
@@ -82,6 +85,14 @@ final class EditorModel {
     private(set) var saveError: String?
     /// An edit has been made that isn't on disk yet.
     private(set) var hasUnsavedChanges = false
+    /// Transcript revisions read from the package (the adopted one and any candidate), by id.
+    var transcripts: [String: TranscriptRevision] = [:]
+    /// Subtitle list search text.
+    var subtitleSearch = ""
+    /// Words selected in the cue editor (unit ids, in order) for "Cut Words".
+    var selectedWordIDs: [String] = []
+    /// A candidate adoption with conflicts waiting for the user's decisions.
+    var pendingMerge: PendingMerge?
 
     @ObservationIgnored weak var undoManager: UndoManager?
     @ObservationIgnored private let autosaver: EditAutosaver
@@ -138,6 +149,7 @@ final class EditorModel {
         startObservingPlayer()
         loadWaveforms()
         reloadPresets()
+        loadTranscripts()
     }
 
     // MARK: - Edits, undo, autosave
@@ -247,7 +259,6 @@ final class EditorModel {
     /// Writes pending edits now (window close, rename, delete).
     func flush() async {
         saveConfirmTask?.cancel()
-        guard hasUnsavedChanges else { return }
         let latest = edit
         do {
             try await saveQueue.flush(latest)
@@ -273,6 +284,7 @@ final class EditorModel {
         case .segment(let id): if !edit.segments.contains(where: { $0.id == id }) { selection = nil }
         case .keyframe(let id): if !edit.zoom.keyframes.contains(where: { $0.id == id }) { selection = nil }
         case .blur(let id): if !edit.blur.contains(where: { $0.id == id }) { selection = nil }
+        case .cue(let id): if !edit.subtitles.cues.contains(where: { $0.id == id }) { selection = nil }
         case nil: break
         }
     }

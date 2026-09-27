@@ -6,7 +6,7 @@ import ProjectKit
 /// what makes preview and export identical.
 ///
 /// Effect order (docs/legacy-inventory.md §4): screen → blur masks → cursor (source space, so it zooms with the
-/// content) → zoom crop/scale → background canvas → webcam overlay (not zoomed).
+/// content) → zoom crop/scale → background canvas → webcam overlay (not zoomed) → subtitles (canvas space).
 ///
 /// Work happens in a *working space*: the source scaled by `k = min(1, contentWidth·zoom / sourceWidth)`, so a 4K
 /// recording previewed in a small window is shrunk once up front instead of being blurred and composited at 4K.
@@ -109,6 +109,11 @@ enum FrameRenderer {
         // 6. Webcam overlay (not zoomed).
         if edit.webcam.enabled, let webcam, webcam.extent.width > 0, webcam.extent.height > 0 {
             output = drawWebcam(webcam, over: output, snapshot: snapshot)
+        }
+
+        // 7. Subtitles, in canvas space (never zoomed).
+        if edit.subtitles.enabled, !edit.subtitles.cues.isEmpty {
+            output = SubtitleRenderer.draw(over: output, snapshot: snapshot, t: t)
         }
 
         output = output.composited(over: CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: canvasRect))

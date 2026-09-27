@@ -14,6 +14,12 @@ public enum PackageLayout {
     public static let microphone = "mic.m4a"
     public static let cacheDirectory = "cache"
     public static let thumbnail = "cache/thumbnail.heic"
+    /// Immutable transcript revisions, `transcripts/<revision id>.json`.
+    public static let transcriptsDirectory = "transcripts"
+    /// Prepared audio and per-window checkpoints for transcription (derived; safe to delete).
+    public static let transcriptionCacheDirectory = "cache/transcription"
+
+    public static func transcript(id: String) -> String { "\(transcriptsDirectory)/\(id).json" }
 
     public static func waveformCache(for kind: StreamKind) -> String { "cache/waveform-\(kind.rawValue).bin" }
 
@@ -110,6 +116,35 @@ public struct RecordingPackage: Sendable, Hashable {
     /// Atomic write (temp file + rename), so a crash never leaves a half-written `edit.json`.
     public func saveEdit(_ edit: EditConfig) throws {
         try JSONEncoder.pretty.encode(edit).write(to: url(PackageLayout.edit), options: .atomic)
+    }
+
+    // MARK: transcripts
+
+    /// A stored transcript revision, or nil when there's no such file. Ids are validated so a value from JSON can't
+    /// name a path outside `transcripts/`.
+    public func loadTranscript(id: String) throws -> TranscriptRevision? {
+        guard Self.isSafeIdentifier(id) else { return nil }
+        let file = url(PackageLayout.transcript(id: id))
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        return try JSONDecoder.iso8601.decode(TranscriptRevision.self, from: Data(contentsOf: file))
+    }
+
+    /// Writes a revision atomically. Revisions are immutable: an existing file with the same id is left alone.
+    public func saveTranscript(_ revision: TranscriptRevision) throws {
+        guard Self.isSafeIdentifier(revision.id) else { throw CocoaError(.fileWriteInvalidFileName) }
+        let directory = url(PackageLayout.transcriptsDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = url(PackageLayout.transcript(id: revision.id))
+        guard !FileManager.default.fileExists(atPath: file.path) else { return }
+        try JSONEncoder.pretty.encode(revision).write(to: file, options: .atomic)
+    }
+
+    /// Letters, digits, `-` and `_` only.
+    static func isSafeIdentifier(_ id: String) -> Bool {
+        !id.isEmpty && id.count <= 128
+            && id.unicodeScalars.allSatisfy {
+                CharacterSet.alphanumerics.contains($0) && $0.isASCII || $0 == "-" || $0 == "_"
+            }
     }
 
     // MARK: events & cursors

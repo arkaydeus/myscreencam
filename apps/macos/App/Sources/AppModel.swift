@@ -7,6 +7,7 @@ import SwiftUI
 /// - `exports`   (App/Sources/Export):   running exports
 /// - `editors`   (App/Sources/Editor):   open editor sessions and their pending saves
 /// - `router`    (App/Sources/Shell):    opening windows from anywhere (menus, hotkeys, URLs, intents)
+/// - `transcription` (App/Sources/Transcription): speech models, settings and the transcription queue
 @MainActor
 @Observable
 final class AppModel {
@@ -15,6 +16,7 @@ final class AppModel {
     let recording: RecordingController
     let exports: ExportCenter
     let editors: EditorSessions
+    let transcription: TranscriptionCenter
 
     init(environment: AppEnvironment) {
         self.environment = environment
@@ -22,9 +24,16 @@ final class AppModel {
         self.router = router
         self.recording = RecordingController(environment: environment, router: router)
         self.exports = ExportCenter()
-        self.editors = EditorSessions()
+        let editors = EditorSessions()
+        self.editors = editors
+        let transcription = TranscriptionCenter()
+        transcription.editors = editors
+        transcription.exports = exports
+        self.transcription = transcription
     }
 
     /// True while quitting or updating would lose work.
-    var isBusy: Bool { recording.isActive || exports.isExporting || editors.hasPendingSaves }
+    var isBusy: Bool {
+        recording.isActive || exports.isExporting || transcription.isWorking || editors.hasPendingSaves
+    }
 }

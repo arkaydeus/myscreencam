@@ -91,6 +91,7 @@ xcodebuild archive \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$derived" -archivePath "$archive" \
   DEVELOPMENT_TEAM="$team" "${version_args[@]}" \
+  -skipPackagePluginValidation -skipMacroValidation \
   -quiet
 
 step "Exporting (developer-id)"

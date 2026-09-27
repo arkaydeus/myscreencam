@@ -5,7 +5,7 @@ import RenderKit
 import SwiftUI
 
 /// The preview: an `AVPlayerLayer` (no controls) plus interactive overlays for dragging the webcam, moving and
-/// resizing the selected blur mask, and picking a zoom target.
+/// resizing the selected blur mask, dragging the subtitle under the playhead, and picking a zoom target.
 struct PreviewContainer: View {
     let model: EditorModel
 
@@ -40,6 +40,8 @@ struct PreviewOverlayState: Equatable {
     var zoom: ZoomSettings
     var isPicking: Bool
     var isPlaying: Bool
+    var subtitles: SubtitleSettings
+    var selectedCue: SubtitleCue.ID?
 
     @MainActor
     init(model: EditorModel) {
@@ -51,6 +53,8 @@ struct PreviewOverlayState: Equatable {
         zoom = model.edit.zoom
         isPicking = model.isPickingZoomTarget
         isPlaying = model.clock.isPlaying
+        subtitles = model.edit.subtitles
+        if case .cue(let id) = model.selection { selectedCue = id } else { selectedCue = nil }
     }
 }
 
@@ -80,8 +84,10 @@ final class PreviewNSView: NSView {
     private let otherMasks = CAShapeLayer()
     private let handles: [CALayer] = (0..<8).map { _ in CALayer() }
     private let targetMarker = CAShapeLayer()
+    private let subtitleOutline = CAShapeLayer()
     private var trackingArea: NSTrackingArea?
     private var hoveringWebcam = false
+    private var hoveringCue: SubtitleCue.ID?
     private var lastBackingSize: CGSize = .zero
 
     var state: PreviewOverlayState? {
@@ -93,6 +99,7 @@ final class PreviewNSView: NSView {
     }
 
     private enum Drag {
+        case subtitle(SubtitleCue.ID, frame: CGRect, from: CGPoint)
         case webcam(start: NormPoint, from: CGPoint)
         case maskMove(BlurMask.ID, start: NormRect, from: NormPoint)
         case maskResize(BlurMask.ID, Handle, start: NormRect)
@@ -102,6 +109,10 @@ final class PreviewNSView: NSView {
 
     private var isDraggingWebcam: Bool {
         if case .webcam = drag { true } else { false }
+    }
+
+    private func isDraggingCue(_ id: SubtitleCue.ID) -> Bool {
+        if case .subtitle(let dragged, _, _) = drag { dragged == id } else { false }
     }
 
     init(model: EditorModel) {
@@ -128,7 +139,13 @@ final class PreviewNSView: NSView {
         targetMarker.fillColor = nil
         targetMarker.strokeColor = NSColor.systemYellow.cgColor
         targetMarker.lineWidth = 2
-        for layer in [otherMasks, maskOutline, webcamOutline, targetMarker] { overlay.addSublayer(layer) }
+        subtitleOutline.fillColor = nil
+        subtitleOutline.strokeColor = EditorTheme.accent.cgColor
+        subtitleOutline.lineWidth = 1.5
+        subtitleOutline.lineDashPattern = [5, 4]
+        for layer in [otherMasks, maskOutline, webcamOutline, targetMarker, subtitleOutline] {
+            overlay.addSublayer(layer)
+        }
         for handle in handles {
             handle.backgroundColor = NSColor.white.cgColor
             handle.borderColor = EditorTheme.accent.cgColor
@@ -224,6 +241,21 @@ final class PreviewNSView: NSView {
         return BlurLayout.active(state.blur, at: model.currentSourceTime)
     }
 
+    /// Subtitles showing at the playhead with their boxes in view points (topmost last), while paused.
+    private func activeCueRects(_ geometry: PreviewGeometry) -> [(cue: SubtitleCue, rect: CGRect)] {
+        guard let model, let state, !state.isPlaying else { return [] }
+        let canvas = geometry.layout.canvasSize
+        return state.subtitles.activeCues(at: model.currentSourceTime).map { cue in
+            let frame = SubtitleLayout.frame(for: cue, settings: state.subtitles, canvasSize: canvas)
+            return (cue, geometry.viewRect(fromCanvas: frame, viewSize: bounds.size).standardized)
+        }
+    }
+
+    private func hitCue(_ p: CGPoint) -> (cue: SubtitleCue, rect: CGRect)? {
+        guard let geometry, state?.isPicking == false else { return nil }
+        return activeCueRects(geometry).last { $0.rect.insetBy(dx: -4, dy: -4).contains(p) }
+    }
+
     // MARK: Overlay
 
     private func refreshOverlay() {
@@ -272,6 +304,19 @@ final class PreviewNSView: NSView {
             otherMasks.isHidden = true
         }
 
+        let cueRects = activeCueRects(geometry)
+        let highlighted = cueRects.filter {
+            $0.cue.id == state.selectedCue || $0.cue.id == hoveringCue || isDraggingCue($0.cue.id)
+        }
+        if !highlighted.isEmpty {
+            let path = CGMutablePath()
+            for item in highlighted { path.addRect(item.rect.insetBy(dx: -3, dy: -3)) }
+            subtitleOutline.path = path
+            subtitleOutline.isHidden = false
+        } else {
+            subtitleOutline.isHidden = true
+        }
+
         if paused, let keyframe = state.selectedKeyframe {
             let canvas = geometry.canvasPoint(fromSource: keyframe.target, zoom: zoom)
             let p = geometry.viewPoint(fromCanvas: canvas, viewSize: bounds.size)
@@ -306,6 +351,11 @@ final class PreviewNSView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
+        let cue = hitCue(p)?.cue.id
+        if cue != hoveringCue {
+            hoveringCue = cue
+            refreshOverlay()
+        }
         let overWebcam = geometry.flatMap { webcamViewRect($0) }?.contains(p) ?? false
         if overWebcam != hoveringWebcam {
             hoveringWebcam = overWebcam
@@ -315,6 +365,10 @@ final class PreviewNSView: NSView {
     }
 
     override func mouseExited(with event: NSEvent) {
+        if hoveringCue != nil {
+            hoveringCue = nil
+            refreshOverlay()
+        }
         if hoveringWebcam {
             hoveringWebcam = false
             refreshOverlay()
@@ -353,6 +407,7 @@ final class PreviewNSView: NSView {
             default: return .crosshair
             }
         }
+        if hitCue(p) != nil { return .openHand }
         if hitMask(p) != nil { return .openHand }
         if let geometry, webcamViewRect(geometry)?.contains(p) == true { return .openHand }
         return .arrow
@@ -365,6 +420,18 @@ final class PreviewNSView: NSView {
         if state.isPicking {
             let source = sourcePoint(p, geometry, zoom: zoomState)
             model.setZoomTarget(source.clamped)
+            return
+        }
+        // Subtitles are drawn on top of everything, so they win the hit test.
+        if let hit = hitCue(p) {
+            model.selection = .cue(hit.cue.id)
+            model.inspectorTab = .subtitles
+            let frame = SubtitleLayout.frame(
+                for: hit.cue, settings: state.subtitles, canvasSize: geometry.layout.canvasSize)
+            model.beginContinuousChange()
+            drag = .subtitle(hit.cue.id, frame: frame, from: p)
+            NSCursor.closedHand.set()
+            refreshOverlay()
             return
         }
         if let handle = hitHandle(p), let id = state.selectedBlur,
@@ -397,6 +464,13 @@ final class PreviewNSView: NSView {
         guard let model, let drag, let geometry else { return }
         let p = convert(event.locationInWindow, from: nil)
         switch drag {
+        case .subtitle(let id, let frame, let from):
+            let video = geometry.videoRect(inViewOfSize: bounds.size)
+            guard video.width > 0 else { return }
+            let scale = geometry.layout.canvasSize.width / video.width
+            let moved = frame.offsetBy(dx: (p.x - from.x) * scale, dy: (p.y - from.y) * scale)
+            model.setCuePosition(
+                id, SubtitleLayout.position(forFrame: moved, canvasSize: geometry.layout.canvasSize))
         case .webcam(let start, let from):
             let video = geometry.videoRect(inViewOfSize: bounds.size)
             guard video.width > 0, video.height > 0 else { return }

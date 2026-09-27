@@ -4,13 +4,24 @@ import SwiftUI
 /// The right-hand panel: an icon tab switcher, the selected tab's title and its controls.
 struct InspectorView: View {
     @Bindable var model: EditorModel
+    @Environment(AppModel.self) private var app
+
+    /// The Subtitles tab appears once an engine is enabled, or when this recording already has subtitles.
+    private var tabs: [InspectorTab] {
+        let subtitles =
+            app.transcription.isAvailable || !model.edit.subtitles.cues.isEmpty
+            || model.edit.subtitles.revisionID != nil || app.transcription.job(for: model.package.url) != nil
+        return InspectorTab.allCases.filter { $0 != .subtitles || subtitles }
+    }
+
+    private var visibleTab: InspectorTab { tabs.contains(model.inspectorTab) ? model.inspectorTab : .zoom }
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 tabSwitcher
                 HStack(alignment: .firstTextBaseline) {
-                    Text(model.inspectorTab.title)
+                    Text(visibleTab.title)
                         .font(.system(size: 20, weight: .bold))
                     Spacer()
                     if let summary {
@@ -24,13 +35,14 @@ struct InspectorView: View {
             .padding(.top, 14)
             .padding(.bottom, 2)
             Group {
-                switch model.inspectorTab {
+                switch visibleTab {
                 case .zoom: ZoomPanel(model: model)
                 case .webcam: WebcamPanel(model: model)
                 case .audio: AudioPanel(model: model)
                 case .blur: BlurPanel(model: model)
                 case .cursor: CursorPanel(model: model)
                 case .background: BackgroundPanel(model: model)
+                case .subtitles: SubtitlesPanel(model: model)
                 }
             }
             .formStyle(.grouped)
@@ -42,8 +54,8 @@ struct InspectorView: View {
 
     private var tabSwitcher: some View {
         HStack(spacing: 2) {
-            ForEach(InspectorTab.allCases) { tab in
-                let selected = model.inspectorTab == tab
+            ForEach(tabs) { tab in
+                let selected = visibleTab == tab
                 Button {
                     model.inspectorTab = tab
                 } label: {
@@ -77,13 +89,16 @@ struct InspectorView: View {
 
     /// A count shown beside the tab title, where the tab holds a list.
     private var summary: String? {
-        switch model.inspectorTab {
+        switch visibleTab {
         case .zoom:
             let count = model.edit.zoom.keyframes.count
             return count == 1 ? "1 zoom" : "\(count) zooms"
         case .blur:
             let count = model.edit.blur.count
             return count == 1 ? "1 mask" : "\(count) masks"
+        case .subtitles:
+            let count = model.edit.subtitles.cues.count
+            return count == 0 ? nil : (count == 1 ? "1 subtitle" : "\(count) subtitles")
         default:
             return nil
         }
