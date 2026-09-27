@@ -40,6 +40,9 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# The script builds from $root; make custom output paths absolute for the cleanup trap and LaunchServices paths.
+out="$(python3 -c 'import os, sys; print(os.path.realpath(os.path.join(sys.argv[1], sys.argv[2])))' "$root" "$out")"
+
 team="QWD87G9T3P"
 identity="Developer ID Application"
 notary_profile="${NOTARY_PROFILE:-myscreenart-notary}"
@@ -76,7 +79,7 @@ notarize_file() {
 
 cd "$root"
 # Archiving and exporting register their apps with LaunchServices; drop those registrations however the run ends.
-trap '"$root/scripts/dev/unregister-builds.sh" || true' EXIT
+trap '"$root/scripts/dev/unregister-builds.sh" --root "$derived" --root "$archive" --root "$export_dir" --root "$out/dmg-staging" || true' EXIT
 rm -rf "$archive" "$export_dir" "$out/dmg-staging"
 mkdir -p "$out"
 
