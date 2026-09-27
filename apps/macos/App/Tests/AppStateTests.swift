@@ -215,6 +215,21 @@ struct AppStateTests {
         await sessions.close(model)
     }
 
+    @Test func qwenAdmissionReflectsEditorPlayback() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sessions = EditorSessions()
+        await sessions.register(model)
+        let center = TranscriptionCenter()
+        center.editors = sessions
+        let job = TranscriptionCenter.Job(packageURL: model.package.url, engine: .qwen)
+        model.clock.isPlaying = true
+        #expect(center.holdReason(for: job) == "Paused during playback")
+        model.clock.isPlaying = false
+        #expect(center.holdReason(for: job) == nil)
+        await sessions.close(model)
+    }
+
     @Test func editorGroupsGestureUndoAndFlushesLatestEdit() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

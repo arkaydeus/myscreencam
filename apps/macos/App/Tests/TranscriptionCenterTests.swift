@@ -9,9 +9,10 @@ import Testing
 @testable import MyScreenArt_Dev
 
 /// A worker with exactly one loaded role; the first recognition can be held while re-time is requested.
-private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Sendable {
+nonisolated private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Sendable {
     private struct State {
         var loaded: WorkerModelRole?
+        var lastLoaded: WorkerModelRole?
         var holdRecognition = true
         var crashFirstRecognition = false
         var recognitionCount = 0
@@ -42,7 +43,7 @@ private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Senda
         }
     }
 
-    func resumeRecognition() {
+    nonisolated func resumeRecognition() {
         let held = lock.withLock { () -> CheckedContinuation<Void, Never>? in
             state.holdRecognition = false
             defer { state.heldRecognition = nil }
@@ -51,18 +52,26 @@ private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Senda
         held?.resume()
     }
 
-    func release() { lock.withLock { state.loaded = nil } }
-    func reset() { release() }
+    nonisolated func release() { lock.withLock { state.loaded = nil } }
+    nonisolated func reset() {
+        lock.withLock {
+            state.loaded = nil
+            state.lastLoaded = nil
+        }
+    }
 
     func send(_ request: WorkerRequest) async throws -> WorkerResponse {
         switch request {
         case .handshake:
             return .capabilities(WorkerCapabilities(protocolVersion: 1, implementation: ["test": "1"], supported: true))
         case .load(let role, _, _):
-            lock.withLock { state.loaded = role }
+            lock.withLock {
+                state.loaded = role
+                state.lastLoaded = role
+            }
             return .loaded(role: role, seconds: 0)
         case .unload, .shutdown:
-            release()
+            reset()
             return .ok
         case .recognise(_, let window, _, _):
             let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
@@ -72,18 +81,26 @@ private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Senda
                 return state.recognitionWaiters
             }
             for waiter in waiters { waiter.resume() }
-            await withCheckedContinuation { continuation in
-                let held = lock.withLock { () -> Bool in
-                    if !state.holdRecognition { return false }
-                    state.heldRecognition = continuation
-                    return true
+            try await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    let held = lock.withLock { () -> Bool in
+                        if !state.holdRecognition { return false }
+                        state.heldRecognition = continuation
+                        return true
+                    }
+                    if !held { continuation.resume() }
                 }
-                if !held { continuation.resume() }
+                try Task.checkCancellation()
+            } onCancel: {
+                self.resumeRecognition()
             }
             if lock.withLock({ state.crashFirstRecognition && state.recognitionCount == 1 }) {
                 throw TranscriptionError.workerCrashed
             }
-            let role = lock.withLock { state.loaded }
+            let role = lock.withLock { () -> WorkerModelRole? in
+                if state.loaded == nil { state.loaded = state.lastLoaded }
+                return state.loaded
+            }
             guard role == .qwenRecogniser else {
                 lock.withLock { state.failures.append(.noModelLoaded) }
                 return .failure(.noModelLoaded, message: "recogniser was replaced")
@@ -93,7 +110,10 @@ private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Senda
                     window: window, text: "word", languageTag: "en", units: [], termination: .complete,
                     processingSeconds: 0))
         case .align(_, let window, let text, _):
-            let role = lock.withLock { state.loaded }
+            let role = lock.withLock { () -> WorkerModelRole? in
+                if state.loaded == nil { state.loaded = state.lastLoaded }
+                return state.loaded
+            }
             guard role == .qwenAligner else {
                 lock.withLock { state.failures.append(.noModelLoaded) }
                 return .failure(.noModelLoaded, message: "aligner was replaced")
@@ -165,6 +185,8 @@ struct TranscriptionCenterTests {
                 text: "word", start: 1, end: 1.5, languageTag: "en", packageURL: package.url,
                 audioSource: .microphone)
         }
+        for _ in 0..<100 where !center.isRetiming { await Task.yield() }
+        #expect(center.isRetiming)
         worker.resumeRecognition()
         await center.waitUntilIdle()
         guard case .succeeded = job.phase else {
@@ -224,6 +246,37 @@ struct TranscriptionCenterTests {
         #expect(worker.recognitionCount == 0)
         export.cancel()
         await exports.waitUntilIdle()
+        await center.waitUntilIdle()
+        #expect(job.phase == .succeeded(.adopted))
+    }
+
+    @Test func cancellingRunningJobStopsBeforeCommit() async throws {
+        let (root, package, models) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let worker = PausingSpeechClient()
+        let center = TranscriptionCenter(models: models, client: worker)
+        let job = try #require(center.transcribe(package.url, engine: .qwen))
+        await worker.waitForRecognition()
+        center.cancel(package.url)
+        await center.waitUntilIdle()
+        #expect(job.phase == .cancelled)
+        #expect(try package.loadEdit()?.subtitles.revisionID == nil)
+    }
+
+    @Test func criticalMemoryHoldsAndThenResumesJob() async throws {
+        let (root, package, models) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let worker = PausingSpeechClient(holdRecognition: false)
+        let center = TranscriptionCenter(models: models, client: worker)
+        center.memoryPressureChanged(critical: true)
+        let job = try #require(center.transcribe(package.url, engine: .qwen))
+        for _ in 0..<200 {
+            if case .held = job.phase { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard case .held = job.phase else { Issue.record("Memory pressure did not hold the job"); return }
+        #expect(worker.recognitionCount == 0)
+        center.memoryPressureChanged(critical: false)
         await center.waitUntilIdle()
         #expect(job.phase == .succeeded(.adopted))
     }

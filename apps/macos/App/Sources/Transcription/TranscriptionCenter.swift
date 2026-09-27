@@ -276,7 +276,7 @@ final class TranscriptionCenter {
         }
     }
 
-    private func holdReason(for job: Job) -> String? {
+    func holdReason(for job: Job) -> String? {
         if memoryCritical { return "Paused: the Mac is low on memory" }
         guard job.engine == .qwen else { return nil }
         if exports?.isExporting == true { return "Paused while exporting" }
@@ -306,7 +306,7 @@ final class TranscriptionCenter {
 
     @ObservationIgnored private var pendingWake: ResumeOnce?
 
-    private func memoryPressureChanged(critical: Bool) {
+    func memoryPressureChanged(critical: Bool) {
         guard critical != memoryCritical else { return }
         memoryCritical = critical
         Log.app.info("Memory pressure \(critical ? "critical" : "normal", privacy: .public)")
