@@ -1,7 +1,8 @@
 import ProjectKit
 import SwiftUI
 
-/// One recording in the Library grid: still, duration badge, name, date and stream icons. Hovering shows "Open".
+/// One recording in the Library grid: a floating panel with the still, duration badge, name, date and stream icons.
+/// Hovering shows "Open"; the selected card has an accent border and glow.
 struct RecordingCard: View {
     let item: ProjectKit.LibraryItem
     let isSelected: Bool
@@ -16,6 +17,7 @@ struct RecordingCard: View {
     @State private var isHovering = false
 
     private static let aspect: CGFloat = 16 / 10
+    private static let radius = AppTheme.panelRadius
 
     private var maxPixelSize: Int { ThumbnailLoader.bucket(Double(width * displayScale)) }
 
@@ -30,7 +32,7 @@ struct RecordingCard: View {
                 HStack(spacing: 6) {
                     Text(item.meta.createdAt, format: .dateTime.day().month(.abbreviated).year().hour().minute())
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.themeSecondaryText)
                     Spacer(minLength: 4)
                     streamIcons
                 }
@@ -38,15 +40,17 @@ struct RecordingCard: View {
             .padding(.horizontal, 4)
         }
         .padding(8)
+        .padding(.bottom, 2)
         .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+            RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+                .fill(isSelected ? Color.themeAccent.opacity(0.1) : isHovering ? Color.themeRow : .themePanel)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+                .strokeBorder(isSelected ? Color.themeAccent : Color.themePanelBorder, lineWidth: isSelected ? 2 : 1)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: isSelected ? Color.themeAccent.opacity(0.25) : .clear, radius: 10, y: 3)
+        .contentShape(RoundedRectangle(cornerRadius: Self.radius, style: .continuous))
         .onHover { isHovering = $0 }
         .task(id: maxPixelSize) { await loadImage() }
         .accessibilityElement(children: .combine)
@@ -57,7 +61,7 @@ struct RecordingCard: View {
 
     private var thumbnail: some View {
         ZStack {
-            Rectangle().fill(Color.black.opacity(0.85))
+            Rectangle().fill(Color.themeStage)
             if let image {
                 Image(decorative: image, scale: displayScale)
                     .resizable()
@@ -66,13 +70,12 @@ struct RecordingCard: View {
             } else {
                 Image(systemName: loadFailed ? "film" : "photo")
                     .font(.title)
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(Color.themeTertiaryText)
             }
             if isHovering {
-                Rectangle().fill(.black.opacity(0.3))
+                Rectangle().fill(Color.themeWindow.opacity(0.45))
                 Button("Open", action: open)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(.themedPrimary)
             }
         }
         .aspectRatio(Self.aspect, contentMode: .fit)
@@ -85,7 +88,7 @@ struct RecordingCard: View {
                 .background(.black.opacity(0.65), in: Capsule())
                 .padding(8)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Self.radius - 6, style: .continuous))
     }
 
     private var streamIcons: some View {
@@ -99,7 +102,7 @@ struct RecordingCard: View {
             }
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.themeTertiaryText)
     }
 
     private static let streamOrder: [(kind: StreamKind, symbol: String, label: String)] = [

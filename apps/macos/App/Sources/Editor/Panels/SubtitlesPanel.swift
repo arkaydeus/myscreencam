@@ -73,7 +73,7 @@ struct SubtitlesPanel: View {
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .background(Color.editorControlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(Color.themeControlFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             Button {
                 model.addCueAtPlayhead()
             } label: {
@@ -249,7 +249,7 @@ private struct CandidateBanner: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.editorAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.themeAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -406,7 +406,7 @@ private struct CueRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(timeText)
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(isActive ? Color.editorAccent : .secondary)
+                    .foregroundStyle(isActive ? Color.themeAccent : .secondary)
                 if cue.coarse {
                     Image(systemName: "clock.badge.questionmark").font(.caption).foregroundStyle(.orange)
                         .help("Approximate timing")
@@ -435,7 +435,7 @@ private struct CueRow: View {
         .background(background, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .strokeBorder(isSelected ? Color.editorAccent : .clear, lineWidth: 1)
+                .strokeBorder(isSelected ? Color.themeAccent : .clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture { if !isSelected { model.focusCue(cue.id) } }
@@ -446,10 +446,10 @@ private struct CueRow: View {
     }
 
     private var background: Color {
-        if isSelected { return Color.editorAccent.opacity(0.12) }
+        if isSelected { return Color.themeAccent.opacity(0.12) }
         if isMatch { return Color.yellow.opacity(0.18) }
-        if isActive { return Color.editorAccent.opacity(0.07) }
-        return Color.editorControlFill.opacity(0.5)
+        if isActive { return Color.themeAccent.opacity(0.07) }
+        return Color.themeControlFill.opacity(0.5)
     }
 
     private var timeText: String {
@@ -581,9 +581,9 @@ private struct WordChips: View {
                     .font(.caption)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .foregroundStyle(selected ? Color.editorOnAccent : (fine ? .primary : .secondary))
+                    .foregroundStyle(selected ? Color.themeOnAccent : (fine ? .primary : .secondary))
                     .background(
-                        selected ? Color.editorAccent : Color.editorControlFill,
+                        selected ? Color.themeAccent : Color.themeControlFill,
                         in: RoundedRectangle(cornerRadius: 4, style: .continuous)
                     )
                     .onTapGesture { toggle(word.unit.id) }

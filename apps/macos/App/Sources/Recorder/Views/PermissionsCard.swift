@@ -15,7 +15,7 @@ struct PermissionsCard: View {
                 if model.relaunchHint {
                     Text("macOS applies Screen Recording and Input Monitoring after MyScreenArt is reopened.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.themeSecondaryText)
                 }
             }
             .padding(4)
@@ -33,13 +33,13 @@ private struct PermissionRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: status.isGranted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(status.isGranted ? .green : .orange)
+                .foregroundStyle(status.isGranted ? Color.themeAccent : Color.themeWarning)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -47,8 +47,10 @@ private struct PermissionRow: View {
             if !status.isGranted {
                 if canRequest {
                     Button("Grant…") { Task { await model.request(kind) } }
+                        .buttonStyle(.themedPrimary)
                 }
                 Button("Open Settings") { model.openSettings(kind) }
+                    .buttonStyle(.themed)
             }
         }
         .controlSize(.small)

@@ -26,7 +26,7 @@ struct SubtitleSettingsView: View {
                         + "choose an engine, and are stored in Application Support."
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeSecondaryText)
             }
 
             if let engine = settings.engine {
@@ -45,14 +45,14 @@ struct SubtitleSettingsView: View {
                     {
                         Text("Word timing isn't available for this language: subtitle timing will be approximate.")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.themeWarning)
                     }
                     Toggle("Transcribe new recordings automatically", isOn: $settings.autoTranscribe)
                 }
             }
 
             if let error = models.lastError {
-                Section { Text(error).foregroundStyle(.red).font(.callout) }
+                Section { Text(error).foregroundStyle(Color.themeDestructive).font(.callout) }
             }
 
             let installed = SpeechEngine.allCases.filter { models.isInstalled($0) }
@@ -62,14 +62,13 @@ struct SubtitleSettingsView: View {
                         ForEach(models.catalogue.manifests(for: engine)) { manifest in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(manifest.repository) — \(manifest.license)").font(.caption.weight(.medium))
-                                Text(manifest.attribution).font(.caption).foregroundStyle(.secondary)
+                                Text(manifest.attribution).font(.caption).foregroundStyle(Color.themeSecondaryText)
                             }
                         }
                     }
                 }
             }
         }
-        .formStyle(.grouped)
         .frame(height: 540)
         .alert(
             "Download \(confirming?.title ?? "")?",
@@ -122,11 +121,11 @@ private struct EngineRow: View {
             Button(action: select) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                        .foregroundStyle(selected ? Color.accentColor : .secondary)
+                        .foregroundStyle(selected ? Color.themeAccent : Color.themeSecondaryText)
                         .font(.title3)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title).font(.body.weight(.medium))
-                        Text(summary).font(.caption).foregroundStyle(.secondary)
+                        Text(summary).font(.caption).foregroundStyle(Color.themeSecondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
@@ -165,7 +164,8 @@ private struct EngineRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 ProgressView(value: progress.fraction)
                 HStack {
-                    Text(DownloadText.describe(progress)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    Text(DownloadText.describe(progress)).font(.caption).monospacedDigit().foregroundStyle(
+                        Color.themeSecondaryText)
                     Spacer()
                     Button("Cancel") { models.cancel(engine) }
                         .buttonStyle(.link)
@@ -175,13 +175,13 @@ private struct EngineRow: View {
         case .verifying(let fraction):
             VStack(alignment: .leading, spacing: 3) {
                 ProgressView(value: fraction)
-                Text("Verifying…").font(.caption).foregroundStyle(.secondary)
+                Text("Verifying…").font(.caption).foregroundStyle(Color.themeSecondaryText)
             }
         case .installed:
             HStack {
                 Label("Installed", systemImage: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.themeAccent)
                 Spacer()
                 Button("Remove") { Task { await models.remove(engine) } }
                     .font(.caption)
@@ -191,14 +191,14 @@ private struct EngineRow: View {
             HStack {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.themeWarning)
                     .lineLimit(2)
                 Spacer()
                 Button("Retry") { models.install(engine) }
                     .font(.caption)
             }
         case .removing:
-            Text("Removing…").font(.caption).foregroundStyle(.secondary)
+            Text("Removing…").font(.caption).foregroundStyle(Color.themeSecondaryText)
         }
     }
 }

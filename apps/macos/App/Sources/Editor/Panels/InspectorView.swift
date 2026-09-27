@@ -27,7 +27,7 @@ struct InspectorView: View {
                     if let summary {
                         Text(summary)
                             .font(.system(size: 11.5))
-                            .foregroundStyle(Color.editorTertiaryText)
+                            .foregroundStyle(Color.themeTertiaryText)
                     }
                 }
             }
@@ -63,12 +63,12 @@ struct InspectorView: View {
                         .font(.system(size: 14))
                         .frame(maxWidth: .infinity)
                         .frame(height: 30)
-                        .foregroundStyle(selected ? Color.editorOnAccent : Color.editorSecondaryText)
+                        .foregroundStyle(selected ? Color.themeOnAccent : Color.themeSecondaryText)
                         .background(
-                            selected ? Color.editorAccent : .clear,
-                            in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius - 1, style: .continuous)
+                            selected ? Color.themeAccent : .clear,
+                            in: RoundedRectangle(cornerRadius: AppTheme.controlRadius - 1, style: .continuous)
                         )
-                        .shadow(color: selected ? Color.editorAccent.opacity(0.35) : .clear, radius: 7, y: 3)
+                        .shadow(color: selected ? Color.themeAccent.opacity(0.35) : .clear, radius: 7, y: 3)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -79,12 +79,12 @@ struct InspectorView: View {
         }
         .padding(3)
         .background(
-            Color.editorControlFill,
-            in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius + 2, style: .continuous)
+            Color.themeControlFill,
+            in: RoundedRectangle(cornerRadius: AppTheme.controlRadius + 2, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: EditorTheme.controlRadius + 2, style: .continuous)
-                .strokeBorder(Color.editorControlBorder))
+            RoundedRectangle(cornerRadius: AppTheme.controlRadius + 2, style: .continuous)
+                .strokeBorder(Color.themeControlBorder))
     }
 
     /// A count shown beside the tab title, where the tab holds a list.
@@ -121,7 +121,7 @@ struct ValueSlider: View {
                 Spacer()
                 Text(format(value))
                     .monospacedDigit()
-                    .foregroundStyle(Color.editorSecondaryText)
+                    .foregroundStyle(Color.themeSecondaryText)
             }
             Slider(value: steppedValue, in: range) { model.editingChanged($0) }
         }

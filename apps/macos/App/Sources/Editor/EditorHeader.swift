@@ -22,14 +22,14 @@ struct EditorHeader: View {
             } label: {
                 Label("Library", systemImage: "chevron.left")
             }
-            .buttonStyle(.editor)
+            .buttonStyle(.themed)
             .help("Back to Library")
 
             PresetsMenu(model: model, showSavePreset: $showSavePreset)
                 .fixedSize()
 
             Rectangle()
-                .fill(Color.editorControlBorder)
+                .fill(Color.themeControlBorder)
                 .frame(width: 1, height: 20)
 
             title
@@ -48,7 +48,7 @@ struct EditorHeader: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .buttonStyle(.editorDestructive)
+            .buttonStyle(.themedDestructive)
             .help("Move this recording to the Trash")
 
             Button {
@@ -57,7 +57,7 @@ struct EditorHeader: View {
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
             }
-            .buttonStyle(.editorPrimary)
+            .buttonStyle(.themedPrimary)
             .help("Export… (⌘E)")
         }
         .padding(.horizontal, 12)
@@ -115,7 +115,7 @@ struct EditorHeader: View {
             }
             Text(model.meta.createdAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
-                .foregroundStyle(Color.editorSecondaryText)
+                .foregroundStyle(Color.themeSecondaryText)
         }
     }
 
@@ -164,7 +164,7 @@ struct PresetsMenu: View {
             Label("Presets", systemImage: "slider.horizontal.3")
         }
         .menuStyle(.button)
-        .buttonStyle(.editor)
+        .buttonStyle(.themed)
         .help("Presets save webcam, audio, cursor, zoom defaults and background settings")
     }
 }

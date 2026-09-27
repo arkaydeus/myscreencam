@@ -46,6 +46,7 @@ final class RecordingHUD {
         panel.isMovableByWindowBackground = true
         panel.becomesKeyOnlyIfNeeded = true
         panel.sharingType = .none
+        panel.appearance = AppTheme.appearance
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.contentView = FirstMouseHostingView(rootView: RecordingHUDView(controller: controller))
         if !panel.setFrameUsingName(Self.autosaveName) || !Self.isOnScreen(panel.frame) {
@@ -81,26 +82,27 @@ private struct RecordingHUDView: View {
     @State private var confirmingDiscard = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if confirmingDiscard {
-                Text("Discard this recording?")
+                Text("Discard recording?")
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Button("Keep") { confirmingDiscard = false }
+                    .buttonStyle(.themed)
                     .keyboardShortcut(.cancelAction)
                 Button("Discard", role: .destructive) {
                     confirmingDiscard = false
                     Task { await controller.discard() }
                 }
-                .tint(.red)
+                .buttonStyle(.themedDestructive)
             } else {
                 RecordingDot(paused: controller.isPaused)
                     .frame(width: 12, height: 12)
                 Text(formatElapsed(controller.elapsedSeconds))
                     .font(.system(.body, design: .rounded).weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(controller.isPaused ? .secondary : .primary)
+                    .foregroundStyle(controller.isPaused ? Color.themeSecondaryText : Color.themePrimaryText)
                     .frame(minWidth: 58, alignment: .leading)
                 Spacer(minLength: 4)
                 Button {
@@ -108,6 +110,7 @@ private struct RecordingHUDView: View {
                 } label: {
                     Image(systemName: controller.isPaused ? "play.fill" : "pause.fill")
                 }
+                .buttonStyle(.themedIcon)
                 .help(controller.isPaused ? "Resume recording" : "Pause recording")
                 .accessibilityLabel(controller.isPaused ? "Resume" : "Pause")
                 Button {
@@ -115,27 +118,29 @@ private struct RecordingHUDView: View {
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
+                .buttonStyle(.themedPrimary)
                 .help("Finish the recording and open it in the editor")
                 Button {
                     confirmingDiscard = true
                 } label: {
                     Image(systemName: "trash")
                 }
+                .buttonStyle(.themedIcon)
                 .help("Discard the recording")
                 .accessibilityLabel("Discard")
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .padding(.horizontal, 14)
+        .foregroundStyle(Color.themePrimaryText)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
         .frame(width: 292, height: 44)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.separator, lineWidth: 0.5))
+        .background(Color.themePanel.opacity(0.94), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.themePanelBorder))
         .gesture(WindowDragGesture())
     }
 }
 
-/// A red dot that pulses while recording. The pulse is a Core Animation animation, so it runs in the window
+/// A record-red dot that pulses while recording (amber while paused). The pulse is a Core Animation animation, so it runs in the window
 /// server without re-rendering any SwiftUI.
 private struct RecordingDot: NSViewRepresentable {
     let paused: Bool
@@ -151,7 +156,7 @@ private struct RecordingDot: NSViewRepresentable {
         override init(frame: NSRect) {
             super.init(frame: frame)
             wantsLayer = true
-            dot.backgroundColor = NSColor.systemRed.cgColor
+            dot.backgroundColor = AppTheme.record.cgColor
             layer?.addSublayer(dot)
         }
 
@@ -168,7 +173,7 @@ private struct RecordingDot: NSViewRepresentable {
             guard paused != self.paused else { return }
             self.paused = paused
             dot.removeAllAnimations()
-            dot.backgroundColor = (paused ? NSColor.systemOrange : NSColor.systemRed).cgColor
+            dot.backgroundColor = (paused ? AppTheme.warning : AppTheme.record).cgColor
             guard !paused else { return }
             let pulse = CABasicAnimation(keyPath: "opacity")
             pulse.fromValue = 1

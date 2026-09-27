@@ -110,14 +110,18 @@ private final class RegionSelectionView: NSView {
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelSelection))
         let use = NSButton(title: "Use Region", target: self, action: #selector(useRegion))
         let record = NSButton(title: "Record", target: self, action: #selector(recordRegion))
-        record.bezelColor = .systemRed
+        record.bezelColor = AppTheme.record
         record.keyEquivalent = "\r"
+        use.bezelColor = AppTheme.accent
         for button in [cancel, use, record] { button.bezelStyle = .push }
         controls.orientation = .horizontal
         controls.spacing = 8
         controls.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        controls.appearance = AppTheme.appearance
         controls.wantsLayer = true
-        controls.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.92).cgColor
+        controls.layer?.backgroundColor = AppTheme.panelBackground.withAlphaComponent(0.95).cgColor
+        controls.layer?.borderColor = AppTheme.panelBorder.cgColor
+        controls.layer?.borderWidth = 1
         controls.layer?.cornerRadius = 10
         controls.setViews([cancel, use, record], in: .leading)
         controls.isHidden = true
@@ -160,7 +164,7 @@ private final class RegionSelectionView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.35).setFill()
+        AppTheme.windowBackground.withAlphaComponent(0.4).setFill()
         bounds.fill()
         guard let rect = ownSelection else {
             if overlay.selection == nil { drawHint() }
@@ -168,9 +172,9 @@ private final class RegionSelectionView: NSView {
         }
         NSColor.clear.setFill()
         rect.fill(using: .copy)
-        NSColor.white.setStroke()
-        let border = NSBezierPath(rect: rect.insetBy(dx: -0.5, dy: -0.5))
-        border.lineWidth = 1
+        AppTheme.accent.setStroke()
+        let border = NSBezierPath(rect: rect.insetBy(dx: -1, dy: -1))
+        border.lineWidth = 2
         border.stroke()
         drawSizeLabel(for: rect)
     }
@@ -179,13 +183,13 @@ private final class RegionSelectionView: NSView {
         let text = "\(Int(rect.width)) × \(Int(rect.height))" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
-            .foregroundColor: NSColor.white,
+            .foregroundColor: AppTheme.primaryText,
         ]
         let size = text.size(withAttributes: attributes)
         var box = CGRect(x: rect.minX, y: rect.minY - size.height - 10, width: size.width + 12, height: size.height + 6)
         if box.minY < bounds.minY + 4 { box.origin.y = rect.minY + 6 }
         box.origin.x = min(max(bounds.minX + 4, box.minX), bounds.maxX - box.width - 4)
-        NSColor.black.withAlphaComponent(0.75).setFill()
+        AppTheme.panelBackground.withAlphaComponent(0.9).setFill()
         NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5).fill()
         text.draw(at: CGPoint(x: box.minX + 6, y: box.minY + 3), withAttributes: attributes)
     }
@@ -193,13 +197,13 @@ private final class RegionSelectionView: NSView {
     private func drawHint() {
         let text = "Drag to select a region to record · Esc to cancel" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 15, weight: .medium), .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 15, weight: .medium), .foregroundColor: AppTheme.primaryText,
         ]
         let size = text.size(withAttributes: attributes)
         let box = CGRect(
             x: bounds.midX - size.width / 2 - 16, y: bounds.midY - size.height / 2 - 10, width: size.width + 32,
             height: size.height + 20)
-        NSColor.black.withAlphaComponent(0.6).setFill()
+        AppTheme.panelBackground.withAlphaComponent(0.9).setFill()
         NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10).fill()
         text.draw(at: CGPoint(x: box.minX + 16, y: box.minY + 10), withAttributes: attributes)
     }

@@ -40,7 +40,9 @@ struct ExportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
+            Rectangle()
+                .fill(Color.themePanelBorder)
+                .frame(height: 1)
             Group {
                 switch job?.state {
                 case .queued?, .preparing?, .running?:
@@ -54,6 +56,8 @@ struct ExportSheet: View {
             .padding(20)
         }
         .frame(width: 480)
+        .toggleStyle(.switch)
+        .themedWindow()
         .interactiveDismissDisabled(job?.isActive == true)
         .task { await load() }
         .onChange(of: choice) { _, newValue in ExportOptionsStore.save(newValue) }
@@ -74,13 +78,16 @@ struct ExportSheet: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "square.and.arrow.up")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.themeOnAccent)
+                .frame(width: 32, height: 32)
+                .background(Color.themeAccent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .shadow(color: Color.themeAccent.opacity(0.3), radius: 8, y: 3)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Export").font(.headline)
+                Text("Export").font(.system(size: 17, weight: .bold))
                 Text(info?.name ?? package.url.deletingPathExtension().lastPathComponent)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -130,7 +137,7 @@ struct ExportSheet: View {
 
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.themeDestructive)
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -139,8 +146,10 @@ struct ExportSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(.themed)
                     .keyboardShortcut(.cancelAction)
                 Button("Export…") { Task { await chooseDestinationAndExport() } }
+                    .buttonStyle(.themedPrimary)
                     .keyboardShortcut(.defaultAction)
                     .disabled(info == nil || isChoosingDestination)
             }
@@ -164,7 +173,7 @@ struct ExportSheet: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.themeSecondaryText)
         }
     }
 
@@ -190,7 +199,7 @@ struct ExportSheet: View {
         .font(.callout)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .themePanel(.themeStage, cornerRadius: AppTheme.controlRadius + 2)
     }
 
     // MARK: progress
@@ -202,20 +211,21 @@ struct ExportSheet: View {
                 Spacer()
                 Text(job.fraction, format: .percent.precision(.fractionLength(0)))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeAccent)
             }
             ProgressView(value: job.fraction)
                 .progressViewStyle(.linear)
             HStack {
                 Text(timeRemainingText(job) ?? " ")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
                 Spacer()
                 Button("Cancel") { job.cancel() }
+                    .buttonStyle(.themed)
             }
             Text(abbreviatedPath(job.destination))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeTertiaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -227,11 +237,12 @@ struct ExportSheet: View {
         VStack(spacing: 14) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.themeAccent)
+                .shadow(color: Color.themeAccent.opacity(0.35), radius: 12)
             Text("Export Complete").font(.title3.weight(.semibold))
             Text(abbreviatedPath(result.url))
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeSecondaryText)
                 .multilineTextAlignment(.center)
                 .textSelection(.enabled)
                 .lineLimit(3)
@@ -241,12 +252,14 @@ struct ExportSheet: View {
                     + ByteCountFormatter.string(fromByteCount: result.fileSize, countStyle: .file)
             )
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.themeTertiaryText)
             .monospacedDigit()
             HStack {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([result.url]) }
+                    .buttonStyle(.themed)
                 Spacer()
                 Button("Done") { dismiss() }
+                    .buttonStyle(.themedPrimary)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(.top, 6)

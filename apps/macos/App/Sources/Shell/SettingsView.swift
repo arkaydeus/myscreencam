@@ -2,7 +2,7 @@ import AppKit
 import MyScreenArtCore
 import SwiftUI
 
-/// Settings window (⌘,): General, Subtitles and Updates.
+/// Settings window (⌘,): General, Subtitles and Updates, in the app theme.
 struct SettingsView: View {
     var body: some View {
         TabView {
@@ -10,7 +10,11 @@ struct SettingsView: View {
             Tab("Subtitles", systemImage: "captions.bubble") { SubtitleSettingsView() }
             Tab("Updates", systemImage: "arrow.triangle.2.circlepath") { UpdateSettingsView() }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .toggleStyle(.switch)
         .frame(width: 520)
+        .themedWindow()
     }
 }
 
@@ -27,10 +31,7 @@ private struct GeneralSettingsView: View {
                     "Launch at login",
                     isOn: Binding(get: { settings.launchAtLogin }, set: { settings.setLaunchAtLogin($0) }))
                 if let message = settings.launchAtLoginMessage {
-                    Text(message).font(.caption).foregroundStyle(.secondary)
-                }
-                Picker("Appearance", selection: $settings.appearance) {
-                    ForEach(AppearancePreference.allCases) { Text($0.title).tag($0) }
+                    Text(message).font(.caption).foregroundStyle(Color.themeSecondaryText)
                 }
             }
 
@@ -46,7 +47,7 @@ private struct GeneralSettingsView: View {
                             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                         }
                     case .failure(let error):
-                        Text(error.localizedDescription).foregroundStyle(.red)
+                        Text(error.localizedDescription).foregroundStyle(Color.themeDestructive)
                     }
                 }
             }
@@ -58,10 +59,9 @@ private struct GeneralSettingsView: View {
             } footer: {
                 Text("⌥⌘↩ opens a new recording and ⌥⇧⌘R finishes the current one, from any app.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
             }
         }
-        .formStyle(.grouped)
         .frame(height: 500)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             settings.refreshLaunchAtLogin()
@@ -90,11 +90,10 @@ private struct UpdateSettingsView: View {
                 if !updates.isConfigured {
                     Text("Updates are unavailable in this build (no update signing key).")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.themeSecondaryText)
                 }
             }
         }
-        .formStyle(.grouped)
         .frame(height: 220)
     }
 }

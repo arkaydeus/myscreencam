@@ -15,12 +15,12 @@ struct TransportBar: View {
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(
-                    Color.editorControlFill,
-                    in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius, style: .continuous)
+                    Color.themeControlFill,
+                    in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: EditorTheme.controlRadius, style: .continuous)
-                        .strokeBorder(Color.editorControlBorder))
+                    RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous)
+                        .strokeBorder(Color.themeControlBorder))
 
             HStack(spacing: 4) {
                 Button {
@@ -37,11 +37,11 @@ struct TransportBar: View {
                 }
                 .help("Forward 5 seconds")
             }
-            .buttonStyle(.editorIcon)
+            .buttonStyle(.themedIcon)
             .font(.title3)
 
             Rectangle()
-                .fill(Color.editorControlBorder)
+                .fill(Color.themeControlBorder)
                 .frame(width: 1, height: 18)
 
             HStack(spacing: 6) {
@@ -67,7 +67,7 @@ struct TransportBar: View {
                 .help("Restore the whole recording")
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(.editorIcon)
+            .buttonStyle(.themedIcon)
 
             if let message = model.transientMessage {
                 Text(message)
@@ -110,7 +110,7 @@ struct TransportBar: View {
                 .disabled(model.timelineZoom >= Self.zoomSteps.last! - 0.001)
                 .help("Zoom timeline in")
             }
-            .buttonStyle(.editorIcon)
+            .buttonStyle(.themedIcon)
         }
         .padding(.horizontal, 12)
         .frame(height: 44)
@@ -232,11 +232,11 @@ final class TimeLabelView: NSView {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             string.append(
                 NSAttributedString(
-                    string: current, attributes: [.font: Self.font, .foregroundColor: EditorTheme.primaryText.cgColor]))
+                    string: current, attributes: [.font: Self.font, .foregroundColor: AppTheme.primaryText.cgColor]))
             string.append(
                 NSAttributedString(
                     string: total,
-                    attributes: [.font: Self.font, .foregroundColor: EditorTheme.secondaryText.cgColor]))
+                    attributes: [.font: Self.font, .foregroundColor: AppTheme.secondaryText.cgColor]))
         }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -256,13 +256,13 @@ private struct PlayPauseButton: View {
         } label: {
             Image(systemName: clock.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(Color.editorOnAccent)
+                .foregroundStyle(Color.themeOnAccent)
                 .frame(width: 34, height: 34)
                 .background(
-                    Color.editorAccent,
-                    in: RoundedRectangle(cornerRadius: EditorTheme.controlRadius, style: .continuous)
+                    Color.themeAccent,
+                    in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous)
                 )
-                .shadow(color: Color.editorAccent.opacity(0.3), radius: 6)
+                .shadow(color: Color.themeAccent.opacity(0.3), radius: 6)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
