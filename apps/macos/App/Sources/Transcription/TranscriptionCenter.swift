@@ -324,7 +324,7 @@ final class TranscriptionCenter {
             return editor.receiveTranscript(revision)
         }
         // Keep the read/modify/write on the main actor. Registering an editor cannot interleave with it.
-        var edit = try package.loadEffectiveEdit(meta: meta, autoZoom: Self.autoZoom)
+        var edit = try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaultsStore.load())
         let receipt = edit.subtitles.receive(revision)
         try package.saveEdit(edit)
         return receipt
@@ -386,14 +386,11 @@ final class TranscriptionCenter {
 
     // MARK: Helpers
 
-    /// The editor's auto-zoom preference (used when a recording has no `edit.json` yet).
-    private static var autoZoom: Bool { UserDefaults.standard.bool(forKey: EditorModel.autoZoomDefaultsKey) }
-
     private static func load(_ package: RecordingPackage) async throws -> (RecordingMeta, EditConfig) {
-        let autoZoom = Self.autoZoom
+        let defaults = ProjectDefaultsStore.load()
         return try await Task.detached {
             let meta = try package.loadMeta()
-            let edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
+            let edit = try package.loadEffectiveEdit(meta: meta, defaults: defaults)
             return (meta, edit)
         }.value
     }

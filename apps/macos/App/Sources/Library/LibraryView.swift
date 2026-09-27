@@ -252,10 +252,9 @@ private struct LibraryContent: View {
     /// Exports with the recording's saved edit (or the initial edit when it has never been edited).
     private func export(_ item: ProjectKit.LibraryItem) {
         do {
-            let autoZoom = UserDefaults.standard.object(forKey: EditorModel.autoZoomDefaultsKey) as? Bool ?? true
             let edit =
                 try app.editors.session(for: item.package.url)?.edit
-                ?? item.package.loadEffectiveEdit(meta: item.meta, autoZoom: autoZoom)
+                ?? item.package.loadEffectiveEdit(meta: item.meta, defaults: ProjectDefaultsStore.load())
             exportRequest = ExportRequest(package: item.package, edit: edit)
         } catch {
             actionError = "Couldn't read the edits of “\(item.meta.name)”: \(error.localizedDescription)"

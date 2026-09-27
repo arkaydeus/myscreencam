@@ -105,14 +105,36 @@ struct InspectorView: View {
     }
 }
 
-/// A labelled slider with its value; the drag is one undo step.
+/// A labelled slider with its value. With a `model`, the drag is one undo step.
 struct ValueSlider: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double?
     var format: (Double) -> String = { String(format: "%.2f", $0) }
-    let model: EditorModel
+    var onEditingChanged: (Bool) -> Void = { _ in }
+
+    init(
+        title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double? = nil,
+        format: @escaping (Double) -> String = { String(format: "%.2f", $0) },
+        onEditingChanged: @escaping (Bool) -> Void = { _ in }
+    ) {
+        self.title = title
+        _value = value
+        self.range = range
+        self.step = step
+        self.format = format
+        self.onEditingChanged = onEditingChanged
+    }
+
+    init(
+        title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double? = nil,
+        format: @escaping (Double) -> String = { String(format: "%.2f", $0) }, model: EditorModel
+    ) {
+        self.init(
+            title: title, value: value, range: range, step: step, format: format,
+            onEditingChanged: { model.editingChanged($0) })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -123,7 +145,7 @@ struct ValueSlider: View {
                     .monospacedDigit()
                     .foregroundStyle(Color.themeSecondaryText)
             }
-            Slider(value: steppedValue, in: range) { model.editingChanged($0) }
+            Slider(value: steppedValue, in: range, onEditingChanged: onEditingChanged)
         }
     }
 

@@ -141,7 +141,7 @@ func importLegacy(from legacy: URL, into root: URL) throws -> RecordingPackage {
         systemCursorHidden: old.hideSystemCursor ?? false
     )
     try package.saveMeta(meta)
-    try package.saveEdit(EditConfig.makeInitial(meta: meta, events: events, autoZoom: true))
+    try package.saveEdit(EditConfig.makeInitial(meta: meta, events: events, defaults: ProjectDefaults()))
     return package
 }
 

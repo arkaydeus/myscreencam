@@ -107,9 +107,9 @@ public struct RecordingPackage: Sendable, Hashable {
     }
 
     /// The edit shown by the editor and used for a direct Library export.
-    public func loadEffectiveEdit(meta: RecordingMeta, autoZoom: Bool) throws -> EditConfig {
+    public func loadEffectiveEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
         if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
-        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), autoZoom: autoZoom)
+        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
             .normalized(duration: meta.duration)
     }
 
