@@ -254,10 +254,24 @@ extension EditorModel {
                 var cue = next.subtitles.cues[i]
                 let spoken = words(of: cue).filter { removed.contains($0.unit.id) }.map(\.text)
                 if !cue.isTextCorrected, let trimmed = Self.removing(spoken, from: cue.text) {
+                    let originalUnits = transcript.allUnits.compactMap { segment, unit -> (String, UnitTiming?)? in
+                        guard cue.unitIDs.contains(unit.id), let text = segment.text(of: unit) else { return nil }
+                        return (text, unit.timing)
+                    }
+                    let sourceStart = originalUnits.compactMap { $0.1?.sourceRange.startSeconds }.first
+                    let moveOffset = sourceStart.flatMap { source in cue.words.first.map { $0.start - source } } ?? 0
                     cue.text = trimmed
                     cue.generatedText = trimmed
                     cue.unitIDs.removeAll { removed.contains($0) }
-                    cue.words.removeAll { $0.start >= range.start && $0.start < range.end }
+                    let remainingUnits = transcript.allUnits.compactMap { segment, unit -> (String, UnitTiming?)? in
+                        guard cue.unitIDs.contains(unit.id), let text = segment.text(of: unit) else { return nil }
+                        return (text, unit.timing)
+                    }
+                    cue.words = SubtitleWords.build(text: trimmed, units: remainingUnits)
+                    for j in cue.words.indices {
+                        cue.words[j].start += moveOffset
+                        cue.words[j].end += moveOffset
+                    }
                     next.subtitles.cues[i] = cue
                 }
             }

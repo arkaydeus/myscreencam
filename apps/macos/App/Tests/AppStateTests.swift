@@ -71,6 +71,41 @@ struct AppStateTests {
         return (root, EditorModel(project: project, renderer: renderer))
     }
 
+    private func timedRevision() -> TranscriptRevision {
+        let entries: [(String, Double, Double)] = [("one", 0, 0.4), ("two", 0.5, 0.9), ("three", 1, 1.4)]
+        var text = ""
+        var units: [TranscriptUnit] = []
+        for (index, entry) in entries.enumerated() {
+            if index > 0 { text += " " }
+            let start = text.utf8.count
+            text += entry.0
+            let range = MediaRange(
+                start: MediaTime(seconds: entry.1, timescale: 16_000),
+                end: MediaTime(seconds: entry.2, timescale: 16_000))
+            units.append(
+                TranscriptUnit(
+                    id: "word-\(index)", utf8Start: start, utf8End: text.utf8.count, kind: .word,
+                    timing: UnitTiming(sourceRange: range, method: .tdt, validation: .valid)))
+        }
+        let range = MediaRange(
+            start: MediaTime(seconds: 0, timescale: 16_000),
+            end: MediaTime(seconds: 1.4, timescale: 16_000))
+        return TranscriptRevision(
+            id: "timed", parentRevisionID: nil, sourceMediaID: "media", audioIdentityHash: "audio",
+            recogniser: ModelIdentity(
+                catalogueID: "test", repository: "test/model", revision: "1", manifestDigest: "digest",
+                quantisation: "none"), aligner: nil, implementationFingerprint: "test", implementation: [:],
+            optionsFingerprint: "test",
+            options: TranscriptionOptions(
+                engine: "parakeet", audioSource: .microphone, languageHint: nil, windowSeconds: 120,
+                maxWindowSeconds: 150, tokenBudgetPerWindow: nil, audioRecipe: "test"), sourceCoverage: [range],
+            segments: [
+                TranscriptSegment(
+                    id: "speech", sourceRange: range, rangeMeaning: .speech, rawText: text, languageTag: "en",
+                    units: units)
+            ], status: .complete, warnings: [])
+    }
+
     @Test func libraryRefusesTrashForOpenEditor() throws {
         let (root, package, meta) = try temporaryPackage()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -278,6 +313,56 @@ struct AppStateTests {
         model.useCueWidthAsDefault(cue.id)
         #expect(model.edit.subtitles.style.maxWidth == 0.45)
         #expect(model.edit.subtitles.cues.first?.maxWidth == nil)
+        await model.close()
+    }
+
+    @Test func shortCueWidthDragStartsAtWrapConstraint() {
+        let gesture = CueWidthDrag(startX: 100, initialWidth: 0.8, edge: 1)
+        #expect(gesture.width(at: 100, videoWidth: 500) == 0.8)
+        #expect(abs(gesture.width(at: 102, videoWidth: 500) - 0.804) < 1e-9)
+        let left = CueWidthDrag(startX: 100, initialWidth: 0.8, edge: -1)
+        #expect(abs(left.width(at: 98, videoWidth: 500) - 0.804) < 1e-9)
+    }
+
+    @Test func movedCueCutKeepsRemainingShiftedWordTimings() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let revision = timedRevision()
+        _ = model.receiveTranscript(revision)
+        let id = try #require(model.edit.subtitles.cues.first?.id)
+        model.moveCue(id, toStart: 0.5)
+        model.selectedWordIDs = ["word-1"]
+        model.cutSelectedWords()
+        let cue = try #require(model.edit.subtitles.cues.first)
+        #expect(cue.text == "one three")
+        #expect(cue.words.map(\.text) == ["one", "three"])
+        #expect(cue.words.map(\.start) == [0.5, 1.5])
+        #expect(cue.unitIDs == ["word-0", "word-2"])
+        await model.close()
+    }
+
+    @Test func lateWordBackfillSurvivesUndoAndAutosave() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let revision = timedRevision()
+        try model.package.saveTranscript(revision)
+        _ = model.receiveTranscript(revision)
+        model.applyDerived { $0.subtitles.cues[0].words = [] }
+        model.transcripts.removeValue(forKey: revision.id)
+        let undo = UndoManager()
+        model.undoManager = undo
+        model.update("Padding") { $0.background.padding = 0.15 }
+        model.loadTranscripts()
+        for _ in 0..<10_000 where model.edit.subtitles.cues[0].words.isEmpty { await Task.yield() }
+        #expect(model.edit.subtitles.cues[0].words.count == 3)
+        undo.undo()
+        #expect(model.edit.background.padding != 0.15)
+        #expect(model.edit.subtitles.cues[0].words.count == 3)
+        await model.flush()
+        #expect(try model.package.loadEdit()?.subtitles.cues[0].words.count == 3)
+        #expect(!model.hasUnsavedChanges)
+        model.loadTranscripts()
+        #expect(!model.hasUnsavedChanges)
         await model.close()
     }
 

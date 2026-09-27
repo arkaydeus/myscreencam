@@ -231,7 +231,11 @@ final class EditorModel {
     private func revert(to old: EditConfig, action: String) {
         registerUndo(restoring: edit, action: action)
         lastCoalesceKey = nil
-        setEditState(old)
+        var restored = old
+        if let id = restored.subtitles.revisionID, let revision = transcripts[id] {
+            _ = restored.subtitles.fillWordTimings(from: revision)
+        }
+        setEditState(restored)
     }
 
     private func setEditState(_ next: EditConfig) {

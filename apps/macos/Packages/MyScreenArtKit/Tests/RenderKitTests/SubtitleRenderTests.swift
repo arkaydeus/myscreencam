@@ -146,6 +146,38 @@ struct SubtitleRenderTests {
         #expect(a != nil)
         #expect(a?.image === b?.image)
     }
+
+    @Test func compositorHighlightsUppercaseMixedScriptRuns() async throws {
+        var edit = try await TestMedia.plainEdit()
+        var style = SubtitleStyle(size: 0.12, textColor: .white, outlineWidth: 0, background: false)
+        style.highlightWords = true
+        style.highlightColor = RGBAColor(r: 0, g: 1, b: 0)
+        style.highlightGrow = 0.2
+        style.uppercase = true
+        edit.subtitles.style = style
+        edit.subtitles.cues = [
+            SubtitleCue(
+                start: 0, end: 2, text: "hi 界 😀",
+                words: [
+                    SubtitleWord(text: "hi", start: 0.1, end: 0.4),
+                    SubtitleWord(text: "界", start: 0.5, end: 0.9),
+                    SubtitleWord(text: "😀", start: 1, end: 1.4),
+                ])
+        ]
+        func greenPixels(_ image: Bitmap) -> Int {
+            var count = 0
+            for y in 0..<360 {
+                for x in 0..<640 {
+                    let pixel = image.pixel(x, y)
+                    if pixel.g > 180 && pixel.r < 100 && pixel.b < 100 { count += 1 }
+                }
+            }
+            return count
+        }
+        let before = greenPixels(try await render(edit, at: 0.05))
+        #expect(greenPixels(try await render(edit, at: 0.2)) > before + 20)
+        #expect(greenPixels(try await render(edit, at: 0.6)) > before + 20)
+    }
 }
 
 struct SubtitleHighlightRenderTests {

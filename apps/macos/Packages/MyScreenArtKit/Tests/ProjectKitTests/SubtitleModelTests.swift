@@ -330,11 +330,15 @@ struct SubtitleEditingTests {
         #expect(result.reapplied == 1)
         #expect(result.conflicts.map(\.mine.text) == ["Goodbye"])
         #expect(result.cues.map(\.text) == ["Hello, world!", "buy"])
+        #expect(result.cues[0].words.map(\.text) == ["hello", "wurld"])
+        #expect(result.cues[0].words.map(\.start) == [0, 0.6])
 
         let kept = SubtitleMerge.merge(
             current: cues, newRevision: TranscriptFixtures.revision([new], id: "new"), keep: [cues[1].id])
         #expect(kept.conflicts.isEmpty)
         #expect(kept.cues.map(\.text) == ["Hello, world!", "Goodbye"])
+        #expect(kept.cues[1].words.map(\.text) == ["buy"])
+        #expect(kept.cues[1].words.map(\.start) == [3])
     }
 }
 
@@ -396,6 +400,37 @@ struct SubtitleWordTests {
         #expect(words == [SubtitleWord(text: "unbelievable", start: 1, end: 1.8)])
     }
 
+    @Test func multiCharacterCJKUnitsTimeEveryDisplayToken() throws {
+        let revision = TranscriptFixtures.revision([
+            TranscriptFixtures.segment("s", [("你好", 0, 0.5), ("世界", 0.6, 1)])
+        ])
+        let cue = try #require(CueBuilder.cues(from: revision).first)
+        #expect(cue.text == "你好 世界")
+        #expect(cue.words.map(\.text) == ["你", "好", "世", "界"])
+        #expect(cue.words.map(\.start) == [0, 0.25, 0.6, 0.8])
+        #expect(SubtitleWords.highlightedRange(in: cue.text, words: cue.words, at: 0.3) == 1..<2)
+        #expect(SubtitleWords.highlightedRange(in: cue.text, words: cue.words, at: 0.9) == 4..<5)
+
+        let kana = SubtitleWords.build(
+            text: "かな",
+            units: [
+                (
+                    "かな",
+                    UnitTiming(
+                        sourceRange: TranscriptFixtures.range(1, 1.4), method: .forcedAlignment, validation: .valid)
+                )
+            ])
+        #expect(kana.map(\.text) == ["か", "な"])
+        #expect(abs((kana.last?.start ?? 0) - 1.2) < 1e-9)
+    }
+
+    @Test func buildSkipsMissingAndWhitespaceUnits() {
+        let timing = UnitTiming(sourceRange: TranscriptFixtures.range(0, 0.5), method: .tdt, validation: .valid)
+        #expect(
+            SubtitleWords.build(text: "hello", units: [(" ", timing), ("missing", timing), ("hello", timing)])
+                == [SubtitleWord(text: "hello", start: 0, end: 0.5)])
+    }
+
     @Test func highlightFollowsTheLastStartedWord() {
         let words = [
             SubtitleWord(text: "Hello,", start: 1, end: 1.4), SubtitleWord(text: "big", start: 1.5, end: 1.8),
@@ -420,6 +455,16 @@ struct SubtitleWordTests {
         #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.1) == nil)
         #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.5) == 15..<20)
         #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.9) == 21..<26)
+    }
+
+    @Test func correctedMiddleWordDoesNotLeaveThePreviousWordLit() {
+        let words = [
+            SubtitleWord(text: "one", start: 0, end: 0.4),
+            SubtitleWord(text: "two", start: 0.5, end: 0.9),
+            SubtitleWord(text: "three", start: 1, end: 1.4),
+        ]
+        #expect(SubtitleWords.highlightedRange(in: "one too three", words: words, at: 0.6) == nil)
+        #expect(SubtitleWords.highlightedRange(in: "one too three", words: words, at: 1.1) == 8..<13)
     }
 
     @Test func oldFilesDecodeWithoutWordsOrHighlight() throws {
@@ -461,6 +506,13 @@ struct SubtitleWordTests {
         #expect(settings.cues == built)
         let again = settings.fillWordTimings(from: revision)
         #expect(!again)
+        settings.cues[0].text = "Hello friend."
+        settings.cues[0].words = []
+        let correctedFilled = settings.fillWordTimings(from: revision)
+        #expect(correctedFilled)
+        #expect(settings.cues[0].words.map(\.text) == ["Hello", "there."])
+        #expect(
+            SubtitleWords.highlightedRange(in: settings.cues[0].text, words: settings.cues[0].words, at: 0.6) == nil)
     }
 }
 

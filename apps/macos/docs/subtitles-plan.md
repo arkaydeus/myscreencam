@@ -139,7 +139,9 @@ Tests cover:
   Each cue stores `words` (text and source times), taken from acoustic unit timing only (TDT or forced
   alignment), so coarse and hand-made cues are never highlighted. A word stays lit until the next one starts.
   When drawing, the stored words are matched to the cue's current text by a longest common subsequence of
-  their letters, so a correction keeps the timing of the words it didn't change. Cues made before this get
+  their letters, so a correction keeps the timing of the words it didn't change; a changed spoken word leaves
+  the highlight off until the next matched word. Multi-character CJK units distribute their acoustic interval
+  evenly across their display characters. Cues made before this get
   their words from the transcript when the editor opens (`SubtitleSettings.fillWordTimings`). Rasters are
   cached per highlighted word, so text is laid out again only when the word changes. Re-time doesn't
   return word timings yet, so after it, only the words that match the old recognition stay lit.

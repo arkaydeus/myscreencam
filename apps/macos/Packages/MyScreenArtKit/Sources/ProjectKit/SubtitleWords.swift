@@ -49,7 +49,8 @@ public enum SubtitleWords {
     }
 
     /// Word timings for `text` from the units it was recognised as, in order. Each unit's text is found in `text`
-    /// left to right; a word's time spans every timed unit found in it (so subword units make one word).
+    /// left to right; subword units share a display word, while a unit spanning multiple CJK display tokens
+    /// distributes its acoustic interval across them.
     public static func build(text: String, units: [(text: String, timing: UnitTiming?)]) -> [SubtitleWord] {
         let utf16 = Array(text.utf16)
         let tokens = tokens(in: text)
@@ -62,11 +63,16 @@ public enum SubtitleWords {
             guard let timing = unit.timing, timing.method == .tdt || timing.method == .forcedAlignment else {
                 continue
             }
-            let at = found.lowerBound.utf16Offset(in: text)
-            guard let k = tokens.firstIndex(where: { $0.contains(at) }) else { continue }
+            let match = found.lowerBound.utf16Offset(in: text)..<found.upperBound.utf16Offset(in: text)
+            let overlapping = tokens.indices.filter { tokens[$0].overlaps(match) }
+            guard !overlapping.isEmpty else { continue }
             let s = timing.sourceRange.startSeconds
             let e = timing.sourceRange.endSeconds
-            spans[k] = spans[k].map { (min($0.start, s), max($0.end, e)) } ?? (s, e)
+            for (index, k) in overlapping.enumerated() {
+                let start = s + (e - s) * Double(index) / Double(overlapping.count)
+                let end = s + (e - s) * Double(index + 1) / Double(overlapping.count)
+                spans[k] = spans[k].map { (min($0.start, start), max($0.end, end)) } ?? (start, end)
+            }
         }
         return spans.keys.sorted().map { k in
             SubtitleWord(
@@ -74,12 +80,12 @@ public enum SubtitleWords {
         }
     }
 
-    /// The UTF-16 range in `text` of the word being spoken at source time `t`: the last timed word that has
-    /// started. `words` are matched to the words of `text` in order by their letters and digits (a longest common
-    /// subsequence), so a correction keeps the timing of every word it didn't change; words the user typed have
-    /// no timing and are never lit. Nil before the first word starts.
+    /// The UTF-16 range in `text` of the current timed word at source time `t`. `words` are matched to the words
+    /// of `text` in order by their letters and digits (a longest common subsequence), so a correction keeps the
+    /// timing of every word it didn't change. A changed current word has no matching range and is never lit;
+    /// the preceding word stays lit only during its own pause. Nil before the first word starts.
     public static func highlightedRange(in text: String, words: [SubtitleWord], at t: Double) -> Range<Int>? {
-        guard words.contains(where: { $0.start <= t }) else { return nil }
+        guard let current = words.indices.last(where: { words[$0].start <= t }) else { return nil }
         let utf16 = Array(text.utf16)
         let tokens = tokens(in: text)
         let a = tokens.map { key(String(decoding: utf16[$0], as: UTF16.self)) }
@@ -91,14 +97,12 @@ public enum SubtitleWords {
                 lengths[i][j] = a[i] == b[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
             }
         }
-        var best: (range: Range<Int>, start: Double)?
+        var matched: Range<Int>?
         var i = 0
         var j = 0
         while i < a.count, j < b.count {
             if a[i] == b[j] {
-                if words[j].start <= t, words[j].start >= best?.start ?? -.infinity {
-                    best = (tokens[i], words[j].start)
-                }
+                if j == current { matched = tokens[i] }
                 i += 1
                 j += 1
             } else if lengths[i + 1][j] >= lengths[i][j + 1] {
@@ -107,7 +111,7 @@ public enum SubtitleWords {
                 j += 1
             }
         }
-        return best?.range
+        return matched
     }
 
     /// Letters and digits, case- and diacritic-folded; a word of punctuation only is compared as is.
