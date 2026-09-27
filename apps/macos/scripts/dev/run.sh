@@ -13,6 +13,10 @@ worktree_root="$(git -C "$root" rev-parse --show-toplevel)"
 worktree_id="$(printf '%s' "$worktree_root" | shasum -a 256 | cut -c1-12)"
 recordings="$HOME/Movies/MyScreenArt Dev/$worktree_id"
 
+# Builds unregister themselves (scripts/dev/xcodebuild.sh), so register this one and its Quick Look extension.
+lsregister="${MSA_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
+"$lsregister" -f -R -trusted "$app"
+
 # Replace an instance already launched from this worktree.
 if pkill -f "$app/Contents/MacOS/"; then sleep 0.5; fi
 

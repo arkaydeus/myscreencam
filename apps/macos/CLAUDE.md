@@ -25,7 +25,7 @@ Packages/MyScreenArtKit/     engine SwiftPM package (testable with `swift test`)
   Sources/SpeechCore         speech-model catalogue/downloads, audio preparation, worker protocol, transcript pipeline
 Packages/SpeechEngines/      Parakeet (FluidAudio) and Qwen (MLX) adapters + `speech-tool`; build with xcodebuild only
 project.yml                  XcodeGen spec (bundle IDs, signing, settings, Sparkle package)
-scripts/dev/                 run.sh (LaunchServices launch), doctor.sh
+scripts/dev/                 run.sh (LaunchServices launch), doctor.sh, xcodebuild.sh + unregister-builds.sh (LaunchServices cleanup)
 scripts/perf/                sample.py (CPU/memory sampler), legacy baseline driver
 scripts/speech/              make-catalogue.py (pinned model manifests), timing fixtures and reports
 scripts/release/             release.sh (archive → notarise → DMG → appcast), ExportOptions.plist
@@ -75,7 +75,8 @@ mise run doctor         # toolchain/signing/build diagnostics
 mise run perf:sample -- --match 'MyScreenArt Dev.app/Contents/MacOS' --duration 60
 mise run release:dmg    # local Developer ID build + DMG (no notarisation / appcast)
 mise run release        # full release pipeline; see docs/release.md
-mise run clean
+mise run clean          # also unregisters stale builds
+mise run unregister     # unregister stale MyScreenArt builds from every worktree
 mise run build:perf     # optimised Dev build (same bundle ID/TCC) for measurements
 ```
 Engine benchmarks without the app: `swift build -c release --product msa-tool` (in `Packages/MyScreenArtKit`), then:
@@ -91,6 +92,7 @@ Building the speech service needs Xcode's Metal Toolchain (`xcodebuild -download
 - Debug: product **MyScreenArt Dev**, bundle ID `com.myscreenart.app.dev`, URL scheme `myscreenart-dev`, signed with the stable `Apple Development` identity (team `QWD87G9T3P`). TCC grants therefore survive rebuilds and are shared by all worktrees.
 - Release: product **MyScreenArt**, `com.myscreenart.app`, scheme `myscreenart`, `Developer ID Application`, arm64 only. Built, notarised and published locally with `scripts/release/release.sh` (`mise run release:publish`) to the public `arkaydeustech/myscreenart-releases` repo (see `docs/release.md`).
 - The Quick Look extension is `<app id>.thumbnail`. It is sandboxed (required for Quick Look extensions) and signed with the app's identity.
+- xcodebuild registers every app it builds with LaunchServices, and there's no setting to turn that off. Left alone, every worktree adds another "MyScreenArt Dev" Quick Look entry to Login Items & Extensions. So the xcodebuild tasks go through `scripts/dev/xcodebuild.sh`, and `release.sh` has an exit trap. Both run `unregister-builds.sh`, which unregisters, across all worktrees, every MyScreenArt bundle that is gone or is an idle build product. Running apps and installed copies are kept. `run.sh` registers the app it launches. If you run xcodebuild on the app scheme by hand, use the wrapper or run `mise run unregister` afterwards.
 - Sparkle stays off until `SPARKLE_PUBLIC_ED_KEY` in `project.yml` holds a real key; Debug builds never check automatically.
 - Always launch through `mise run run` (it uses `open`). If the app is started from a terminal, TCC charges the terminal instead of the app.
 - Recordings: release uses `~/Movies/MyScreenArt/`. `mise run run` sets `MYSCREENART_RECORDINGS_DIR=~/Movies/MyScreenArt Dev/<worktree-hash>/`, so worktrees don't share data.
