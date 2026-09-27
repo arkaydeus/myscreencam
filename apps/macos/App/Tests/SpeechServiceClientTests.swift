@@ -56,6 +56,7 @@ nonisolated private final class TestSpeechListener: NSObject, NSXPCListenerDeleg
     private let holdRecognition: Bool
     private let lock = NSLock()
     private var endpoints: [TestSpeechEndpoint] = []
+    private var acceptedConnections: [NSXPCConnection] = []
 
     init(holdRecognition: Bool = false) {
         self.holdRecognition = holdRecognition
@@ -65,11 +66,15 @@ nonisolated private final class TestSpeechListener: NSObject, NSXPCListenerDeleg
     }
 
     var services: [TestSpeechEndpoint] { lock.withLock { endpoints } }
+    var connections: [NSXPCConnection] { lock.withLock { acceptedConnections } }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         let endpoint = TestSpeechEndpoint(
             holdRecognition: holdRecognition, recognitionStarted: recognitionStarted)
-        lock.withLock { endpoints.append(endpoint) }
+        lock.withLock {
+            endpoints.append(endpoint)
+            acceptedConnections.append(connection)
+        }
         connection.exportedInterface = NSXPCInterface(with: SpeechServiceProtocol.self)
         connection.exportedObject = endpoint
         connection.resume()
@@ -79,6 +84,35 @@ nonisolated private final class TestSpeechListener: NSObject, NSXPCListenerDeleg
 
 @MainActor
 struct SpeechServiceClientTests {
+    @Test func interruptedServiceReplaysLoadOnNewConnection() async throws {
+        let server = TestSpeechListener()
+        defer { server.listener.invalidate() }
+        let client = SpeechServiceClient { NSXPCConnection(listenerEndpoint: server.listener.endpoint) }
+        defer { client.reset() }
+        let load = WorkerRequest.load(role: .qwenRecogniser, directory: "/model", runtimeDirectory: "")
+        _ = try await client.send(load)
+        let first = try #require(server.connections.first)
+        first.invalidate()
+
+        let window = WorkWindow(index: 0, owned: SampleRange(start: 0, end: 100), read: SampleRange(start: 0, end: 100))
+        var response: WorkerResponse?
+        for _ in 0..<20 {
+            do {
+                response = try await client.send(
+                    .recognise(audioPath: "/audio", window: window, languageHint: nil, tokenBudget: nil))
+                break
+            } catch TranscriptionError.workerCrashed {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        guard let response, case .recognised = response else {
+            Issue.record("Client did not replay the load after interruption")
+            return
+        }
+        #expect(server.services.count >= 2)
+        #expect(server.services.last?.received.first == load)
+    }
+
     @Test func cancellationInvalidatesInFlightRequest() async throws {
         let server = TestSpeechListener(holdRecognition: true)
         defer { server.listener.invalidate() }
