@@ -1,6 +1,6 @@
-# MyScreenArt monorepo
+# My Screen Cam monorepo
 
-MyScreenArt is a native macOS screen recorder and editor. This repo holds the app and its marketing site.
+My Screen Cam is a native macOS screen recorder and editor. This repo holds the app and its marketing site.
 
 ## Layout
 ```
@@ -29,6 +29,6 @@ Inside a project directory, `mise run <task>` runs that project's task (for exam
 There is no GitHub CI. Before pushing, run `mise run check`, or the `check` task of each project you changed.
 
 ## Conventions
-- Never commit generated output: `MyScreenArt.xcodeproj`, `build/`, `.next/`, `node_modules/`.
+- Never commit generated output: `MyScreenCam.xcodeproj`, `build/`, `.next/`, `node_modules/`.
 - JavaScript dependencies are installed with bun from the repo root (`bun install`); `bun.lock` is committed.
 - Facts the site states about the app (requirements, export presets, measured performance) come from `apps/macos`. Update `apps/web` when those change.

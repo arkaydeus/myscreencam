@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Drop the LaunchServices registrations that builds leave behind. xcodebuild registers every app it builds (and
-# its Quick Look extension) with no opt-out, so each worktree adds another "MyScreenArt Dev" entry to System
-# Settings > Login Items & Extensions. This unregisters, across all worktrees, every MyScreenArt bundle that is
+# its Quick Look extension) with no opt-out, so each worktree adds another "My Screen Cam Dev" entry to System
+# Settings > Login Items & Extensions. This unregisters, across all worktrees, every My Screen Cam bundle that is
 # either gone from disk or an idle build product (under build/ or an explicit --root). Installed copies such as
-# /Applications/MyScreenArt.app are left alone. run.sh re-registers the app it launches.
+# /Applications/My Screen Cam.app are left alone. run.sh re-registers the app it launches.
 #
 #   scripts/dev/unregister-builds.sh [--dry-run] [--root BUILD_PRODUCT_DIR]...
 set -euo pipefail
 
-lsregister="${MSA_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
+lsregister="${MSC_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
 dry_run=0
 roots=()
 while [[ $# -gt 0 ]]; do
@@ -30,7 +30,7 @@ count=0
 while IFS= read -r path; do
   [[ -n "$path" ]] || continue
   # Only our app bundles (or their nested registrations) are eligible, regardless of parent directory names.
-  [[ "$path" =~ ^(.*/MyScreenArt(\ Dev)?\.app)(/.*)?$ ]] || continue
+  [[ "$path" =~ ^(.*/My\ Screen\ Cam(\ Dev)?\.app)(/.*)?$ ]] || continue
   owner="${BASH_REMATCH[1]}"
   if [[ -e "$owner" ]]; then
     canonical_owner="$(cd -P "$owner" && pwd)"
@@ -53,5 +53,5 @@ while IFS= read -r path; do
   count=$((count + 1))
 done <<< "$paths"
 
-[[ $count -gt 0 ]] || echo "No stale MyScreenArt registrations."
+[[ $count -gt 0 ]] || echo "No stale My Screen Cam registrations."
 [[ $dry_run -eq 0 ]] || echo "Dry run: no registrations were changed."

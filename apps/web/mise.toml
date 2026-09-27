@@ -1,4 +1,4 @@
-# Tasks for the MyScreenArt marketing site (//apps/web in the monorepo): Next.js, Tailwind, shadcn/ui, bun, oxc.
+# Tasks for the My Screen Cam marketing site (//apps/web in the monorepo): Next.js, Tailwind, shadcn/ui, bun, oxc.
 # bun and node are pinned in the root mise.toml. From this directory run `mise run <task>`; from anywhere
 # else run `mise //apps/web:<task>`.
 

@@ -13,7 +13,7 @@ struct PermissionsCard: View {
                     PermissionRow(kind: kind, status: model.status(kind), model: model)
                 }
                 if model.relaunchHint {
-                    Text("macOS applies Screen Recording and Input Monitoring after MyScreenArt is reopened.")
+                    Text("macOS applies Screen Recording and Input Monitoring after My Screen Cam is reopened.")
                         .font(.caption)
                         .foregroundStyle(Color.themeSecondaryText)
                 }

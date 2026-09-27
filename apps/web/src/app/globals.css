@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * MyScreenArt palette. The page follows the Mac's own neutrals: white and light-grey sections, near-black
+ * My Screen Cam palette. The page follows the Mac's own neutrals: white and light-grey sections, near-black
  * text and one blue for actions. The saturated pigments only appear inside "canvases", the way the app
  * frames a recording on a painted background, and as the yellow of zooms and click rings.
  */
@@ -131,7 +131,7 @@
  * Hero demo: one 12 s loop shared by the camera (zoom), cursor, click rings and timeline playhead, so the
  * zoom blocks on the timeline line up with what the preview does.
  */
-@keyframes msa-camera {
+@keyframes msc-camera {
   0%,
   14% {
     transform: scale(1);
@@ -164,7 +164,7 @@
   }
 }
 
-@keyframes msa-cursor {
+@keyframes msc-cursor {
   0% {
     left: 46%;
     top: 30%;
@@ -190,7 +190,7 @@
   }
 }
 
-@keyframes msa-click-publish {
+@keyframes msc-click-publish {
   0%,
   13% {
     opacity: 0;
@@ -207,7 +207,7 @@
   }
 }
 
-@keyframes msa-click-check {
+@keyframes msc-click-check {
   0%,
   72% {
     opacity: 0;
@@ -224,7 +224,7 @@
   }
 }
 
-@keyframes msa-published {
+@keyframes msc-published {
   0%,
   13.5% {
     opacity: 0;
@@ -238,7 +238,7 @@
   }
 }
 
-@keyframes msa-checked {
+@keyframes msc-checked {
   0%,
   72.5% {
     opacity: 0;
@@ -252,7 +252,7 @@
   }
 }
 
-@keyframes msa-playhead {
+@keyframes msc-playhead {
   from {
     left: 0%;
   }
@@ -262,25 +262,25 @@
 }
 
 @utility demo-camera {
-  animation: msa-camera 12s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  animation: msc-camera 12s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @utility demo-cursor {
-  animation: msa-cursor 12s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation: msc-cursor 12s cubic-bezier(0.45, 0, 0.25, 1) infinite;
 }
 @utility demo-click-publish {
-  animation: msa-click-publish 12s linear infinite;
+  animation: msc-click-publish 12s linear infinite;
 }
 @utility demo-click-check {
-  animation: msa-click-check 12s linear infinite;
+  animation: msc-click-check 12s linear infinite;
 }
 @utility demo-published {
-  animation: msa-published 12s linear infinite;
+  animation: msc-published 12s linear infinite;
 }
 @utility demo-checked {
-  animation: msa-checked 12s linear infinite;
+  animation: msc-checked 12s linear infinite;
 }
 @utility demo-playhead {
-  animation: msa-playhead 12s linear infinite;
+  animation: msc-playhead 12s linear infinite;
 }
 
 /* Reduced motion: a still frame of the first zoom, with the click already made. */

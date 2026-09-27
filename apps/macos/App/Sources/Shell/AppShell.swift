@@ -1,9 +1,9 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// Owns the shell services: preferences, actions, global hotkeys, Dock-icon policy and updates.
-/// Created in `MyScreenArtApp.init` next to the `AppModel`; the app delegate and the menus use it.
+/// Created in `MyScreenCamApp.init` next to the `AppModel`; the app delegate and the menus use it.
 @MainActor
 @Observable
 final class AppShell {
@@ -26,7 +26,7 @@ final class AppShell {
         self.dockIcon = DockIconController(settings: settings, recording: model.recording)
     }
 
-    /// URL schemes this build answers to (`CFBundleURLSchemes`, e.g. `myscreenart-dev` in Debug).
+    /// URL schemes this build answers to (`CFBundleURLSchemes`, e.g. `myscreencam-dev` in Debug).
     static let urlSchemes: Set<String> = {
         let types = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] ?? []
         return Set(types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }.map { $0.lowercased() })

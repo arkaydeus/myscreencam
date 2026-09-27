@@ -1,11 +1,11 @@
-#!/usr/bin/env swift  // Writes a realistic synthetic MyScreenArt recording package (`.msarec`) for development and integration tests.
+#!/usr/bin/env swift  // Writes a realistic synthetic My Screen Cam recording package (`.mscam`) for development and integration tests.
 //
 // Usage (full Xcode is needed for AVFoundation's encoders; mise sets DEVELOPER_DIR):
 //   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift scripts/dev/make-sample-recording.swift <folder>
 //     [--duration 20] [--name "Sample Recording"] [--codec hevc|h264]
 //     [--no-webcam] [--no-system-audio] [--no-mic] [--cursor-visible] [--speech "text" [--voice name]]
 //
-// Creates `<folder>/Recording_YYYYMMDD_HHMMSS_xxxxxxxx.msarec` and prints its path on stdout. Contents:
+// Creates `<folder>/Recording_YYYYMMDD_HHMMSS_xxxxxxxx.mscam` and prints its path on stdout. Contents:
 // - `screen.mov`   1920×1080 @30 (HEVC by default): moving shapes, a scrolling "document", a running clock and a
 //                  frame counter, so cuts, zooms and sync are easy to see.
 // - `webcam.mov`   1280×720 @30, H.264, starting 0.4 s into the session (a stream start offset), ends early.
@@ -220,7 +220,7 @@ func drawScreen(_ ctx: CGContext, t: Double, frame: Int, duration: Double) {
     let clock = String(format: "%02d:%02d.%02d", seconds / 60, seconds % 60, Int((t - Double(seconds)) * 100))
     drawText(clock, in: ctx, x: 1420, y: 150, size: 64, color: white, weight: .semibold, monospaced: true)
     drawText("frame \(frame)", in: ctx, x: 1420, y: 236, size: 28, color: rgb(0.8, 0.85, 0.95), monospaced: true)
-    drawText("MyScreenArt sample recording", in: ctx, x: 20, y: 5, size: 18, color: white, weight: .medium)
+    drawText("My Screen Cam sample recording", in: ctx, x: 20, y: 5, size: 18, color: white, weight: .medium)
     drawText(
         "Second \(seconds)", in: ctx, x: window.minX + 48, y: window.minY + 36, size: 22,
         color: rgb(0.1, 0.1, 0.12), weight: .bold)
@@ -404,7 +404,7 @@ let stamp: String = {
     return formatter.string(from: createdAt)
 }()
 let suffix = id.uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased()
-let package = options.folder.appending(path: "Recording_\(stamp)_\(suffix).msarec", directoryHint: .isDirectory)
+let package = options.folder.appending(path: "Recording_\(stamp)_\(suffix).mscam", directoryHint: .isDirectory)
 try fm.createDirectory(at: package.appending(path: "cursors"), withIntermediateDirectories: true)
 try fm.createDirectory(at: package.appending(path: "cache"), withIntermediateDirectories: true)
 
@@ -453,7 +453,7 @@ func run(_ tool: String, _ arguments: [String]) throws {
 
 if options.microphone, let speech = options.speech {
     // `say` → 48 kHz mono AIFF → AAC m4a.
-    let aiff = FileManager.default.temporaryDirectory.appending(path: "msa-speech-\(UUID().uuidString).aiff")
+    let aiff = FileManager.default.temporaryDirectory.appending(path: "msc-speech-\(UUID().uuidString).aiff")
     defer { try? FileManager.default.removeItem(at: aiff) }
     var sayArgs = ["-o", aiff.path, "--data-format=BEI16@48000"]
     if let voice = options.voice { sayArgs += ["-v", voice] }

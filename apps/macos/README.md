@@ -1,6 +1,6 @@
-# MyScreenArt for macOS
+# My Screen Cam for macOS
 
-The native app, in `apps/macos` of the MyScreenArt monorepo. Commands below run from this directory; from elsewhere use `mise //apps/macos:<task>`.
+The native app, in `apps/macos` of the My Screen Cam monorepo. Commands below run from this directory; from elsewhere use `mise //apps/macos:<task>`.
 
 A native macOS screen recorder and editor built on ScreenCaptureKit, AVFoundation, VideoToolbox, Core Image and Metal. It aims for high quality recordings with a small CPU, memory and energy footprint.
 
@@ -14,10 +14,10 @@ A native macOS screen recorder and editor built on ScreenCaptureKit, AVFoundatio
 ## Getting started
 ```bash
 mise install      # installs XcodeGen (run once in this directory)
-mise run run      # generate the Xcode project, build, and launch "MyScreenArt Dev"
+mise run run      # generate the Xcode project, build, and launch "My Screen Cam Dev"
 mise run test     # engine tests
 ```
-On first use, grant **Screen & System Audio Recording**, **Input Monitoring**, **Camera** and **Microphone** to *MyScreenArt Dev* when macOS asks. `mise run doctor` prints the direct links to those settings panes.
+On first use, grant **Screen & System Audio Recording**, **Input Monitoring**, **Camera** and **Microphone** to *My Screen Cam Dev* when macOS asks. `mise run doctor` prints the direct links to those settings panes.
 
 ## Docs
 - [Live test checklist](docs/live-test-checklist.md): what needs real permissions to verify

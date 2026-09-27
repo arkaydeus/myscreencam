@@ -23,7 +23,7 @@ const daemonPath = join(legacyRepo, 'target/release/screen-recorder-daemon');
 const sampler = join(dirname(fileURLToPath(import.meta.url)), 'sample.py');
 
 // Work on a copy so the original recording is never touched.
-const root = mkdtempSync(join(tmpdir(), 'msa-legacy-baseline-'));
+const root = mkdtempSync(join(tmpdir(), 'msc-legacy-baseline-'));
 const pkg = join(root, basename(packageDir));
 cpSync(packageDir, pkg, { recursive: true });
 const output = join(root, `export-${quality}-${fps}.mp4`);
@@ -31,8 +31,8 @@ const output = join(root, `export-${quality}-${fps}.mp4`);
 const daemon = spawn(daemonPath, [], {
   env: {
     ...process.env,
-    MYSCREENART_RECORDINGS_DIR: root,
-    MYSCREENART_RESOURCES_DIR: join(legacyRepo, 'apps/desktop/resources'),
+    MYSCREENCAM_RECORDINGS_DIR: root,
+    MYSCREENCAM_RESOURCES_DIR: join(legacyRepo, 'apps/desktop/resources'),
   },
   stdio: ['ignore', 'pipe', 'inherit'],
 });

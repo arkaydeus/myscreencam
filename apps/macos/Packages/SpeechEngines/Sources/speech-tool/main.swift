@@ -5,12 +5,12 @@ import SpeechCore
 import SpeechEngines
 
 // Developer tool: on-device smoke tests and benchmarks for the speech engines, using exactly the code the
-// `MyScreenArtSpeech` service runs (in-process here). Build with xcodebuild (see docs/speech-integration.md).
+// `MyScreenCamSpeech` service runs (in-process here). Build with xcodebuild (see docs/speech-integration.md).
 //
 //   speech-tool import-models <downloaded-dir> <models-root>        verify + install catalogue models from disk
-//   speech-tool transcribe <pkg.msarec> <models-root> [--engine parakeet|qwen] [--language xx] [--source mic|system]
+//   speech-tool transcribe <pkg.mscam> <models-root> [--engine parakeet|qwen] [--language xx] [--source mic|system]
 //                          [--out revision.json] [--cues] [--fresh]   (--fresh: ignore prepared audio/checkpoints)
-//   speech-tool compare-aligners <pkg.msarec> <models-root> <other-aligner-dir> [--language xx] [--out both.json]
+//   speech-tool compare-aligners <pkg.mscam> <models-root> <other-aligner-dir> [--language xx] [--out both.json]
 
 struct LocalWorker: SpeechWorker {
     let engine: InferenceEngine

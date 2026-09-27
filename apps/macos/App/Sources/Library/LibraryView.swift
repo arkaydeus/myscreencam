@@ -78,7 +78,7 @@ private struct LibraryContent: View {
                 Button("Move to Trash", role: .destructive) { moveToTrash(item) }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
-                Text("MyScreenArt can't undo this, but you can put the recording back from the Trash in Finder.")
+                Text("My Screen Cam can't undo this, but you can put the recording back from the Trash in Finder.")
             }
             .sheet(item: $exportRequest) { request in
                 ExportSheet(package: request.package, edit: request.edit)

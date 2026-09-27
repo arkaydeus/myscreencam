@@ -8,12 +8,12 @@ import SpeechCore
 import SwiftUI
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 @MainActor
 struct AppStateTests {
     private func temporaryPackage() throws -> (URL, RecordingPackage, RecordingMeta) {
-        let root = FileManager.default.temporaryDirectory.appending(path: "msa-app-test-\(UUID().uuidString)")
+        let root = FileManager.default.temporaryDirectory.appending(path: "msc-app-test-\(UUID().uuidString)")
         let package = try RecordingPackage.create(in: root)
         let meta = RecordingMeta(
             name: "Test", duration: 2, source: .display(displayID: 1, name: "Test Display"),

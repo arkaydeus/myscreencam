@@ -19,7 +19,7 @@ test("Download for Mac points at the stable DMG asset while Releases opens the r
   const download = renderToStaticMarkup(createElement(DownloadButton));
   const footer = renderToStaticMarkup(createElement(SiteFooter));
 
-  expect(site.downloadUrl).toMatch(/\/releases\/latest\/download\/MyScreenArt\.dmg$/);
+  expect(site.downloadUrl).toMatch(/\/releases\/latest\/download\/MyScreenCam\.dmg$/);
   expect(download).toContain(`href="${site.downloadUrl}"`);
   expect(download).toContain("Download for Mac");
   expect(footer).toContain(`href="${site.releasesUrl}"`);
@@ -27,9 +27,9 @@ test("Download for Mac points at the stable DMG asset while Releases opens the r
 
 test("hero timeline matches the camera and click keyframes over one 12 second loop", () => {
   const demo = renderToStaticMarkup(createElement(CanvasDemo));
-  const camera = keyframes("msa-camera");
-  const publish = keyframes("msa-click-publish");
-  const check = keyframes("msa-click-check");
+  const camera = keyframes("msc-camera");
+  const publish = keyframes("msc-click-publish");
+  const check = keyframes("msc-click-check");
 
   expect(demo).toContain("left:14%;width:42%");
   expect(demo).toContain("left:73%;width:25%");
@@ -42,7 +42,7 @@ test("hero timeline matches the camera and click keyframes over one 12 second lo
   expect(publish).toMatch(/13\.5%\s*\{\s*opacity: 0\.95/);
   expect(check).toMatch(/72\.5%\s*\{\s*opacity: 0\.95/);
   for (const name of ["camera", "cursor", "click-publish", "click-check", "playhead"]) {
-    expect(css).toContain(`animation: msa-${name} 12s`);
+    expect(css).toContain(`animation: msc-${name} 12s`);
   }
 });
 

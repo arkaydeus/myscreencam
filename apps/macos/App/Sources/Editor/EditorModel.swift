@@ -1,5 +1,5 @@
 import AVFoundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import ProjectKit
 import RenderKit

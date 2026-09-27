@@ -52,7 +52,7 @@ let window = NSWindow(
     backing: .buffered,
     defer: false
 )
-window.title = "MyScreenArt perf motion"
+window.title = "My Screen Cam perf motion"
 let view = ScrollingPageView(frame: window.contentLayoutRect)
 window.contentView = view
 // Place it in the middle of the primary display (the one with the menu bar).

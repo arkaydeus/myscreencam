@@ -1,5 +1,5 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// Process-wide facts resolved once at launch.

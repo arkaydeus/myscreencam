@@ -1,5 +1,5 @@
 {
-  "name": "myscreenart",
+  "name": "myscreencam",
   "private": true,
   "workspaces": ["apps/web"]
 }

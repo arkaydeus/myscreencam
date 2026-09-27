@@ -31,7 +31,7 @@ struct RecorderMenuBarContent: View {
         Button("Show Library") { model.router.showLibrary() }
         SettingsLink { Text("Settings…") }
         Divider()
-        Button("Quit MyScreenArt") { NSApp.terminate(nil) }
+        Button("Quit My Screen Cam") { NSApp.terminate(nil) }
     }
 }
 
@@ -48,13 +48,13 @@ struct RecorderMenuBarLabel: View {
                 Image(nsImage: paused ? Self.pausedImage : Self.recordingImage)
                 Text(formatElapsed(recording.elapsedSeconds)).monospacedDigit()
             }
-            .accessibilityLabel(paused ? "MyScreenArt — Paused" : "MyScreenArt — Recording")
+            .accessibilityLabel(paused ? "My Screen Cam — Paused" : "My Screen Cam — Recording")
         case .countingDown, .stopping:
             Image(nsImage: Self.recordingImage)
-                .accessibilityLabel("MyScreenArt — Recording")
+                .accessibilityLabel("My Screen Cam — Recording")
         case .idle:
             Image(systemName: "record.circle")
-                .accessibilityLabel("MyScreenArt")
+                .accessibilityLabel("My Screen Cam")
         }
     }
 

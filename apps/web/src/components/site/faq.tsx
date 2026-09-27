@@ -20,11 +20,11 @@ const questions = [
   },
   {
     q: "Can I record system audio without extra software?",
-    a: "Yes. MyScreenArt uses macOS’s built-in audio capture, so there’s no virtual audio device or driver to set up. System audio and your microphone are kept on separate tracks.",
+    a: "Yes. My Screen Cam uses macOS’s built-in audio capture, so there’s no virtual audio device or driver to set up. System audio and your microphone are kept on separate tracks.",
   },
   {
     q: "Where are my recordings kept?",
-    a: "In the MyScreenArt folder inside your Movies folder. Each recording is a single file you can move, back up or share. Nothing is uploaded anywhere.",
+    a: "In the My Screen Cam folder inside your Movies folder. Each recording is a single file you can move, back up or share. Nothing is uploaded anywhere.",
   },
   {
     q: "Can I change an edit after exporting?",

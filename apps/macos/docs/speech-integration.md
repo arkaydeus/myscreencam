@@ -15,7 +15,7 @@ Measurements were taken on 2026-09-27.
 | Qwen3-ASR 1.7B 8-bit | `mlx-community/Qwen3-ASR-1.7B-8bit@a8379a2e…` | 10 files, 2.47 GB, Apache-2.0 |
 | Qwen3-ForcedAligner 0.6B 8-bit | `mlx-community/Qwen3-ForcedAligner-0.6B-8bit@0e1a68e9…` | 10 files, 1.28 GB, Apache-2.0 |
 
-The model inventory, sizes and SHA-256 hashes live in `Packages/MyScreenArtKit/Sources/SpeechCore/Resources/catalogue.json`,
+The model inventory, sizes and SHA-256 hashes live in `Packages/MyScreenCamKit/Sources/SpeechCore/Resources/catalogue.json`,
 which `scripts/speech/make-catalogue.py` generates from the Hugging Face tree API at the pinned revisions. LFS
 files carry their SHA-256 in that API. Small files are downloaded and hashed. To move a pin, bump the revision in
 the script, regenerate the catalogue, and review the new revision's licence files. `InferenceEngine.implementation`
@@ -65,13 +65,13 @@ records the SDK versions in every transcript; update it together with `Package.r
 
 ## Process and packaging
 
-- `MyScreenArtSpeech.xpc` is embedded in `Contents/XPCServices`. It's signed with the app's identity and uses the
+- `MyScreenCamSpeech.xpc` is embedded in `Contents/XPCServices`. It's signed with the app's identity and uses the
   Hardened Runtime with no exception entitlements.
   - It accepts connections only from our team ID (`setCodeSigningRequirement`).
   - It exits when its connection ends, so cancelling a job or releasing an idle service returns all Core ML and MLX
     memory to the system.
   - Its resources include `mlx-swift_Cmlx.bundle` (the Metal library), `FluidAudio_FluidAudio.bundle` and
-    `MyScreenArtKit_SpeechCore.bundle` (the catalogue).
+    `MyScreenCamKit_SpeechCore.bundle` (the catalogue).
   - Debug service size: 100 MB.
 - Protocol: JSON `WorkerRequest`/`WorkerResponse` inside one XPC method, with a 16 MB message cap. Audio moves as
   a path to the prepared `.f32` file plus sample ranges.
@@ -91,8 +91,8 @@ cd Packages/SpeechEngines && xcodebuild -scheme speech-tool -configuration Relea
   -destination 'platform=macOS,arch=arm64' -derivedDataPath /tmp/stt-dd -skipPackagePluginValidation -skipMacroValidation build
 T=/tmp/stt-dd/Build/Products/Release/speech-tool
 $T import-models <dir-from-make-catalogue.py --download> <models-root>     # verify + install from disk
-$T transcribe <pkg.msarec> <models-root> --engine parakeet|qwen [--language xx] [--fresh] [--cues] [--out rev.json]
-$T compare-aligners <pkg.msarec> <models-root> <other-aligner-dir> [--out both.json]
+$T transcribe <pkg.mscam> <models-root> --engine parakeet|qwen [--language xx] [--fresh] [--cues] [--out rev.json]
+$T compare-aligners <pkg.mscam> <models-root> <other-aligner-dir> [--out both.json]
 swift scripts/dev/make-sample-recording.swift <dir> --speech "…"          # speech fixture (macOS `say`)
 swift scripts/speech/make-timing-fixture.swift <pkg> "<text>"             # speech + ground-truth phrase starts
 scripts/speech/timing-report.py <rev.json> <pkg>/speech-words.json        # boundary error vs ground truth
@@ -122,7 +122,7 @@ Further figures:
 - **App end to end** (Debug XPC, 40 s fixture): Settings downloaded and installed the Parakeet model (632 MB) in
   under 20 s on this connection. "Generate Subtitles" produced 9 cues; "Regenerate with Qwen" produced a candidate
   that was adopted with the edits carried over. The service process had exited after each job.
-- **Playback cost** (`msa-tool play`, 1600×900 @ 30 fps, 20 s): subtitles on 7.0 % of a core and 177 MB; off 6.6 %
+- **Playback cost** (`msc-tool play`, 1600×900 @ 30 fps, 20 s): subtitles on 7.0 % of a core and 177 MB; off 6.6 %
   and 172 MB. Both at 29.8–29.9 fps.
 - **Export:** subtitles are burned in by `FrameRenderer`. A 1080p H.264 export of 40 s took 2.9 s, the same as without subtitles.
 

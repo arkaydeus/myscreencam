@@ -2,7 +2,7 @@ import Foundation
 import SpeechCore
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 nonisolated private final class TestSpeechEndpoint: NSObject, SpeechServiceProtocol, @unchecked Sendable {
     private let lock = NSLock()

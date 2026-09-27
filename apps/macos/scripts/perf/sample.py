@@ -5,7 +5,7 @@ CPU comes from cumulative CPU-time deltas, so it's exact rather than ps's decayi
 Memory is the summed phys_footprint (what Activity Monitor calls "Memory"), gathered with `footprint`.
 
 Examples:
-  scripts/perf/sample.py --match 'MyScreenArt Dev.app/Contents/MacOS' --duration 60
+  scripts/perf/sample.py --match 'My Screen Cam Dev.app/Contents/MacOS' --duration 60
   scripts/perf/sample.py --pid 1234 --csv /tmp/run.csv      # until the process exits or Ctrl-C
 """
 

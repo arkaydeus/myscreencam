@@ -11,7 +11,7 @@ export function Hero() {
         Screen recordings that look finished.
       </h1>
       <p className="mx-auto mt-5 max-w-[760px] text-[19px] leading-[1.42] text-pretty text-muted-foreground sm:mt-7 sm:text-2xl sm:leading-[1.34]">
-        Record your Mac, and MyScreenArt adds the zooms, the painted background, the framed webcam
+        Record your Mac, and My Screen Cam adds the zooms, the painted background, the framed webcam
         and the tidy cursor. Then it exports in seconds on Apple’s hardware encoders.
       </p>
       <div className="mt-7 flex flex-col items-center gap-4 sm:mt-9 sm:flex-row sm:justify-center sm:gap-7">

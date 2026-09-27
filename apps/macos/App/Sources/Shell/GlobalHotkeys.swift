@@ -1,5 +1,5 @@
 import Carbon.HIToolbox
-import MyScreenArtCore
+import MyScreenCamCore
 
 /// System-wide hotkeys through Carbon's `RegisterEventHotKey`, which needs no Accessibility or Input
 /// Monitoring permission. The event handler runs on the main thread (application event target).
@@ -15,7 +15,7 @@ final class GlobalHotkeys {
         let action: @MainActor () -> Void
     }
 
-    private static let signature: OSType = 0x4D53_4148  // 'MSAH'
+    private static let signature: OSType = 0x4D53_4348  // 'MSCH'
 
     private let hotkeys: [Hotkey]
     private var registrations: [EventHotKeyRef] = []

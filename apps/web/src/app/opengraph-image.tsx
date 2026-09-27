@@ -42,7 +42,7 @@ export default function OpengraphImage() {
         >
           {/* oxlint-disable-next-line nextjs/no-img-element -- ImageResponse renders plain <img> only */}
           <img src={iconSrc} width={64} height={64} alt="" />
-          {site.name}
+          {site.brand}
         </div>
         <div style={{ fontSize: 84, fontWeight: 800, lineHeight: 1, letterSpacing: -3 }}>
           Screen recordings that look finished.

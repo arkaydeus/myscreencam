@@ -1,7 +1,7 @@
 import CaptureKit
 import CoreGraphics
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import ScreenCaptureKit
 
 /// "Choose with System Picker": presents `SCContentSharingPicker` for a single display or window and maps the

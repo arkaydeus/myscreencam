@@ -8,9 +8,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# MyScreenArt marketing site (`apps/web`)
+# My Screen Cam marketing site (`apps/web`)
 
-A single-page marketing site for the MyScreenArt Mac app. It's statically rendered. The hero demo is pure CSS; the only client JavaScript of its own is the highlights gallery's paddle buttons (`highlights-gallery.tsx`), and the row still scrolls natively without it.
+A single-page marketing site for the My Screen Cam Mac app. It's statically rendered. The hero demo is pure CSS; the only client JavaScript of its own is the highlights gallery's paddle buttons (`highlights-gallery.tsx`), and the row still scrolls natively without it.
 
 ## Stack
 
@@ -22,7 +22,7 @@ A single-page marketing site for the MyScreenArt Mac app. It's statically render
 ## Layout
 
 - `src/app/page.tsx` composes the sections in `src/components/site/`.
-- `src/components/site/canvas-demo.tsx` is the hero. Its zoom blocks and click times must match the `msa-*` keyframes in `globals.css` (one 12 s loop).
+- `src/components/site/canvas-demo.tsx` is the hero. Its zoom blocks and click times must match the `msc-*` keyframes in `globals.css` (one 12 s loop).
 - `src/lib/site.ts` holds the shared facts: download URL, requirements, description.
 - The app icon is `src/assets/app-icon.png` (drawn by `LogoMark`, and in the OG image). `src/app/icon.png` and `apple-icon.png` are copies made from the same artwork as `apps/macos/App/Resources/AppIcon.icon`.
 - Measured figures carry a footnote marker (`FootnoteRef`) that links to the numbered note in `SiteFooter`.

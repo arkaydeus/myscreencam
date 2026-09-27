@@ -2,8 +2,8 @@
 
 import PackageDescription
 
-// Speech recognition backends for MyScreenArt. Only the `MyScreenArtSpeech` XPC service (and the developer
-// `speech-tool`) link this package, so the app, the Quick Look extension and `MyScreenArtKit`'s tests never compile
+// Speech recognition backends for My Screen Cam. Only the `MyScreenCamSpeech` XPC service (and the developer
+// `speech-tool`) link this package, so the app, the Quick Look extension and `MyScreenCamKit`'s tests never compile
 // MLX or Core ML model code. See docs/subtitles-plan.md and docs/speech-integration.md.
 //
 // Pins: FluidAudio exactly 0.17.3 (Parakeet Ultra support), without its NeMo text-normalisation binary (we keep
@@ -20,7 +20,7 @@ let package = Package(
         .executable(name: "speech-tool", targets: ["speech-tool"]),
     ],
     dependencies: [
-        .package(path: "../MyScreenArtKit"),
+        .package(path: "../MyScreenCamKit"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.3", traits: []),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
@@ -34,8 +34,8 @@ let package = Package(
         .target(
             name: "SpeechEngines",
             dependencies: [
-                .product(name: "SpeechCore", package: "MyScreenArtKit"),
-                .product(name: "ProjectKit", package: "MyScreenArtKit"),
+                .product(name: "SpeechCore", package: "MyScreenCamKit"),
+                .product(name: "ProjectKit", package: "MyScreenCamKit"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
@@ -50,8 +50,8 @@ let package = Package(
             name: "speech-tool",
             dependencies: [
                 "SpeechEngines",
-                .product(name: "SpeechCore", package: "MyScreenArtKit"),
-                .product(name: "ProjectKit", package: "MyScreenArtKit"),
+                .product(name: "SpeechCore", package: "MyScreenCamKit"),
+                .product(name: "ProjectKit", package: "MyScreenCamKit"),
             ]
         ),
         .testTarget(
@@ -59,8 +59,8 @@ let package = Package(
             dependencies: [
                 "SpeechEngines",
                 .product(name: "FluidAudio", package: "FluidAudio"),
-                .product(name: "SpeechCore", package: "MyScreenArtKit"),
-                .product(name: "ProjectKit", package: "MyScreenArtKit"),
+                .product(name: "SpeechCore", package: "MyScreenCamKit"),
+                .product(name: "ProjectKit", package: "MyScreenCamKit"),
             ]
         ),
     ]

@@ -30,7 +30,7 @@
 		<dict>
 			<key>QLSupportedContentTypes</key>
 			<array>
-				<string>com.myscreenart.recording</string>
+				<string>com.myscreencam.recording</string>
 			</array>
 			<key>QLThumbnailMinimumDimension</key>
 			<integer>0</integer>

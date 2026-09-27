@@ -3,7 +3,7 @@ import CoreGraphics
 import ProjectKit
 import QuickLookThumbnailing
 
-/// Finder / Quick Look thumbnails for `com.myscreenart.recording` packages (`*.msarec`).
+/// Finder / Quick Look thumbnails for `com.myscreencam.recording` packages (`*.mscam`).
 ///
 /// Uses the cached still the app writes (HEIC or JPEG) when present; otherwise grabs a frame
 /// near the start of `screen.mov` with `AVAssetImageGenerator` (nearest keyframe, so it stays cheap).

@@ -27,7 +27,7 @@
 			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>$(MSA_URL_SCHEME)</string>
+				<string>$(MSC_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
@@ -35,7 +35,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>MyScreenArt Recording</string>
+			<string>My Screen Cam Recording</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -44,7 +44,7 @@
 			<true/>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.myscreenart.recording</string>
+				<string>com.myscreencam.recording</string>
 			</array>
 		</dict>
 	</array>
@@ -52,9 +52,9 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.myscreenart.recording</string>
+			<string>com.myscreencam.recording</string>
 			<key>UTTypeDescription</key>
-			<string>MyScreenArt Recording</string>
+			<string>My Screen Cam Recording</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>com.apple.package</string>
@@ -64,17 +64,17 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>msarec</string>
+					<string>mscam</string>
 				</array>
 			</dict>
 		</dict>
 	</array>
 	<key>SUFeedURL</key>
-	<string>https://github.com/arkaydeustech/myscreenart-releases/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/arkaydeustech/myscreencam-releases/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 	<key>SUEnableAutomaticChecks</key>
-	<string>$(MSA_SPARKLE_AUTOMATIC_CHECKS)</string>
+	<string>$(MSC_SPARKLE_AUTOMATIC_CHECKS)</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>21600</integer>
 	<key>LSApplicationCategoryType</key>
@@ -82,9 +82,9 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>MyScreenArt records your camera as an overlay on your screen recordings.</string>
+	<string>My Screen Cam records your camera as an overlay on your screen recordings.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>MyScreenArt records your microphone alongside your screen recordings.</string>
+	<string>My Screen Cam records your microphone alongside your screen recordings.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Digital Insight Consulting Ltd.</string>
 </dict>

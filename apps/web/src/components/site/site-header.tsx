@@ -16,7 +16,7 @@ export function SiteHeader() {
         <a href="#top" className="flex items-center gap-2.5 rounded-md">
           <LogoMark size={26} className="size-[22px] sm:size-[26px]" />
           <span className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[21px]">
-            {site.name}
+            {site.brand}
           </span>
         </a>
         <div className="flex items-center gap-7">

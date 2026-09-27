@@ -1,4 +1,4 @@
-# MyScreenArt
+# My Screen Cam
 
 A native macOS screen recorder and editor built on ScreenCaptureKit, AVFoundation, VideoToolbox, Core Image and Metal. It aims for high quality recordings with a small CPU, memory and energy footprint.
 
@@ -16,7 +16,7 @@ This monorepo contains:
 ## Getting started
 ```bash
 mise run setup               # install every project's tools and JS dependencies
-mise run app                 # build and launch "MyScreenArt Dev"
+mise run app                 # build and launch "My Screen Cam Dev"
 mise run web                 # run the site at http://localhost:3000
 mise run start               # both of the above
 mise run check               # lint, test and build everything before pushing

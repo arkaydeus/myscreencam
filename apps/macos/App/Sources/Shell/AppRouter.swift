@@ -1,8 +1,8 @@
-import MyScreenArtCore
+import MyScreenCamCore
 import SwiftUI
 
 /// Opens windows from places that aren't SwiftUI views (menus, hotkeys, URL scheme, App Intents).
-/// Scene IDs are the constants below; `MyScreenArtApp` declares the scenes.
+/// Scene IDs are the constants below; `MyScreenCamApp` declares the scenes.
 ///
 /// Requests made before any scene has appeared (a URL or document that launched the app, an App Intent)
 /// are queued and replayed, in order, as soon as the first scene binds `openWindowAction`.

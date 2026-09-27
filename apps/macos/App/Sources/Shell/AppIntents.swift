@@ -1,7 +1,7 @@
 import AppIntents
 
 // App Intents for Shortcuts, Spotlight and Siri. They reach the app through the `AppModel` registered with
-// `AppDependencyManager` in `MyScreenArtApp.init`, and use only `AppRouter` and the `RecordingController`
+// `AppDependencyManager` in `MyScreenCamApp.init`, and use only `AppRouter` and the `RecordingController`
 // skeleton API.
 
 enum RecordingSourceOption: String, AppEnum {
@@ -28,7 +28,7 @@ enum RecordingSourceOption: String, AppEnum {
 struct NewRecordingIntent: AppIntent {
     nonisolated static let title: LocalizedStringResource = "New Recording"
     nonisolated static let description = IntentDescription(
-        "Opens the MyScreenArt recorder, optionally on a display, window or region.")
+        "Opens the My Screen Cam recorder, optionally on a display, window or region.")
     nonisolated static let openAppWhenRun = true
 
     @Parameter(title: "Source")
@@ -52,7 +52,7 @@ struct NewRecordingIntent: AppIntent {
 struct StopRecordingIntent: AppIntent {
     nonisolated static let title: LocalizedStringResource = "Stop Recording"
     nonisolated static let description = IntentDescription(
-        "Finishes the current MyScreenArt recording and opens it in the editor.")
+        "Finishes the current My Screen Cam recording and opens it in the editor.")
 
     @Dependency private var model: AppModel
 
@@ -65,7 +65,7 @@ struct StopRecordingIntent: AppIntent {
 
 struct OpenLibraryIntent: AppIntent {
     nonisolated static let title: LocalizedStringResource = "Open Library"
-    nonisolated static let description = IntentDescription("Shows the MyScreenArt recording library.")
+    nonisolated static let description = IntentDescription("Shows the My Screen Cam recording library.")
     nonisolated static let openAppWhenRun = true
 
     @Dependency private var model: AppModel
@@ -82,13 +82,13 @@ enum IntentError: Error, CustomLocalizedStringResourceConvertible {
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
-        case .alreadyRecording: "MyScreenArt is already recording."
-        case .notRecording: "MyScreenArt isn't recording."
+        case .alreadyRecording: "My Screen Cam is already recording."
+        case .notRecording: "My Screen Cam isn't recording."
         }
     }
 }
 
-struct MyScreenArtShortcuts: AppShortcutsProvider {
+struct MyScreenCamShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: NewRecordingIntent(),

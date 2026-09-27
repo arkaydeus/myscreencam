@@ -4,7 +4,7 @@ import { Portrait } from "@/components/site/brand";
 import { cn } from "@/lib/utils";
 
 /**
- * The hero: a looping, CSS-only mock of what MyScreenArt produces. A recording on a painted canvas, a
+ * The hero: a looping, CSS-only mock of what My Screen Cam produces. A recording on a painted canvas, a
  * camera that zooms to the cursor's clicks, a webcam overlay, and the editor timeline driving it all.
  * Every animation shares the 12 s loop defined in globals.css, so the timeline's zoom blocks line up
  * with the preview. Positions are percentages of the recording so the targets stay under the cursor.

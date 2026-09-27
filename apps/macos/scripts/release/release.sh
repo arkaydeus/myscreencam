@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Builds a Developer ID signed, notarised MyScreenArt.app, wraps it in a signed + notarised DMG, refreshes the
+# Builds a Developer ID signed, notarised My Screen Cam.app, wraps it in a signed + notarised DMG, refreshes the
 # Sparkle appcast and (with --publish) uploads both to the public releases repo. Runs entirely on this Mac.
 # See docs/release.md.
 #
 #   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--no-dmg] [--output DIR]
-#   MSA_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and source tag
+#   MSC_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and source tag
 #
 # Environment:
-#   NOTARY_PROFILE        notarytool keychain profile (default: myscreenart-notary)
-#   MSA_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
-#   MSA_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
-#   MSA_RELEASES_REPO     public GitHub repo that hosts DMGs + appcast (default: arkaydeustech/myscreenart-releases)
-#   MSA_SPARKLE_ACCOUNT   Keychain account of the Sparkle private key (default: Sparkle's default, "ed25519")
-#   MSA_PREVIOUS_APPCAST  path or URL of the current appcast.xml, merged so older versions stay listed
-#                         (default: the latest release's appcast.xml in MSA_RELEASES_REPO)
+#   NOTARY_PROFILE        notarytool keychain profile (default: myscreencam-notary)
+#   MSC_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
+#   MSC_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
+#   MSC_RELEASES_REPO     public GitHub repo that hosts DMGs + appcast (default: arkaydeustech/myscreencam-releases)
+#   MSC_SPARKLE_ACCOUNT   Keychain account of the Sparkle private key (default: Sparkle's default, "ed25519")
+#   MSC_PREVIOUS_APPCAST  path or URL of the current appcast.xml, merged so older versions stay listed
+#                         (default: the latest release's appcast.xml in MSC_RELEASES_REPO)
 set -euo pipefail
 
 notarize=1
@@ -25,7 +25,7 @@ notes=""
 # The macOS app root (apps/macos in the monorepo), not the git top level.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="$root/build/release"
-releases_repo="${MSA_RELEASES_REPO:-arkaydeustech/myscreenart-releases}"
+releases_repo="${MSC_RELEASES_REPO:-arkaydeustech/myscreencam-releases}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,19 +47,19 @@ out="$(python3 -c 'import os, sys; print(os.path.realpath(os.path.join(sys.argv[
 
 team="QWD87G9T3P"
 identity="Developer ID Application"
-notary_profile="${NOTARY_PROFILE:-myscreenart-notary}"
+notary_profile="${NOTARY_PROFILE:-myscreencam-notary}"
 derived="$out/DerivedData"
-archive="$out/MyScreenArt.xcarchive"
+archive="$out/MyScreenCam.xcarchive"
 export_dir="$out/export"
-app="$export_dir/MyScreenArt.app"
-stable_dmg="$out/MyScreenArt.dmg"
+app="$export_dir/My Screen Cam.app"
+stable_dmg="$out/MyScreenCam.dmg"
 
 source_tag_for_version() { printf 'macos/v%s' "$1"; }
 
 if [[ $print_config -eq 1 ]]; then
-  [[ -n "${MSA_VERSION:-}" ]] || { echo "--print-config needs MSA_VERSION" >&2; exit 2; }
+  [[ -n "${MSC_VERSION:-}" ]] || { echo "--print-config needs MSC_VERSION" >&2; exit 2; }
   printf 'Root: %s\nDerivedData: %s\nArchive: %s\nApp: %s\nDMG asset: %s\nSource tag: %s\n' \
-    "$root" "$derived" "$archive" "$app" "$stable_dmg" "$(source_tag_for_version "$MSA_VERSION")"
+    "$root" "$derived" "$archive" "$app" "$stable_dmg" "$(source_tag_for_version "$MSC_VERSION")"
   exit 0
 fi
 
@@ -89,16 +89,16 @@ trap '"$root/scripts/dev/unregister-builds.sh" --root "$derived" --root "$archiv
 rm -rf "$archive" "$export_dir" "$out/dmg-staging"
 mkdir -p "$out"
 
-build_number="${MSA_BUILD:-$(git rev-list --count HEAD)}"
+build_number="${MSC_BUILD:-$(git rev-list --count HEAD)}"
 version_args=(CURRENT_PROJECT_VERSION="$build_number")
-[[ -n "${MSA_VERSION:-}" ]] && version_args+=(MARKETING_VERSION="$MSA_VERSION")
+[[ -n "${MSC_VERSION:-}" ]] && version_args+=(MARKETING_VERSION="$MSC_VERSION")
 
 step "Generating the Xcode project"
 xcodegen generate --quiet
 
 step "Archiving (Release, $identity, build $build_number)"
 xcodebuild archive \
-  -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Release \
+  -project MyScreenCam.xcodeproj -scheme MyScreenCam -configuration Release \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$derived" -archivePath "$archive" \
   DEVELOPMENT_TEAM="$team" "${version_args[@]}" \
@@ -113,14 +113,14 @@ xcodebuild -exportArchive \
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")"
-dmg="$out/MyScreenArt-$version.dmg"
+dmg="$out/MyScreenCam-$version.dmg"
 
 step "Verifying the app signature"
 codesign --verify --deep --strict --verbose=2 "$app"
 codesign -dvv "$app" 2>&1 | grep -E '^(Authority=Developer ID|TeamIdentifier|Runtime Version|Timestamp)'
 
 if [[ $notarize -eq 1 ]]; then
-  zip="$out/MyScreenArt-$version-notarize.zip"
+  zip="$out/MyScreenCam-$version-notarize.zip"
   ditto -c -k --keepParent "$app" "$zip"
   notarize_file "$zip"
   rm -f "$zip"
@@ -134,10 +134,10 @@ if [[ $dmg_enabled -eq 1 ]]; then
   step "Building $(basename "$dmg")"
   staging="$out/dmg-staging"
   mkdir -p "$staging"
-  ditto "$app" "$staging/MyScreenArt.app"
+  ditto "$app" "$staging/My Screen Cam.app"
   ln -s /Applications "$staging/Applications"
   rm -f "$dmg"
-  hdiutil create -volname "MyScreenArt $version" -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg" -quiet
+  hdiutil create -volname "My Screen Cam $version" -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg" -quiet
   rm -rf "$staging"
   codesign --sign "$identity" --timestamp "$dmg"
   codesign --verify --verbose=2 "$dmg"
@@ -155,7 +155,7 @@ if [[ $appcast -eq 1 ]]; then
   generate_appcast="$(find "$derived/SourcePackages/artifacts" -path '*/Sparkle/bin/generate_appcast' -type f | head -1)"
   [[ -x "$generate_appcast" ]] || { echo "generate_appcast not found under $derived/SourcePackages/artifacts" >&2; exit 1; }
   prefix="https://github.com/$releases_repo/releases/download/v$version/"
-  previous="${MSA_PREVIOUS_APPCAST:-https://github.com/$releases_repo/releases/latest/download/appcast.xml}"
+  previous="${MSC_PREVIOUS_APPCAST:-https://github.com/$releases_repo/releases/latest/download/appcast.xml}"
   updates="$out/updates"
   rm -rf "$updates"
   mkdir -p "$updates"
@@ -169,7 +169,7 @@ if [[ $appcast -eq 1 ]]; then
   step "Generating the Sparkle appcast (download prefix $prefix)"
   # The private key is read from the login Keychain (it never leaves this Mac).
   appcast_args=(--download-url-prefix "$prefix" -o "$updates/appcast.xml")
-  [[ -n "${MSA_SPARKLE_ACCOUNT:-}" ]] && appcast_args+=(--account "$MSA_SPARKLE_ACCOUNT")
+  [[ -n "${MSC_SPARKLE_ACCOUNT:-}" ]] && appcast_args+=(--account "$MSC_SPARKLE_ACCOUNT")
   "$generate_appcast" "${appcast_args[@]}" "$updates"
   cp "$updates/appcast.xml" "$out/appcast.xml"
 else
@@ -179,24 +179,24 @@ fi
 if [[ $publish -eq 1 ]]; then
   tag="v$version"
   if gh release view "$tag" --repo "$releases_repo" >/dev/null 2>&1; then
-    echo "$releases_repo already has a $tag release; bump MARKETING_VERSION (or MSA_VERSION) first" >&2
+    echo "$releases_repo already has a $tag release; bump MARKETING_VERSION (or MSC_VERSION) first" >&2
     exit 1
   fi
   step "Publishing $tag to $releases_repo"
-  notes_args=(--notes "MyScreenArt $version (build $build)")
+  notes_args=(--notes "My Screen Cam $version (build $build)")
   [[ -n "$notes" ]] && notes_args=(--notes-file "$notes")
   # The site links to this stable asset name; retain the versioned DMG for Sparkle's appcast.
   cp "$dmg" "$stable_dmg"
-  gh release create "$tag" --repo "$releases_repo" --title "MyScreenArt $version" "${notes_args[@]}" \
+  gh release create "$tag" --repo "$releases_repo" --title "My Screen Cam $version" "${notes_args[@]}" \
     "$dmg" "$stable_dmg" "$out/appcast.xml"
   # The source repo is a monorepo, so the app's source tag is namespaced.
   source_tag="$(source_tag_for_version "$version")"
-  git tag -a "$source_tag" -m "MyScreenArt $version (build $build)" 2>/dev/null || echo "Local tag $source_tag already exists"
+  git tag -a "$source_tag" -m "My Screen Cam $version (build $build)" 2>/dev/null || echo "Local tag $source_tag already exists"
   echo "Published: https://github.com/$releases_repo/releases/tag/$tag"
   echo "Push the source tag when ready: git push origin $source_tag"
 fi
 
-step "Done: MyScreenArt $version ($build)"
+step "Done: My Screen Cam $version ($build)"
 echo "App: $app"
 [[ $dmg_enabled -eq 1 ]] && echo "DMG: $dmg"
 [[ $appcast -eq 1 ]] && echo "Appcast: $out/appcast.xml"

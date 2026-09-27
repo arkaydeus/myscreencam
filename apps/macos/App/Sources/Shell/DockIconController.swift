@@ -1,5 +1,5 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// "Hide Dock icon when idle": switches between `.regular` and `.accessory` activation policies.
