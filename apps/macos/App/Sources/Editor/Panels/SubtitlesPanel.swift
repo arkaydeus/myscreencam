@@ -306,6 +306,42 @@ struct ConflictSheet: View {
 
 // MARK: - Style
 
+/// Drop shadow: direction, depth (distance), blur, colour and opacity.
+private struct ShadowControls: View {
+    let model: EditorModel
+
+    private var shadow: SubtitleShadow { model.edit.subtitles.style.shadow }
+    private static let percent: (Double) -> String = { String(format: "%.0f%%", $0 * 100) }
+
+    var body: some View {
+        HStack {
+            Toggle("Shadow", isOn: model.binding(\.subtitles.style.shadow.enabled, "Subtitle Shadow"))
+            Spacer()
+            ColorPicker("", selection: model.colorBinding(\.subtitles.style.shadow.color, "Shadow Colour"))
+                .labelsHidden()
+                .disabled(!shadow.enabled)
+        }
+        if shadow.enabled {
+            ValueSlider(
+                title: "Angle", value: model.binding(\.subtitles.style.shadow.angle, "Shadow Angle"), range: 0...360,
+                step: 1, format: { String(format: "%.0f°", $0) }, model: model
+            )
+            .help("Direction the shadow falls (90° is straight down)")
+            ValueSlider(
+                title: "Depth", value: model.binding(\.subtitles.style.shadow.distance, "Shadow Depth"),
+                range: EditLimits.subtitleShadowDistance, step: 0.01, format: Self.percent, model: model
+            )
+            .help("How far the shadow falls, as a share of the font size")
+            ValueSlider(
+                title: "Blur", value: model.binding(\.subtitles.style.shadow.blur, "Shadow Blur"),
+                range: EditLimits.subtitleShadowBlur, step: 0.01, format: Self.percent, model: model)
+            ValueSlider(
+                title: "Opacity", value: model.binding(\.subtitles.style.shadow.opacity, "Shadow Opacity"),
+                range: 0...1, step: 0.01, format: Self.percent, model: model)
+        }
+    }
+}
+
 private struct SubtitleStyleControls: View {
     let model: EditorModel
 
@@ -334,13 +370,47 @@ private struct SubtitleStyleControls: View {
                 }
                 .toggleStyle(.button)
                 .help("Italic")
+                Toggle("Uppercase", isOn: model.binding(\.subtitles.style.uppercase, "Uppercase Subtitles"))
+                    .toggleStyle(.button)
+                    .help("Show all subtitle text in capitals")
                 Spacer()
                 ColorPicker("Text", selection: model.colorBinding(\.subtitles.style.textColor, "Subtitle Colour"))
+            }
+            HStack {
+                Toggle(
+                    "Highlight spoken word",
+                    isOn: model.binding(\.subtitles.style.highlightWords, "Word Highlight"))
+                Spacer()
+                ColorPicker("", selection: model.colorBinding(\.subtitles.style.highlightColor, "Highlight Colour"))
+                    .labelsHidden()
+                    .disabled(!style.highlightWords)
+            }
+            .help("Colour each word as it's spoken")
+            if style.highlightWords, !model.edit.subtitles.cues.isEmpty,
+                !model.edit.subtitles.cues.contains(where: { !$0.words.isEmpty })
+            {
+                Text("No word timing in these subtitles (approximate or typed by hand), so no words are highlighted.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if style.highlightWords {
+                ValueSlider(
+                    title: "Grow", value: model.binding(\.subtitles.style.highlightGrow, "Highlight Grow"),
+                    range: EditLimits.subtitleHighlightGrow, step: 0.01,
+                    format: { $0 == 0 ? "Off" : String(format: "+%.0f%%", $0 * 100) }, model: model
+                )
+                .help("How much bigger the spoken word is drawn")
             }
             ValueSlider(
                 title: "Size", value: model.binding(\.subtitles.style.size, "Subtitle Size"),
                 range: EditLimits.subtitleSize, step: 0.0025, format: { String(format: "%.1f%%", $0 * 100) },
                 model: model)
+            ValueSlider(
+                title: "Width", value: model.binding(\.subtitles.style.maxWidth, "Subtitle Width"),
+                range: EditLimits.subtitleMaxWidth, step: 0.01, format: { String(format: "%.0f%%", $0 * 100) },
+                model: model
+            )
+            .help("Widest line, as a share of the video width; longer text wraps onto the next line")
             HStack(alignment: .bottom, spacing: 10) {
                 ValueSlider(
                     title: "Outline", value: model.binding(\.subtitles.style.outlineWidth, "Subtitle Outline"),
@@ -363,6 +433,7 @@ private struct SubtitleStyleControls: View {
                     title: "Opacity", value: model.binding(\.subtitles.style.backgroundOpacity, "Background Opacity"),
                     range: 0...1, step: 0.01, format: { String(format: "%.0f%%", $0 * 100) }, model: model)
             }
+            ShadowControls(model: model)
             Divider()
             Picker("Position", selection: model.binding(\.subtitles.placement.anchor, "Subtitle Position")) {
                 Text("Top").tag(SubtitlePlacement.Anchor.top)
@@ -387,9 +458,11 @@ private struct SubtitleStyleControls: View {
                         .controlSize(.small)
                 }
             }
-            Text("Drag a subtitle in the preview (while paused) to move just that one.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "Drag a subtitle in the preview (while paused) to move just that one, or drag its left or right edge to change its width."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -417,6 +490,10 @@ private struct CueRow: View {
                 if cue.position != nil {
                     Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").font(.caption2)
                         .foregroundStyle(.secondary).help("Has its own position")
+                }
+                if cue.maxWidth != nil {
+                    Image(systemName: "arrow.left.and.right").font(.caption2)
+                        .foregroundStyle(.secondary).help("Has its own width")
                 }
                 if cue.isTextCorrected, cue.generatedText != nil {
                     Image(systemName: "pencil").font(.caption2).foregroundStyle(.secondary).help("Edited")
@@ -510,6 +587,14 @@ private struct CueEditor: View {
                         Button("Use as Default Position") { model.useCuePositionAsDefault(cue.id) }
                     }
                     .fixedSize()
+                }
+                if let width = cue.maxWidth {
+                    Menu("Width \(Int((width * 100).rounded()))%") {
+                        Button("Reset Width") { model.setCueWidth(cue.id, nil) }
+                        Button("Use as Default Width") { model.useCueWidthAsDefault(cue.id) }
+                    }
+                    .fixedSize()
+                    .help("This subtitle's own width (drag its box's edges in the preview)")
                 }
                 if canRetime {
                     Button(isRetiming ? "Re-timing…" : "Re-time") { retime() }

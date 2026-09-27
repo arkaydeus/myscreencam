@@ -20,8 +20,11 @@ public enum SubtitleLayout {
         public var fontSize: Double
         /// Size of the laid-out text.
         public var textSize: CGSize
-        /// Size of the whole box (text + padding).
+        /// Size of the whole box (text + padding + room for a grown word).
         public var boxSize: CGSize
+        /// Room in the box above and below the text for a grown word on the top or bottom line (canvas pixels).
+        public var growAbove: Double = 0
+        public var growBelow: Double = 0
     }
 
     public static func fontSize(_ style: SubtitleStyle, canvasSize: CGSize) -> Double {
@@ -68,8 +71,37 @@ public enum SubtitleLayout {
             ])
     }
 
+    /// `string` filled in `textColor`, with the UTF-16 `range` in `highlight`. Every run gets an explicit colour:
+    /// Core Text leaves the context's fill set to the last explicit colour it drew, so text after the highlighted
+    /// word would otherwise inherit the highlight colour.
+    static func highlighting(
+        _ range: Range<Int>, in string: NSAttributedString, textColor: RGBAColor, highlight: RGBAColor
+    ) -> NSAttributedString {
+        let r = NSRange(location: range.lowerBound, length: range.count)
+        guard range.lowerBound >= 0, NSMaxRange(r) <= string.length else { return string }
+        let copy = NSMutableAttributedString(attributedString: string)
+        let all = NSRange(location: 0, length: copy.length)
+        let key = NSAttributedString.Key(kCTForegroundColorAttributeName as String)
+        copy.removeAttribute(NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String), range: all)
+        copy.addAttribute(key, value: cgColor(textColor), range: all)
+        copy.addAttribute(key, value: cgColor(highlight), range: r)
+        return copy
+    }
+
+    private static func cgColor(_ c: RGBAColor) -> CGColor {
+        CGColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: c.a)
+    }
+
     /// Lays out `text` wrapped to the style's maximum width.
-    public static func measure(_ text: String, style: SubtitleStyle, canvasSize: CGSize) -> Measured {
+    ///
+    /// With `grow` > 0 (word highlighting that enlarges the spoken word by that fraction) the box also has room for
+    /// whichever word is grown, so it keeps one size for the whole cue. A grown word scales about its centre and
+    /// pushes the rest of its line apart by half its growth each side (see `SubtitleRasterCache.draw`), so a line
+    /// can widen by its widest word's growth (outline included). It grows from the shared baseline, so a word on
+    /// the top line rises by the growth of the ascent and one on the bottom line drops by the growth of the descent
+    /// (`growAbove`, `growBelow`). The text keeps its layout (`textSize`, so the same line breaks), centred
+    /// horizontally with that room above and below it.
+    public static func measure(_ text: String, style: SubtitleStyle, canvasSize: CGSize, grow: Double = 0) -> Measured {
         let size = fontSize(style, canvasSize: canvasSize)
         let font = font(style, size: size)
         let maxText = max(size, style.maxWidth * canvasSize.width - 2 * paddingX * size)
@@ -79,10 +111,55 @@ public enum SubtitleLayout {
             nil)
         let textSize = CGSize(width: ceil(fitted.width), height: ceil(fitted.height))
         let outline = style.outlineWidth * size
+        let room =
+            grow > 0
+            ? growthRoom(framesetter, text: text, width: maxText, grow: grow, outline: outline)
+            : (width: textSize.width, above: 0, below: 0)
+        let above = ceil(room.above)
+        let below = ceil(room.below)
         let box = CGSize(
-            width: textSize.width + 2 * paddingX * size + 2 * outline,
-            height: textSize.height + 2 * paddingY * size + 2 * outline)
-        return Measured(fontSize: size, textSize: textSize, boxSize: box)
+            width: max(textSize.width, ceil(room.width)) + 2 * paddingX * size + 2 * outline,
+            height: textSize.height + above + below + 2 * paddingY * size + 2 * outline)
+        return Measured(fontSize: size, textSize: textSize, boxSize: box, growAbove: above, growBelow: below)
+    }
+
+    /// The widest any line gets with its widest word grown, and how far a grown word on the top line rises above
+    /// the text and one on the bottom line drops below it.
+    static func growthRoom(
+        _ framesetter: CTFramesetter, text: String, width: Double, grow: Double, outline: Double
+    ) -> (width: Double, above: Double, below: Double) {
+        // The same line breaks as the fitted frame the renderer draws.
+        let frame = CTFramesetterCreateFrame(
+            framesetter, CFRange(location: 0, length: 0),
+            CGPath(rect: CGRect(x: 0, y: 0, width: width, height: 1_000_000), transform: nil), nil)
+        let tokens = SubtitleWords.tokens(in: text)
+        var widest = 0.0
+        var maxAscent = 0.0
+        var maxDescent = 0.0
+        for line in CTFrameGetLines(frame) as? [CTLine] ?? [] {
+            var ascent: CGFloat = 0
+            var descent: CGFloat = 0
+            let full = CTLineGetTypographicBounds(line, &ascent, &descent, nil)
+            maxAscent = max(maxAscent, ascent)
+            maxDescent = max(maxDescent, descent)
+            let r = CTLineGetStringRange(line)
+            let range = r.location..<(r.location + r.length)
+            var word = 0.0
+            for token in tokens where token.overlaps(range) {
+                let a = CTLineGetOffsetForStringIndex(line, max(token.lowerBound, range.lowerBound), nil)
+                let b = CTLineGetOffsetForStringIndex(line, min(token.upperBound, range.upperBound), nil)
+                word = max(word, abs(b - a))
+            }
+            let visible = full - CTLineGetTrailingWhitespaceWidth(line)
+            widest = max(widest, visible + grow * (word + 2 * outline))
+        }
+        return (widest, grow * (maxAscent + outline), grow * (maxDescent + outline))
+    }
+
+    /// How much `cue`'s spoken word grows in `style`: 0 when the cue can't be highlighted (no word timing), so its
+    /// box doesn't make room for a growth that never happens.
+    public static func grow(for cue: SubtitleCue, style: SubtitleStyle) -> Double {
+        style.highlightWords && !cue.words.isEmpty ? style.highlightGrow : 0
     }
 
     /// Centre of a box of `boxSize` for the placement (canvas pixels).
@@ -98,11 +175,15 @@ public enum SubtitleLayout {
         return CGPoint(x: x, y: y)
     }
 
-    /// The box for `cue`, clamped inside the canvas.
+    /// The box for `cue`, clamped inside the canvas. `measured` must be of the style's display text.
     public static func frame(
         for cue: SubtitleCue, settings: SubtitleSettings, canvasSize: CGSize, measured: Measured? = nil
     ) -> CGRect {
-        let m = measured ?? measure(cue.text, style: settings.style, canvasSize: canvasSize)
+        let style = settings.style(for: cue)
+        let m =
+            measured
+            ?? measure(
+                style.displayText(cue.text), style: style, canvasSize: canvasSize, grow: grow(for: cue, style: style))
         let center: CGPoint =
             cue.position.map { CGPoint(x: $0.x * canvasSize.width, y: $0.y * canvasSize.height) }
             ?? defaultCenter(settings.placement, boxSize: m.boxSize, canvasSize: canvasSize)
@@ -110,6 +191,14 @@ public enum SubtitleLayout {
             CGRect(
                 x: center.x - m.boxSize.width / 2, y: center.y - m.boxSize.height / 2, width: m.boxSize.width,
                 height: m.boxSize.height), in: canvasSize)
+    }
+
+    /// The `maxWidth` (fraction of the canvas width) whose longest line gives a box `boxWidth` canvas pixels wide:
+    /// the inverse of ``measure(_:style:canvasSize:)`` when the text fills its width. Clamped to the limits.
+    public static func maxWidth(forBoxWidth boxWidth: Double, style: SubtitleStyle, canvasSize: CGSize) -> Double {
+        let outline = style.outlineWidth * fontSize(style, canvasSize: canvasSize)
+        let fraction = (boxWidth - 2 * outline) / max(canvasSize.width, 1)
+        return min(max(fraction, EditLimits.subtitleMaxWidth.lowerBound), EditLimits.subtitleMaxWidth.upperBound)
     }
 
     /// Normalised centre for a box dragged to `frame` (what gets stored in `SubtitleCue.position`).

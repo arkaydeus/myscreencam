@@ -34,7 +34,15 @@ extension EditorModel {
             }.value
             guard let self else { return }
             for revision in loaded { self.transcripts[revision.id] = revision }
+            self.fillWordTimings()
         }
+    }
+
+    /// Cues built before word timing was stored get it from their transcript. Not an undo step: it's derived data,
+    /// and nothing on screen changes unless word highlighting is on.
+    private func fillWordTimings() {
+        guard let transcript else { return }
+        applyDerived { _ = $0.subtitles.fillWordTimings(from: transcript) }
     }
 
     /// Lands a finished transcription (called by `TranscriptionCenter`): cues are rebuilt when the user hasn't
@@ -127,15 +135,37 @@ extension EditorModel {
     func moveCue(_ id: SubtitleCue.ID, toStart start: Double) {
         updateCue(id, "Move Subtitle") { cue in
             let length = cue.duration
+            let old = cue.start
             cue.start = min(max(0, start), max(0, meta.duration - length))
             cue.end = cue.start + length
             cue.timingEdited = true
+            // The words move with the cue, so the highlight stays in step with the text.
+            let delta = cue.start - old
+            for i in cue.words.indices {
+                cue.words[i].start += delta
+                cue.words[i].end += delta
+            }
         }
     }
 
     /// Gives a cue its own position (a preview drag; wrap in a continuous change).
     func setCuePosition(_ id: SubtitleCue.ID, _ position: NormPoint?) {
         updateCue(id, position == nil ? "Reset Subtitle Position" : "Move Subtitle") { $0.position = position }
+    }
+
+    /// Gives a cue its own wrap width (fraction of the canvas width), or nil for the style's (a preview edge drag;
+    /// wrap in a continuous change).
+    func setCueWidth(_ id: SubtitleCue.ID, _ width: Double?) {
+        updateCue(id, width == nil ? "Reset Subtitle Width" : "Subtitle Width") { $0.maxWidth = width }
+    }
+
+    /// Makes a cue's own width the style's width, and clears every cue's own width.
+    func useCueWidthAsDefault(_ id: SubtitleCue.ID) {
+        guard let width = edit.subtitles.cues.first(where: { $0.id == id })?.maxWidth else { return }
+        update("Default Subtitle Width") { edit in
+            edit.subtitles.style.maxWidth = width
+            for i in edit.subtitles.cues.indices { edit.subtitles.cues[i].maxWidth = nil }
+        }
     }
 
     func resetAllCuePositions() {
@@ -224,9 +254,24 @@ extension EditorModel {
                 var cue = next.subtitles.cues[i]
                 let spoken = words(of: cue).filter { removed.contains($0.unit.id) }.map(\.text)
                 if !cue.isTextCorrected, let trimmed = Self.removing(spoken, from: cue.text) {
+                    let originalUnits = transcript.allUnits.compactMap { segment, unit -> (String, UnitTiming?)? in
+                        guard cue.unitIDs.contains(unit.id), let text = segment.text(of: unit) else { return nil }
+                        return (text, unit.timing)
+                    }
+                    let sourceStart = originalUnits.compactMap { $0.1?.sourceRange.startSeconds }.first
+                    let moveOffset = sourceStart.flatMap { source in cue.words.first.map { $0.start - source } } ?? 0
                     cue.text = trimmed
                     cue.generatedText = trimmed
                     cue.unitIDs.removeAll { removed.contains($0) }
+                    let remainingUnits = transcript.allUnits.compactMap { segment, unit -> (String, UnitTiming?)? in
+                        guard cue.unitIDs.contains(unit.id), let text = segment.text(of: unit) else { return nil }
+                        return (text, unit.timing)
+                    }
+                    cue.words = SubtitleWords.build(text: trimmed, units: remainingUnits)
+                    for j in cue.words.indices {
+                        cue.words[j].start += moveOffset
+                        cue.words[j].end += moveOffset
+                    }
                     next.subtitles.cues[i] = cue
                 }
             }

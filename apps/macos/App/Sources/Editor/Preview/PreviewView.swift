@@ -5,7 +5,8 @@ import RenderKit
 import SwiftUI
 
 /// The preview: an `AVPlayerLayer` (no controls) plus interactive overlays for dragging the webcam, moving and
-/// resizing the selected blur mask, dragging the subtitle under the playhead, and picking a zoom target.
+/// resizing the selected blur mask, dragging the subtitle under the playhead (or its left/right edge, to set its
+/// width), and picking a zoom target.
 struct PreviewContainer: View {
     let model: EditorModel
 
@@ -75,6 +76,20 @@ struct PreviewRepresentable: NSViewRepresentable {
     }
 }
 
+/// Width is a wrap constraint, which may be much wider than the visible text box.
+struct CueWidthDrag {
+    let startX: CGFloat
+    let initialWidth: Double
+    let edge: CGFloat
+
+    func width(at x: CGFloat, videoWidth: CGFloat) -> Double {
+        guard videoWidth > 0 else { return initialWidth }
+        return min(
+            max(initialWidth + Double(edge * (x - startX) / videoWidth), EditLimits.subtitleMaxWidth.lowerBound),
+            EditLimits.subtitleMaxWidth.upperBound)
+    }
+}
+
 final class PreviewNSView: NSView {
     private weak var model: EditorModel?
     private let playerLayer = AVPlayerLayer()
@@ -100,6 +115,8 @@ final class PreviewNSView: NSView {
 
     private enum Drag {
         case subtitle(SubtitleCue.ID, frame: CGRect, from: CGPoint)
+        /// Resizing a cue's box symmetrically about its centre (view x), so the centred text keeps its place.
+        case subtitleWidth(SubtitleCue.ID, centerX: CGFloat, gesture: CueWidthDrag)
         case webcam(start: NormPoint, from: CGPoint)
         case maskMove(BlurMask.ID, start: NormRect, from: NormPoint)
         case maskResize(BlurMask.ID, Handle, start: NormRect)
@@ -112,7 +129,10 @@ final class PreviewNSView: NSView {
     }
 
     private func isDraggingCue(_ id: SubtitleCue.ID) -> Bool {
-        if case .subtitle(let dragged, _, _) = drag { dragged == id } else { false }
+        switch drag {
+        case .subtitle(let dragged, _, _), .subtitleWidth(let dragged, _, _): dragged == id
+        default: false
+        }
     }
 
     init(model: EditorModel) {
@@ -256,6 +276,29 @@ final class PreviewNSView: NSView {
         return activeCueRects(geometry).last { $0.rect.insetBy(dx: -4, dy: -4).contains(p) }
     }
 
+    /// A subtitle whose left or right box edge is under `p` (topmost first).
+    private func hitCueEdge(_ p: CGPoint) -> (cue: SubtitleCue, rect: CGRect)? {
+        guard let geometry, state?.isPicking == false else { return nil }
+        return activeCueRects(geometry).last { item in
+            let r = item.rect.insetBy(dx: -3, dy: -3)
+            return p.y >= r.minY && p.y <= r.maxY && (abs(p.x - r.minX) <= 5 || abs(p.x - r.maxX) <= 5)
+        }
+    }
+
+    /// Where the dragged cue's lines wrap (view x), while its width is being dragged.
+    private func wrapGuides(_ geometry: PreviewGeometry) -> (left: CGFloat, right: CGFloat)? {
+        guard case .subtitleWidth(let id, let centerX, _) = drag, let state,
+            let cue = state.subtitles.cues.first(where: { $0.id == id })
+        else { return nil }
+        let video = geometry.videoRect(inViewOfSize: bounds.size)
+        let canvas = geometry.layout.canvasSize
+        guard video.width > 0, canvas.width > 0 else { return nil }
+        let style = state.subtitles.style(for: cue)
+        let outline = style.outlineWidth * SubtitleLayout.fontSize(style, canvasSize: canvas)
+        let half = (style.maxWidth * canvas.width + 2 * outline) / 2 * video.width / canvas.width
+        return (centerX - half, centerX + half)
+    }
+
     // MARK: Overlay
 
     private func refreshOverlay() {
@@ -311,6 +354,16 @@ final class PreviewNSView: NSView {
         if !highlighted.isEmpty {
             let path = CGMutablePath()
             for item in highlighted { path.addRect(item.rect.insetBy(dx: -3, dy: -3)) }
+            if let guides = wrapGuides(geometry),
+                let dragged = highlighted.first(where: { isDraggingCue($0.cue.id) })
+            {
+                // The width being set; the box itself fits the wrapped text inside it.
+                let r = dragged.rect.insetBy(dx: 0, dy: -8)
+                for x in [guides.left, guides.right] {
+                    path.move(to: CGPoint(x: x, y: r.minY))
+                    path.addLine(to: CGPoint(x: x, y: r.maxY))
+                }
+            }
             subtitleOutline.path = path
             subtitleOutline.isHidden = false
         } else {
@@ -407,6 +460,7 @@ final class PreviewNSView: NSView {
             default: return .crosshair
             }
         }
+        if hitCueEdge(p) != nil { return .resizeLeftRight }
         if hitCue(p) != nil { return .openHand }
         if hitMask(p) != nil { return .openHand }
         if let geometry, webcamViewRect(geometry)?.contains(p) == true { return .openHand }
@@ -422,7 +476,19 @@ final class PreviewNSView: NSView {
             model.setZoomTarget(source.clamped)
             return
         }
-        // Subtitles are drawn on top of everything, so they win the hit test.
+        // Subtitles are drawn on top of everything, so they win the hit test; their edges set their width.
+        if let hit = hitCueEdge(p) {
+            model.selection = .cue(hit.cue.id)
+            model.inspectorTab = .subtitles
+            model.beginContinuousChange()
+            let width = state.subtitles.style(for: hit.cue).maxWidth
+            drag = .subtitleWidth(
+                hit.cue.id, centerX: hit.rect.midX,
+                gesture: CueWidthDrag(startX: p.x, initialWidth: width, edge: p.x < hit.rect.midX ? -1 : 1))
+            NSCursor.resizeLeftRight.set()
+            refreshOverlay()
+            return
+        }
         if let hit = hitCue(p) {
             model.selection = .cue(hit.cue.id)
             model.inspectorTab = .subtitles
@@ -471,6 +537,10 @@ final class PreviewNSView: NSView {
             let moved = frame.offsetBy(dx: (p.x - from.x) * scale, dy: (p.y - from.y) * scale)
             model.setCuePosition(
                 id, SubtitleLayout.position(forFrame: moved, canvasSize: geometry.layout.canvasSize))
+        case .subtitleWidth(let id, _, let gesture):
+            let video = geometry.videoRect(inViewOfSize: bounds.size)
+            guard video.width > 0 else { return }
+            model.setCueWidth(id, gesture.width(at: p.x, videoWidth: video.width))
         case .webcam(let start, let from):
             let video = geometry.videoRect(inViewOfSize: bounds.size)
             guard video.width > 0, video.height > 0 else { return }

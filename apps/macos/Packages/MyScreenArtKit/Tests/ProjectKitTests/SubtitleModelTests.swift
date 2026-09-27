@@ -330,11 +330,15 @@ struct SubtitleEditingTests {
         #expect(result.reapplied == 1)
         #expect(result.conflicts.map(\.mine.text) == ["Goodbye"])
         #expect(result.cues.map(\.text) == ["Hello, world!", "buy"])
+        #expect(result.cues[0].words.map(\.text) == ["hello", "wurld"])
+        #expect(result.cues[0].words.map(\.start) == [0, 0.6])
 
         let kept = SubtitleMerge.merge(
             current: cues, newRevision: TranscriptFixtures.revision([new], id: "new"), keep: [cues[1].id])
         #expect(kept.conflicts.isEmpty)
         #expect(kept.cues.map(\.text) == ["Hello, world!", "Goodbye"])
+        #expect(kept.cues[1].words.map(\.text) == ["buy"])
+        #expect(kept.cues[1].words.map(\.start) == [3])
     }
 }
 
@@ -356,5 +360,218 @@ struct SubtitleReceiveTests {
         #expect(result.reapplied == 1)
         #expect(settings.revisionID == "r2" && settings.candidateRevisionID == nil)
         #expect(settings.cues.map(\.text) == ["One!"])
+    }
+}
+
+struct SubtitleWordTests {
+    private func words(_ text: String, _ ranges: [Range<Int>]) -> [String] {
+        let utf16 = Array(text.utf16)
+        return ranges.map { String(decoding: utf16[$0], as: UTF16.self) }
+    }
+
+    @Test func tokensSplitOnSpacesAndCJKCharacters() {
+        #expect(
+            words("Hello,  big world!", SubtitleWords.tokens(in: "Hello,  big world!")) == ["Hello,", "big", "world!"])
+        #expect(words("你好。OK 世界", SubtitleWords.tokens(in: "你好。OK 世界")) == ["你", "好。", "OK", "世", "界"])
+        // UTF-16 offsets, as Core Text counts them.
+        #expect(SubtitleWords.tokens(in: "😀 hi") == [0..<2, 3..<5])
+    }
+
+    @Test func cuesCarryAcousticWordTimingWithPunctuationAttached() throws {
+        let revision = TranscriptFixtures.revision([
+            TranscriptFixtures.segment("s", [("Hello,", 0, 0.4), ("big", 0.5, 0.8), ("world.", 0.9, 1.3)])
+        ])
+        let cue = try #require(CueBuilder.cues(from: revision).first)
+        #expect(cue.text == "Hello, big world.")
+        #expect(cue.words.map(\.text) == ["Hello,", "big", "world."])
+        #expect(cue.words.map(\.start) == [0, 0.5, 0.9])
+        #expect(cue.words[2].end == 1.3)
+    }
+
+    @Test func subwordUnitsMakeOneWordAndManualTimingNone() {
+        let timing = { (a: Double, b: Double, m: TimingMethod) in
+            UnitTiming(sourceRange: TranscriptFixtures.range(a, b), method: m, validation: .valid)
+        }
+        let words = SubtitleWords.build(
+            text: "unbelievable news",
+            units: [
+                ("un", timing(1, 1.2, .tdt)), ("believable", timing(1.2, 1.8, .tdt)), ("news", timing(2, 2.4, .manual)),
+            ])
+        #expect(words == [SubtitleWord(text: "unbelievable", start: 1, end: 1.8)])
+    }
+
+    @Test func multiCharacterCJKUnitsTimeEveryDisplayToken() throws {
+        let revision = TranscriptFixtures.revision([
+            TranscriptFixtures.segment("s", [("你好", 0, 0.5), ("世界", 0.6, 1)])
+        ])
+        let cue = try #require(CueBuilder.cues(from: revision).first)
+        #expect(cue.text == "你好 世界")
+        #expect(cue.words.map(\.text) == ["你", "好", "世", "界"])
+        #expect(cue.words.map(\.start) == [0, 0.25, 0.6, 0.8])
+        #expect(SubtitleWords.highlightedRange(in: cue.text, words: cue.words, at: 0.3) == 1..<2)
+        #expect(SubtitleWords.highlightedRange(in: cue.text, words: cue.words, at: 0.9) == 4..<5)
+
+        let kana = SubtitleWords.build(
+            text: "かな",
+            units: [
+                (
+                    "かな",
+                    UnitTiming(
+                        sourceRange: TranscriptFixtures.range(1, 1.4), method: .forcedAlignment, validation: .valid)
+                )
+            ])
+        #expect(kana.map(\.text) == ["か", "な"])
+        #expect(abs((kana.last?.start ?? 0) - 1.2) < 1e-9)
+    }
+
+    @Test func buildSkipsMissingAndWhitespaceUnits() {
+        let timing = UnitTiming(sourceRange: TranscriptFixtures.range(0, 0.5), method: .tdt, validation: .valid)
+        #expect(
+            SubtitleWords.build(text: "hello", units: [(" ", timing), ("missing", timing), ("hello", timing)])
+                == [SubtitleWord(text: "hello", start: 0, end: 0.5)])
+    }
+
+    @Test func highlightFollowsTheLastStartedWord() {
+        let words = [
+            SubtitleWord(text: "Hello,", start: 1, end: 1.4), SubtitleWord(text: "big", start: 1.5, end: 1.8),
+            SubtitleWord(text: "world.", start: 1.9, end: 2.3),
+        ]
+        let text = "Hello, big world."
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.9) == nil)
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 1) == 0..<6)
+        // A pause keeps the last word lit rather than flickering off.
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 1.45) == 0..<6)
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 1.6) == 7..<10)
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 5) == 11..<17)
+    }
+
+    @Test func correctionsKeepTheTimingOfUnchangedWords() {
+        let words = [
+            SubtitleWord(text: "their", start: 0, end: 0.3), SubtitleWord(text: "going", start: 0.4, end: 0.7),
+            SubtitleWord(text: "home", start: 0.8, end: 1),
+        ]
+        // "their" → "They're", a word inserted, case and punctuation changed.
+        let text = "They're really going HOME!"
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.1) == nil)
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.5) == 15..<20)
+        #expect(SubtitleWords.highlightedRange(in: text, words: words, at: 0.9) == 21..<26)
+    }
+
+    @Test func correctedMiddleWordDoesNotLeaveThePreviousWordLit() {
+        let words = [
+            SubtitleWord(text: "one", start: 0, end: 0.4),
+            SubtitleWord(text: "two", start: 0.5, end: 0.9),
+            SubtitleWord(text: "three", start: 1, end: 1.4),
+        ]
+        #expect(SubtitleWords.highlightedRange(in: "one too three", words: words, at: 0.6) == nil)
+        #expect(SubtitleWords.highlightedRange(in: "one too three", words: words, at: 1.1) == 8..<13)
+    }
+
+    @Test func oldFilesDecodeWithoutWordsOrHighlight() throws {
+        var config = EditConfig(segments: [Segment(start: 0, end: 10)])
+        config.subtitles.cues = [SubtitleCue(start: 1, end: 2, text: "Hi")]
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config)) as! [String: Any]
+        var subtitles = json["subtitles"] as! [String: Any]
+        var style = subtitles["style"] as! [String: Any]
+        for key in ["highlightWords", "highlightColor", "highlightGrow", "shadow", "uppercase"] {
+            style.removeValue(forKey: key)
+        }
+        subtitles["style"] = style
+        var cues = subtitles["cues"] as! [[String: Any]]
+        cues[0].removeValue(forKey: "words")
+        subtitles["cues"] = cues
+        json["subtitles"] = subtitles
+        let decoded = try JSONDecoder().decode(EditConfig.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(decoded == config)
+        #expect(!decoded.subtitles.style.highlightWords)
+        #expect(decoded.subtitles.style.highlightGrow == 0.1)
+        #expect(!decoded.subtitles.style.shadow.enabled)
+        #expect(!decoded.subtitles.style.uppercase)
+
+        config.subtitles.style.highlightWords = true
+        config.subtitles.cues[0].words = [SubtitleWord(text: "Hi", start: 1, end: 1.5)]
+        #expect(try JSONDecoder().decode(EditConfig.self, from: JSONEncoder().encode(config)) == config)
+    }
+
+    @Test func wordTimingIsFilledInForCuesMadeBeforeIt() {
+        let revision = TranscriptFixtures.revision([
+            TranscriptFixtures.segment("s", [("Hello", 0, 0.4), ("there.", 0.5, 1.2)])
+        ])
+        var settings = SubtitleSettings()
+        _ = settings.receive(revision)
+        let built = settings.cues
+        for i in settings.cues.indices { settings.cues[i].words = [] }
+        let filled = settings.fillWordTimings(from: revision)
+        #expect(filled)
+        #expect(settings.cues == built)
+        let again = settings.fillWordTimings(from: revision)
+        #expect(!again)
+        settings.cues[0].text = "Hello friend."
+        settings.cues[0].words = []
+        let correctedFilled = settings.fillWordTimings(from: revision)
+        #expect(correctedFilled)
+        #expect(settings.cues[0].words.map(\.text) == ["Hello", "there."])
+        #expect(
+            SubtitleWords.highlightedRange(in: settings.cues[0].text, words: settings.cues[0].words, at: 0.6) == nil)
+    }
+}
+
+struct SubtitleShadowAndGrowTests {
+    @Test func shadowFallsInItsDirection() {
+        let down = SubtitleShadow(angle: 90, distance: 0.1).offset
+        #expect(abs(down.dx) < 1e-12 && abs(down.dy - 0.1) < 1e-12)
+        let right = SubtitleShadow(angle: 0, distance: 0.2).offset
+        #expect(abs(right.dx - 0.2) < 1e-12 && abs(right.dy) < 1e-12)
+    }
+
+    @Test func normalisationClampsGrowAndShadow() {
+        var config = EditConfig(segments: [Segment(start: 0, end: 10)])
+        config.subtitles.style.highlightGrow = 3
+        config.subtitles.style.shadow = SubtitleShadow(
+            enabled: true, angle: -20, distance: 9, blur: .nan, opacity: 2)
+        let style = config.normalized(duration: 10).subtitles.style
+        #expect(style.highlightGrow == EditLimits.subtitleHighlightGrow.upperBound)
+        #expect(style.shadow.angle == 0)
+        #expect(style.shadow.distance == EditLimits.subtitleShadowDistance.upperBound)
+        #expect(style.shadow.blur == SubtitleShadow().blur)
+        #expect(style.shadow.opacity == 1)
+    }
+
+    @Test func shadowRoundTrips() throws {
+        var config = EditConfig(segments: [Segment(start: 0, end: 10)])
+        config.subtitles.style.highlightGrow = 0.25
+        config.subtitles.style.shadow = SubtitleShadow(enabled: true, angle: 120, distance: 0.2, blur: 0.3)
+        #expect(try JSONDecoder().decode(EditConfig.self, from: JSONEncoder().encode(config)) == config)
+    }
+}
+
+struct SubtitleCueWidthTests {
+    @Test func aCueWidthOverridesTheStyleAndCountsAsAnEdit() {
+        var settings = SubtitleSettings(cues: [SubtitleCue(start: 0, end: 1, text: "a", generatedText: "a")])
+        #expect(settings.style(for: settings.cues[0]).maxWidth == settings.style.maxWidth)
+        #expect(!settings.cues[0].isUserEdited)
+        settings.cues[0].maxWidth = 0.4
+        #expect(settings.style(for: settings.cues[0]).maxWidth == 0.4)
+        #expect(settings.cues[0].isUserEdited)
+    }
+
+    @Test func cueWidthIsClampedAndRoundTrips() throws {
+        var config = EditConfig(segments: [Segment(start: 0, end: 10)])
+        config.subtitles.cues = [
+            SubtitleCue(start: 0, end: 1, text: "narrow", maxWidth: 0.01),
+            SubtitleCue(start: 2, end: 3, text: "wide", maxWidth: 0.5),
+        ]
+        let normalised = config.normalized(duration: 10)
+        #expect(normalised.subtitles.cues[0].maxWidth == EditLimits.subtitleMaxWidth.lowerBound)
+        #expect(try JSONDecoder().decode(EditConfig.self, from: JSONEncoder().encode(normalised)) == normalised)
+
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(normalised)) as! [String: Any]
+        var subtitles = json["subtitles"] as! [String: Any]
+        var cues = subtitles["cues"] as! [[String: Any]]
+        cues[1].removeValue(forKey: "maxWidth")
+        subtitles["cues"] = cues
+        json["subtitles"] = subtitles
+        let old = try JSONDecoder().decode(EditConfig.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.subtitles.cues[1].maxWidth == nil)
     }
 }

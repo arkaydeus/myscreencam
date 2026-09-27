@@ -76,8 +76,11 @@ public enum CueBuilder {
             else { return }
             let text = joinedText(run, revision: revision)
             guard !text.isEmpty else { return }
+            let words = SubtitleWords.build(text: text, units: run.map { ($0.text, $0.unit.timing) })
             cues.append(
-                SubtitleCue(start: start, end: end, text: text, generatedText: text, unitIDs: run.map(\.unit.id)))
+                SubtitleCue(
+                    start: start, end: end, text: text, generatedText: text, unitIDs: run.map(\.unit.id),
+                    words: words))
         }
 
         for item in items {
