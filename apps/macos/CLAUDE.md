@@ -46,6 +46,7 @@ Engine modules are added as their phase starts. The layering is in the comment a
   - `Export/`: `ExportCenter`, `ExportSheet`.
   - `Transcription/`: `TranscriptionCenter` (the one transcription queue and speech-service owner), `SpeechModels` (downloads), `SpeechSettings`, the XPC client, Settings › Subtitles.
   - `Shell/`: `AppRouter`, app delegate, commands, URL scheme, intents, updates, settings.
+  - `Theme/`: `AppTheme` (shared, not an area): colour tokens, `ThemeButtonStyle`/`ThemeIconButtonStyle`, `ThemeGroupBoxStyle`, `themePanel()`. Every window and sheet root applies `.themedWindow()`; the app is always dark.
 - **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll/isAnyPlaying/session(for:)`, `EditorModel.receiveTranscript(_:)` (transcription commits through an open editor), `TranscriptionCenter.job(for:)/transcribe/cancel/cancelAll/isAvailable/retime`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`.
 - **Shell hooks for other areas** (`App/Sources/Shell/`):
   - **Export… (⌘E)** is driven by the focused-scene value `\.exportAction: (() -> Void)?` (declared in `Shell/AppCommands.swift`). The editor window publishes it with `.focusedSceneValue(\.exportAction) { showExport = true }`; the menu item is disabled when no focused scene sets it.

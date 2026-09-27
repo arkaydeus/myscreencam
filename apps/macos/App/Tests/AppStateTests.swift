@@ -5,6 +5,7 @@ import Foundation
 import ProjectKit
 import RenderKit
 import SpeechCore
+import SwiftUI
 import Testing
 
 @testable import MyScreenArt_Dev
@@ -306,5 +307,51 @@ struct AppStateTests {
         #expect(EditorWindowHooks.HooksView.route(space, through: hooks) == nil)
         #expect(EditorWindowHooks.HooksView.route(space, through: nil) === space)
         await model.close()
+    }
+
+    @Test func editorSheetsInstallNavyWindowChromeUnderLightAppearance() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .aqua)
+        defer { NSApp.appearance = previousAppearance }
+
+        func checkSheet<Content: View>(_ content: Content) {
+            let window = NSWindow(
+                contentRect: CGRect(x: 0, y: 0, width: 500, height: 400), styleMask: [.titled],
+                backing: .buffered, defer: false)
+            window.contentView = NSHostingView(rootView: content)
+            window.makeKeyAndOrderFront(nil)
+            defer { window.close() }
+            window.contentView?.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+
+            #expect(window.appearance?.name == .darkAqua)
+            #expect(window.backgroundColor == AppTheme.windowBackground)
+            #expect(window.titlebarAppearsTransparent)
+        }
+
+        checkSheet(PresetNameSheet(model: model))
+        checkSheet(ConflictSheet(model: model))
+        await model.close()
+    }
+
+    @Test func appThemeIgnoresTheRemovedAppearancePreference() {
+        let previousAppearance = NSApp.appearance
+        let previousPreference = UserDefaults.standard.object(forKey: "shell.appearance")
+        defer {
+            NSApp.appearance = previousAppearance
+            if let previousPreference {
+                UserDefaults.standard.set(previousPreference, forKey: "shell.appearance")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "shell.appearance")
+            }
+        }
+        NSApp.appearance = NSAppearance(named: .aqua)
+        UserDefaults.standard.set("light", forKey: "shell.appearance")
+
+        AppTheme.applyAppearance()
+
+        #expect(NSApp.appearance?.name == .darkAqua)
     }
 }

@@ -64,11 +64,15 @@ private struct CountdownView: View {
         Text("\(model.remaining)")
             .font(.system(size: 120, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.themePrimaryText)
             .contentTransition(.numericText(countsDown: true))
             .animation(.snappy, value: model.remaining)
             .frame(width: 220, height: 220)
-            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .background(Color.themePanel.opacity(0.88), in: RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 40, style: .continuous)
+                    .strokeBorder(Color.themeAccent.opacity(0.5), lineWidth: 2)
+            )
             .accessibilityLabel("Recording starts in \(model.remaining)")
     }
 }

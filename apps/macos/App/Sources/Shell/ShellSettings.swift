@@ -11,7 +11,6 @@ final class ShellSettings {
     enum Key {
         static let hideDockIconWhenIdle = "shell.hideDockIconWhenIdle"
         static let globalHotkeysEnabled = "shell.globalHotkeysEnabled"
-        static let appearance = "shell.appearance"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -24,13 +23,6 @@ final class ShellSettings {
         didSet { defaults.set(globalHotkeysEnabled, forKey: Key.globalHotkeysEnabled) }
     }
 
-    var appearance: AppearancePreference {
-        didSet {
-            defaults.set(appearance.rawValue, forKey: Key.appearance)
-            applyAppearance()
-        }
-    }
-
     /// Mirrors `SMAppService.mainApp`; the system (System Settings > Login Items) is the source of truth.
     private(set) var launchAtLogin: Bool
     /// Set when the last launch-at-login change failed or needs approval in System Settings.
@@ -41,21 +33,10 @@ final class ShellSettings {
         defaults.register(defaults: [
             Key.hideDockIconWhenIdle: false,
             Key.globalHotkeysEnabled: true,
-            Key.appearance: AppearancePreference.system.rawValue,
         ])
         hideDockIconWhenIdle = defaults.bool(forKey: Key.hideDockIconWhenIdle)
         globalHotkeysEnabled = defaults.bool(forKey: Key.globalHotkeysEnabled)
-        appearance = AppearancePreference(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .system
         launchAtLogin = SMAppService.mainApp.status == .enabled
-    }
-
-    func applyAppearance() {
-        NSApp.appearance =
-            switch appearance {
-            case .system: nil
-            case .light: NSAppearance(named: .aqua)
-            case .dark: NSAppearance(named: .darkAqua)
-            }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

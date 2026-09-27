@@ -13,7 +13,7 @@ final class MicLevelSink {
     func reset() { view?.show(.silence) }
 }
 
-/// A horizontal level meter (green → yellow → red) drawn by Core Animation layers.
+/// A horizontal level meter (accent green → amber → record red) drawn by Core Animation layers.
 struct MicLevelMeterView: NSViewRepresentable {
     let sink: MicLevelSink
 
@@ -38,16 +38,16 @@ struct MicLevelMeterView: NSViewRepresentable {
         override init(frame: NSRect) {
             super.init(frame: frame)
             wantsLayer = true
-            track.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+            track.backgroundColor = AppTheme.controlFill.cgColor
             track.cornerRadius = 3
-            gradient.colors = [NSColor.systemGreen, .systemGreen, .systemYellow, .systemRed].map(\.cgColor)
+            gradient.colors = [AppTheme.accent, AppTheme.accent, AppTheme.warning, AppTheme.record].map(\.cgColor)
             gradient.locations = [0, 0.6, 0.8, 1]
             gradient.startPoint = CGPoint(x: 0, y: 0.5)
             gradient.endPoint = CGPoint(x: 1, y: 0.5)
             gradient.cornerRadius = 3
             mask.backgroundColor = NSColor.black.cgColor
             gradient.mask = mask
-            peakMarker.backgroundColor = NSColor.labelColor.withAlphaComponent(0.6).cgColor
+            peakMarker.backgroundColor = AppTheme.primaryText.withAlphaComponent(0.7).cgColor
             layer?.addSublayer(track)
             layer?.addSublayer(gradient)
             layer?.addSublayer(peakMarker)
@@ -55,14 +55,6 @@ struct MicLevelMeterView: NSViewRepresentable {
 
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-        override func viewDidChangeEffectiveAppearance() {
-            super.viewDidChangeEffectiveAppearance()
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                track.backgroundColor = NSColor.quaternaryLabelColor.cgColor
-                peakMarker.backgroundColor = NSColor.labelColor.withAlphaComponent(0.6).cgColor
-            }
-        }
 
         override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 6) }
 

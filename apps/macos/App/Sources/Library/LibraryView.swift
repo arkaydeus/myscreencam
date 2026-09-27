@@ -21,6 +21,7 @@ struct LibraryView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 480)
+        .themedWindow()
     }
 }
 
@@ -104,6 +105,7 @@ private struct LibraryContent: View {
                 Text(message)
             } actions: {
                 Button("Try Again") { Task { await model.rescan() } }
+                    .buttonStyle(.themed)
             }
         case .loaded:
             if model.items.isEmpty {
@@ -112,9 +114,8 @@ private struct LibraryContent: View {
                 } description: {
                     Text("Recordings you make will appear here.")
                 } actions: {
-                    Button("New Recording") { app.router.showRecorder() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                    Button("New Recording", systemImage: "record.circle") { app.router.showRecorder() }
+                        .buttonStyle(ThemeButtonStyle(kind: .primary, isLarge: true))
                 }
             } else if model.visibleItems.isEmpty {
                 ContentUnavailableView.search(text: model.searchText)
@@ -187,7 +188,7 @@ private struct LibraryContent: View {
             systemImage: "exclamationmark.triangle"
         )
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.themeWarning)
         .help(model.failures.map { $0.url.lastPathComponent }.joined(separator: "\n"))
         .padding(.bottom, Self.padding)
     }

@@ -16,6 +16,9 @@ struct RecorderView: View {
                 Color.clear.frame(width: 760, height: 560)
             }
         }
+        .groupBoxStyle(.themed)
+        .toggleStyle(.switch)
+        .themedWindow()
         .onAppear {
             if model == nil { model = RecorderWindowModel(controller: appModel.recording) }
         }
@@ -32,8 +35,12 @@ private struct RecorderContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
-                SourceSection(model: model)
-                    .frame(width: 400)
+                GroupBox {
+                    SourceSection(model: model)
+                } label: {
+                    Label("Source", systemImage: "display")
+                }
+                .frame(width: 400)
                 VStack(alignment: .leading, spacing: 12) {
                     CameraSection(model: model)
                     MicrophoneSection(model: model)
@@ -134,6 +141,7 @@ private struct SourceSection: View {
     private var regionPicker: some View {
         HStack {
             Button("Select Region…", systemImage: "rectangle.dashed") { model.selectRegion() }
+                .buttonStyle(.themed)
                 .fixedSize()
             if let region = preferences.region {
                 let name = model.displays.first { $0.id == region.displayID }?.name ?? "a disconnected display"
@@ -143,10 +151,10 @@ private struct SourceSection: View {
                         "\(Int(rect.width)) × \(Int(rect.height)) at (\(Int(rect.minX)), \(Int(rect.minY))) on \(name)"
                 )
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeSecondaryText)
                 .lineLimit(2)
             } else {
-                Text("No region selected").foregroundStyle(.secondary)
+                Text("No region selected").foregroundStyle(Color.themeSecondaryText)
             }
         }
     }
@@ -161,19 +169,20 @@ private struct WindowList: View {
                 Text(model.selectedWindow?.pickerTitle ?? "Choose a window")
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .foregroundStyle(model.selectedWindow == nil ? .secondary : .primary)
+                    .foregroundStyle(model.selectedWindow == nil ? Color.themeSecondaryText : Color.themePrimaryText)
                 Spacer()
                 Button("Refresh", systemImage: "arrow.clockwise") { model.refreshWindows() }
                     .labelStyle(.iconOnly)
+                    .buttonStyle(.themedIcon)
                     .help("Refresh the window list")
                     .disabled(!model.isGranted(.screenRecording))
             }
             if !model.isGranted(.screenRecording) {
                 Text("Allow Screen Recording to list windows.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
             } else if let error = model.windowsError {
-                Text(error).font(.callout).foregroundStyle(.red)
+                Text(error).font(.callout).foregroundStyle(Color.themeDestructive)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
@@ -187,10 +196,10 @@ private struct WindowList: View {
                     }
                 }
                 .frame(height: 150)
-                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+                .themePanel(.themeStage, cornerRadius: AppTheme.controlRadius + 2)
                 .overlay {
                     if model.windowsLoaded, model.windows.isEmpty {
-                        Text("No windows").foregroundStyle(.secondary)
+                        Text("No windows").foregroundStyle(Color.themeSecondaryText)
                     } else if !model.windowsLoaded {
                         ProgressView().controlSize(.small)
                     }
@@ -213,7 +222,7 @@ private struct WindowRow: View {
                     if let thumbnail {
                         Image(nsImage: thumbnail).resizable().aspectRatio(contentMode: .fit)
                     } else {
-                        Image(systemName: "macwindow").foregroundStyle(.tertiary)
+                        Image(systemName: "macwindow").foregroundStyle(Color.themeTertiaryText)
                     }
                 }
                 .frame(width: 56, height: 34)
@@ -221,7 +230,7 @@ private struct WindowRow: View {
                     Text(window.appName ?? window.title).lineLimit(1)
                     Text("\(window.title) · \(window.sizeDescription)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.themeSecondaryText)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -230,7 +239,13 @@ private struct WindowRow: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .contentShape(Rectangle())
-            .background(isSelected ? Color.accentColor.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 5))
+            .background(
+                isSelected ? Color.themeAccent.opacity(0.18) : .clear,
+                in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous)
+                    .strokeBorder(isSelected ? Color.themeAccent.opacity(0.6) : .clear))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -242,7 +257,9 @@ private struct SourcePreview: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.6))
+            RoundedRectangle(cornerRadius: AppTheme.controlRadius + 2, style: .continuous).fill(Color.themeStage)
+            RoundedRectangle(cornerRadius: AppTheme.controlRadius + 2, style: .continuous)
+                .strokeBorder(Color.themePanelBorder)
             if let image = model.sourcePreview {
                 Image(nsImage: image)
                     .resizable()
@@ -254,7 +271,7 @@ private struct SourcePreview: View {
             } else {
                 Text(placeholder)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeSecondaryText)
                     .multilineTextAlignment(.center)
                     .padding()
             }
@@ -264,8 +281,8 @@ private struct SourcePreview: View {
             if model.isGranted(.screenRecording), model.preferences.selectedSource != nil {
                 Button("Refresh Preview", systemImage: "arrow.clockwise") { model.refreshSourcePreview() }
                     .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .padding(8)
+                    .buttonStyle(.themedIcon)
+                    .padding(4)
                     .help("Take a new preview")
             }
         }
@@ -302,8 +319,10 @@ private struct CameraSection: View {
                     }
                 case .notDetermined:
                     Button("Grant Camera Access…") { Task { await model.request(.camera) } }
+                        .buttonStyle(.themed)
                 case .denied, .restricted:
                     Button("Allow Camera in System Settings…") { model.openSettings(.camera) }
+                        .buttonStyle(.themed)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -320,15 +339,15 @@ private struct CameraSection: View {
             if let camera = hub.camera, camera.configuration.deviceID == device.id {
                 CameraPreviewView(camera: camera)
             } else if let failure = hub.failure {
-                Text(failure).font(.caption).foregroundStyle(.secondary).padding()
+                Text(failure).font(.caption).foregroundStyle(Color.themeSecondaryText).padding()
             } else {
                 ProgressView().controlSize(.small)
             }
         }
         .frame(height: 150)
         .frame(maxWidth: .infinity)
-        .background(.black)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(Color.themeStage)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.controlRadius + 2, style: .continuous))
         .accessibilityLabel("Camera preview")
     }
 }
@@ -357,13 +376,15 @@ private struct MicrophoneSection: View {
                             .frame(height: 6)
                             .accessibilityLabel("Microphone level")
                         if let error = model.micMeterError {
-                            Text(error).font(.caption).foregroundStyle(.secondary)
+                            Text(error).font(.caption).foregroundStyle(Color.themeSecondaryText)
                         }
                     }
                 case .notDetermined:
                     Button("Grant Microphone Access…") { Task { await model.request(.microphone) } }
+                        .buttonStyle(.themed)
                 case .denied, .restricted:
                     Button("Allow Microphone in System Settings…") { model.openSettings(.microphone) }
+                        .buttonStyle(.themed)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -390,7 +411,7 @@ private struct OptionsSection: View {
                         : "Needs Input Monitoring. Without it the system cursor is recorded as is."
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
                 DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -425,7 +446,7 @@ private struct WarningsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(warnings, id: \.self) { message in
                     Label(message, systemImage: "exclamationmark.triangle.fill")
-                        .symbolRenderingMode(.multicolor)
+                        .foregroundStyle(Color.themeWarning)
                         .font(.callout)
                 }
             }
@@ -454,19 +475,16 @@ private struct StartButton: View {
     var body: some View {
         VStack(spacing: 6) {
             Button(action: action) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
+                Label(title, systemImage: isCountingDown ? "xmark" : "record.circle.fill")
                     .monospacedDigit()
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.extraLarge)
-            .tint(isCountingDown ? .gray : .red)
+            // A countdown shows Cancel, so it isn't drawn as the red record action.
+            .buttonStyle(ThemeButtonStyle(kind: isCountingDown ? .standard : .record, isLarge: true))
             .keyboardShortcut(.defaultAction)
             .disabled(isDisabled)
             if controller.state == .idle, let blocker = model.startBlocker {
-                Text(blocker).font(.callout).foregroundStyle(.secondary)
+                Text(blocker).font(.callout).foregroundStyle(Color.themeSecondaryText)
             }
         }
     }

@@ -269,7 +269,7 @@ Size, smoothing, click highlight, drag trail and hide-when-idle apply to all thr
 - **Updates:**
   - Sparkle 2 with an EdDSA-signed appcast hosted on GitHub Releases.
   - Update installation is blocked while recording or exporting (Sparkle's `updater(_:shouldPostponeRelaunchForUpdate:)`).
-- **Theme:** follows the system appearance automatically. Light/Dark/System override via `NSApp.appearance`.
+- **Theme:** "Midnight Glass" across every window (navy surfaces, floating panels, green accent), always dark: `NSApp.appearance` is Dark Aqua so menus, alerts and panels match. Tokens, button styles and `themedWindow()` live in `App/Sources/Theme/AppTheme.swift`.
 
 ### 3.6 Development signing (replaces the Electron dev-host machinery)
 

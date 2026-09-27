@@ -29,8 +29,7 @@ struct EditorWindow: View {
             }
         }
         .frame(minWidth: 980, minHeight: 640)
-        .background(Color.editorWindow)
-        .preferredColorScheme(.dark)
+        .themedWindow()
         .task(id: packageURL) { await load() }
         .onDisappear {
             if case .loaded(let model) = phase {

@@ -36,12 +36,12 @@ private final class DockProgressView: NSView {
         let track = NSRect(
             x: bounds.width * 0.1, y: bounds.height * 0.08, width: bounds.width * 0.8, height: height)
         let radius = height / 2
-        NSColor.black.withAlphaComponent(0.55).setFill()
+        AppTheme.windowBackground.withAlphaComponent(0.8).setFill()
         NSBezierPath(roundedRect: track, xRadius: radius, yRadius: radius).fill()
         let inset = track.insetBy(dx: 1.5, dy: 1.5)
         var bar = inset
         bar.size.width = max(inset.height, inset.width * fraction)
-        NSColor.controlAccentColor.setFill()
+        AppTheme.accent.setFill()
         NSBezierPath(roundedRect: bar, xRadius: inset.height / 2, yRadius: inset.height / 2).fill()
     }
 }

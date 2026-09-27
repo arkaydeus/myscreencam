@@ -11,7 +11,7 @@ struct PreviewContainer: View {
 
     var body: some View {
         PreviewRepresentable(model: model, state: PreviewOverlayState(model: model))
-            .background(Color.editorStage)
+            .background(Color.themeStage)
             .overlay(alignment: .top) {
                 if model.isPickingZoomTarget {
                     HStack(spacing: 8) {
@@ -119,7 +119,7 @@ final class PreviewNSView: NSView {
         self.model = model
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.backgroundColor = EditorTheme.stageBackground.cgColor
+        layer?.backgroundColor = AppTheme.stageBackground.cgColor
         playerLayer.player = model.player
         playerLayer.videoGravity = .resizeAspect
         layer?.addSublayer(playerLayer)
@@ -133,14 +133,14 @@ final class PreviewNSView: NSView {
         otherMasks.strokeColor = NSColor.white.withAlphaComponent(0.45).cgColor
         otherMasks.lineWidth = 1
         otherMasks.lineDashPattern = [3, 3]
-        maskOutline.fillColor = EditorTheme.accent.withAlphaComponent(0.12).cgColor
-        maskOutline.strokeColor = EditorTheme.accent.cgColor
+        maskOutline.fillColor = AppTheme.accent.withAlphaComponent(0.12).cgColor
+        maskOutline.strokeColor = AppTheme.accent.cgColor
         maskOutline.lineWidth = 1.5
         targetMarker.fillColor = nil
         targetMarker.strokeColor = NSColor.systemYellow.cgColor
         targetMarker.lineWidth = 2
         subtitleOutline.fillColor = nil
-        subtitleOutline.strokeColor = EditorTheme.accent.cgColor
+        subtitleOutline.strokeColor = AppTheme.accent.cgColor
         subtitleOutline.lineWidth = 1.5
         subtitleOutline.lineDashPattern = [5, 4]
         for layer in [otherMasks, maskOutline, webcamOutline, targetMarker, subtitleOutline] {
@@ -148,7 +148,7 @@ final class PreviewNSView: NSView {
         }
         for handle in handles {
             handle.backgroundColor = NSColor.white.cgColor
-            handle.borderColor = EditorTheme.accent.cgColor
+            handle.borderColor = AppTheme.accent.cgColor
             handle.borderWidth = 1
             handle.bounds = CGRect(x: 0, y: 0, width: 8, height: 8)
             overlay.addSublayer(handle)

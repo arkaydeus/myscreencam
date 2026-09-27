@@ -36,7 +36,8 @@ final class AppShell {
     func start() {
         guard !started else { return }
         started = true
-        settings.applyAppearance()
+        // The Midnight Glass theme is dark-only; menus, alerts and panels follow it.
+        AppTheme.applyAppearance()
         dockIcon.start()
         observeHotkeyPreference()
         updates.start()

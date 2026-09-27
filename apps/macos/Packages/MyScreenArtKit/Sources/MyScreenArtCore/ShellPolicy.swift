@@ -25,23 +25,6 @@ public enum QuitGuard: Sendable, Equatable {
     }
 }
 
-/// Appearance override. `system` follows macOS.
-public enum AppearancePreference: String, Sendable, CaseIterable, Identifiable {
-    case system
-    case light
-    case dark
-
-    public var id: String { rawValue }
-
-    public var title: String {
-        switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
-        }
-    }
-}
-
 /// Sparkle update configuration checks.
 public enum UpdateConfiguration {
     /// Placeholder value of `SPARKLE_PUBLIC_ED_KEY` in `project.yml` until a real key is generated.
