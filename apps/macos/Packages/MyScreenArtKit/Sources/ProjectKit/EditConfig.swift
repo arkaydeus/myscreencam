@@ -15,6 +15,8 @@ public struct EditConfig: Codable, Sendable, Equatable {
     public var blur: [BlurMask]
     public var audio: AudioSettings
     public var background: BackgroundSettings
+    /// Absent in files written before subtitles existed (decoded as the default).
+    public var subtitles: SubtitleSettings
 
     public init(
         version: Int = EditConfig.currentVersion,
@@ -24,7 +26,8 @@ public struct EditConfig: Codable, Sendable, Equatable {
         cursor: CursorSettings = CursorSettings(),
         blur: [BlurMask] = [],
         audio: AudioSettings = AudioSettings(),
-        background: BackgroundSettings = BackgroundSettings()
+        background: BackgroundSettings = BackgroundSettings(),
+        subtitles: SubtitleSettings = SubtitleSettings()
     ) {
         self.version = version
         self.segments = segments
@@ -34,6 +37,24 @@ public struct EditConfig: Codable, Sendable, Equatable {
         self.blur = blur
         self.audio = audio
         self.background = background
+        self.subtitles = subtitles
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, segments, zoom, webcam, cursor, blur, audio, background, subtitles
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(Int.self, forKey: .version)
+        segments = try c.decode([Segment].self, forKey: .segments)
+        zoom = try c.decode(ZoomSettings.self, forKey: .zoom)
+        webcam = try c.decode(WebcamSettings.self, forKey: .webcam)
+        cursor = try c.decode(CursorSettings.self, forKey: .cursor)
+        blur = try c.decode([BlurMask].self, forKey: .blur)
+        audio = try c.decode(AudioSettings.self, forKey: .audio)
+        background = try c.decode(BackgroundSettings.self, forKey: .background)
+        subtitles = try c.decodeIfPresent(SubtitleSettings.self, forKey: .subtitles) ?? SubtitleSettings()
     }
 
     /// A fresh config for a recording: one segment covering everything, cursor overlay on if the system cursor

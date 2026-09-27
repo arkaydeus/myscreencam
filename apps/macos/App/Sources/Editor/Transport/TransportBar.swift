@@ -284,6 +284,19 @@ enum TimeFormat {
         return String(format: "%d:%02d.%02d", m, sec, cs)
     }
 
+    /// Parses `h:mm:ss.cc`, `m:ss.cc` or plain seconds; nil when malformed.
+    static func parse(_ text: String) -> Double? {
+        let parts = text.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false)
+        guard (1...3).contains(parts.count) else { return nil }
+        var total = 0.0
+        for (i, part) in parts.enumerated() {
+            guard let value = Double(part), value >= 0, value.isFinite else { return nil }
+            if i < parts.count - 1, value != value.rounded() { return nil }
+            total = total * 60 + value
+        }
+        return total
+    }
+
     /// Short seconds, e.g. `1.25 s`.
     static func seconds(_ value: Double) -> String {
         String(format: "%.2f s", value)

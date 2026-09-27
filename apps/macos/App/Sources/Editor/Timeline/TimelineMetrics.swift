@@ -12,7 +12,7 @@ enum TimelineMetrics {
     static let zoomRange: ClosedRange<Double> = 0.5...4
 
     enum Row: CaseIterable {
-        case screen, webcam, systemAudio, microphone, zoom, blur, clicks
+        case screen, webcam, systemAudio, microphone, zoom, blur, subtitles, clicks
 
         var height: CGFloat {
             switch self {
@@ -21,6 +21,7 @@ enum TimelineMetrics {
             case .systemAudio, .microphone: 30
             case .zoom: 28
             case .blur: 22
+            case .subtitles: 22
             case .clicks: 16
             }
         }
@@ -33,24 +34,27 @@ enum TimelineMetrics {
             case .microphone: "Mic"
             case .zoom: "Zoom"
             case .blur: "Blur"
+            case .subtitles: "Subtitles"
             case .clicks: "Clicks"
             }
         }
     }
 
-    static func rows(for streams: Set<StreamKind>) -> [Row] {
+    /// The rows to show: stream rows only for recorded streams, the Subtitles row only when there are subtitles.
+    static func rows(for streams: Set<StreamKind>, subtitles: Bool = false) -> [Row] {
         Row.allCases.filter { row in
             switch row {
             case .webcam: streams.contains(.webcam)
             case .systemAudio: streams.contains(.systemAudio)
             case .microphone: streams.contains(.microphone)
+            case .subtitles: subtitles
             default: true
             }
         }
     }
 
-    static func preferredHeight(for streams: Set<StreamKind>) -> CGFloat {
-        rulerHeight + rows(for: streams).reduce(0) { $0 + $1.height + rowGap } + bottomPad
+    static func preferredHeight(for streams: Set<StreamKind>, subtitles: Bool = false) -> CGFloat {
+        rulerHeight + rows(for: streams, subtitles: subtitles).reduce(0) { $0 + $1.height + rowGap } + bottomPad
     }
 
     /// Major/minor tick spacing in seconds so major ticks are at least `minimumSpacing` points apart.

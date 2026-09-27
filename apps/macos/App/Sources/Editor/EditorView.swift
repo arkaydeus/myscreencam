@@ -19,7 +19,10 @@ struct EditorView: View {
                     TransportBar(model: model)
                         .editorPanel()
                     TimelineContainer(model: model)
-                        .frame(height: TimelineMetrics.preferredHeight(for: model.recordedStreams))
+                        .frame(
+                            height: TimelineMetrics.preferredHeight(
+                                for: model.recordedStreams, subtitles: !model.edit.subtitles.cues.isEmpty)
+                        )
                         .editorPanel()
                 }
                 InspectorView(model: model)

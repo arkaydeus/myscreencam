@@ -1,7 +1,8 @@
 import Foundation
 import Observation
 
-/// The open editor windows' models. Other areas rely only on `hasPendingSaves` and `flushAll()`.
+/// The open editor windows' models. Other areas rely only on `hasPendingSaves`, `flushAll()`, `isAnyPlaying` and
+/// `session(for:)` (transcription commits a finished transcript through `EditorModel.receiveTranscript(_:)`).
 ///
 /// Each `EditorModel` autosaves through its own `EditAutosaver` (500 ms debounce) and flushes on window close,
 /// rename and delete; `flushAll()` covers app termination.
@@ -9,6 +10,9 @@ import Observation
 @Observable
 final class EditorSessions {
     private var sessions: [URL: EditorModel] = [:]
+
+    /// True while any editor is playing (transcription holds GPU-heavy work meanwhile).
+    var isAnyPlaying: Bool { sessions.values.contains { $0.clock.isPlaying } }
 
     /// True while any open editor has edits that aren't on disk yet.
     var hasPendingSaves: Bool { sessions.values.contains { $0.hasUnsavedChanges } }

@@ -19,6 +19,11 @@ struct ExportSheet: View {
     @State private var job: ExportCenter.Job?
     @State private var errorMessage: String?
     @State private var isChoosingDestination = false
+    @AppStorage("export.saveSubtitles") private var saveSubtitles = false
+
+    private var hasSubtitles: Bool {
+        edit.subtitles.enabled && edit.subtitles.cues.contains { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
 
     /// What the sheet needs from the package, loaded off the main actor.
     private nonisolated struct RecordingInfo: Sendable {
@@ -113,6 +118,10 @@ struct ExportSheet: View {
                 if choice.settings.format != .gif {
                     Toggle("Include audio", isOn: $choice.settings.includesAudio)
                         .disabled(info?.hasAudibleAudio == false)
+                }
+                if hasSubtitles {
+                    Toggle("Also save subtitles (.srt)", isOn: $saveSubtitles)
+                        .help("Subtitles are burned into the video; this also writes them as a SubRip file beside it.")
                 }
             }
             .formStyle(.columns)
@@ -363,8 +372,12 @@ struct ExportSheet: View {
         ExportOptionsStore.rememberDirectory(of: url)
 
         errorMessage = nil
+        let subtitles =
+            hasSubtitles && saveSubtitles
+            ? SubtitleExport.srt(cues: edit.subtitles.cues, timeline: EditTimeline(segments: edit.segments)) : nil
         job = model.exports.start(
-            package: package, name: info.name, edit: edit, settings: settings, destination: url)
+            package: package, name: info.name, edit: edit, settings: settings, destination: url,
+            subtitleSidecar: subtitles)
     }
 
     /// A file name for the recording's display name: path separators and colons replaced.

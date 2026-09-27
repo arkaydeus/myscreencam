@@ -13,6 +13,12 @@ echo "DEVELOPER_DIR=${DEVELOPER_DIR:-<unset>}"
 xcodebuild -version
 swift --version 2>&1 | head -1
 xcodegen --version
+# The speech service builds MLX's Metal shaders (docs/speech-integration.md).
+if xcrun metal --version >/dev/null 2>&1; then
+  echo "Metal Toolchain: installed"
+else
+  echo "Metal Toolchain: MISSING — run: xcodebuild -downloadComponent MetalToolchain"
+fi
 
 section "Signing identities"
 security find-identity -v -p codesigning | grep -E 'Apple Development|Developer ID Application' \

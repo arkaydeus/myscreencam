@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitWhenExportFinishesPending = false
         switch QuitGuard.resolve(isRecording: model.recording.isActive, isExporting: exportGuardApplies) {
         case .none:
+            model.transcription.cancelAll()
             model.editors.flushAll()
             return .terminateNow
         case .recording:
@@ -133,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await resolveExportGuard(model)
             return
         }
+        model.transcription.cancelAll()
         model.editors.flushAll()
         finishTermination(quit: true)
     }
@@ -150,6 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .alertFirstButtonReturn:
             model.exports.cancelAll()
             await model.exports.waitUntilIdle()
+            model.transcription.cancelAll()
             model.editors.flushAll()
             finishTermination(quit: true)
         case .alertSecondButtonReturn:

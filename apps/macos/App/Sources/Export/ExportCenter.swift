@@ -37,6 +37,8 @@ final class ExportCenter {
         let name: String
         let destination: URL
         let settings: ExportSettings
+        /// SubRip text written beside the exported file when the export succeeds.
+        let subtitleSidecar: String?
         fileprivate let edit: EditConfig
         private(set) var state: State = .queued
         @ObservationIgnored fileprivate var exportJob: ExportJob?
@@ -44,8 +46,10 @@ final class ExportCenter {
         @ObservationIgnored fileprivate var cancelRequested = false
 
         fileprivate init(
-            package: RecordingPackage, name: String, edit: EditConfig, settings: ExportSettings, destination: URL
+            package: RecordingPackage, name: String, edit: EditConfig, settings: ExportSettings, destination: URL,
+            subtitleSidecar: String?
         ) {
+            self.subtitleSidecar = subtitleSidecar
             self.package = package
             self.name = name
             self.edit = edit
@@ -119,9 +123,12 @@ final class ExportCenter {
     /// Queues an export and returns its job. Starts it immediately when nothing else is running.
     @discardableResult
     func start(
-        package: RecordingPackage, name: String, edit: EditConfig, settings: ExportSettings, destination: URL
+        package: RecordingPackage, name: String, edit: EditConfig, settings: ExportSettings, destination: URL,
+        subtitleSidecar: String? = nil
     ) -> Job {
-        let job = Job(package: package, name: name, edit: edit, settings: settings, destination: destination)
+        let job = Job(
+            package: package, name: name, edit: edit, settings: settings, destination: destination,
+            subtitleSidecar: subtitleSidecar)
         jobs.append(job)
         trimFinishedJobs()
         notifier.prepare()
@@ -209,6 +216,14 @@ final class ExportCenter {
         job.exportJob = nil
         switch state {
         case .succeeded(let result):
+            if let srt = job.subtitleSidecar {
+                let url = result.url.deletingPathExtension().appendingPathExtension("srt")
+                do {
+                    try Data(srt.utf8).write(to: url, options: .atomic)
+                } catch {
+                    Log.app.error("Couldn't write subtitles: \(error.localizedDescription, privacy: .public)")
+                }
+            }
             Log.app.info(
                 "Export finished: \(result.url.lastPathComponent, privacy: .public), \(result.fileSize) bytes in \(result.wallTime, format: .fixed(precision: 1)) s"
             )

@@ -34,6 +34,7 @@ enum EditorTheme {
     static let microphoneTrack = NSColor(hex: 0x7CB8FF)
     static let zoomTrack = NSColor(hex: 0xFFB25B)
     static let blurTrack = NSColor(hex: 0xFF6FAE)
+    static let subtitleTrack = NSColor(hex: 0x4FD1E8)
     static let clickMarker = NSColor(hex: 0xFFE066)
     static let playhead = NSColor(hex: 0xFF5C8A)
 

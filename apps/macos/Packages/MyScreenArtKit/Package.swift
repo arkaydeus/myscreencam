@@ -11,6 +11,8 @@ import PackageDescription
 //   RecordingKit     – recording session, writers, package writer
 //   RenderKit        – timeline math, effect math, composition builder, Core Image compositor, audio mix
 //   ExportKit        – reader/writer export pipeline, presets, GIF
+//   SpeechCore       – speech-model catalogue/downloads, audio preparation, worker protocol, transcript assembly
+//                      (no SDKs: the recognisers live in Packages/SpeechEngines, linked only by the XPC service)
 
 let package = Package(
     name: "MyScreenArtKit",
@@ -22,6 +24,7 @@ let package = Package(
         .library(name: "RecordingKit", targets: ["RecordingKit"]),
         .library(name: "RenderKit", targets: ["RenderKit"]),
         .library(name: "ExportKit", targets: ["ExportKit"]),
+        .library(name: "SpeechCore", targets: ["SpeechCore"]),
     ],
     targets: [
         .target(name: "MyScreenArtCore"),
@@ -34,6 +37,11 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "ExportKit", dependencies: ["MyScreenArtCore"]),
+        .target(
+            name: "SpeechCore",
+            dependencies: ["MyScreenArtCore", "ProjectKit"],
+            resources: [.copy("Resources/catalogue.json")]
+        ),
         // Developer tool (import legacy recordings, export benchmark); not shipped in the app.
         .executableTarget(name: "msa-tool", dependencies: ["ProjectKit", "RenderKit", "ExportKit"]),
 
@@ -43,5 +51,6 @@ let package = Package(
         .testTarget(name: "RecordingKitTests", dependencies: ["RecordingKit"]),
         .testTarget(name: "RenderKitTests", dependencies: ["RenderKit"]),
         .testTarget(name: "ExportKitTests", dependencies: ["ExportKit"]),
+        .testTarget(name: "SpeechCoreTests", dependencies: ["SpeechCore", "ProjectKit"]),
     ]
 )

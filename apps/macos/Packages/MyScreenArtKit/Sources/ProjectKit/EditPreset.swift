@@ -1,7 +1,7 @@
 import Foundation
 
-/// A named set of look-and-feel settings: webcam, audio, cursor, zoom defaults and background.
-/// Presets never carry per-recording content (segments, zoom keyframes, blur masks, zoom on/off).
+/// A named set of look-and-feel settings: webcam, audio, cursor, zoom defaults, background and subtitle style.
+/// Presets never carry per-recording content (segments, zoom keyframes, blur masks, subtitle cues, zoom on/off).
 public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
     public var id: UUID
     public var name: String
@@ -10,11 +10,15 @@ public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
     public var cursor: CursorSettings
     public var zoomDefaults: ZoomTiming
     public var background: BackgroundSettings
+    /// Subtitle look (style and default placement; never the cues). Absent in presets saved before subtitles.
+    public var subtitleStyle: SubtitleStyle?
+    public var subtitlePlacement: SubtitlePlacement?
 
     public init(
         id: UUID = UUID(), name: String, webcam: WebcamSettings = WebcamSettings(),
         audio: AudioSettings = AudioSettings(), cursor: CursorSettings = CursorSettings(),
-        zoomDefaults: ZoomTiming = ZoomTiming(), background: BackgroundSettings = BackgroundSettings()
+        zoomDefaults: ZoomTiming = ZoomTiming(), background: BackgroundSettings = BackgroundSettings(),
+        subtitleStyle: SubtitleStyle? = nil, subtitlePlacement: SubtitlePlacement? = nil
     ) {
         self.id = id
         self.name = name
@@ -23,13 +27,16 @@ public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
         self.cursor = cursor
         self.zoomDefaults = zoomDefaults
         self.background = background
+        self.subtitleStyle = subtitleStyle
+        self.subtitlePlacement = subtitlePlacement
     }
 
     /// Captures the preset-able settings of `config`.
     public init(id: UUID = UUID(), name: String, from config: EditConfig) {
         self.init(
             id: id, name: name, webcam: config.webcam, audio: config.audio, cursor: config.cursor,
-            zoomDefaults: config.zoom.defaults, background: config.background)
+            zoomDefaults: config.zoom.defaults, background: config.background,
+            subtitleStyle: config.subtitles.style, subtitlePlacement: config.subtitles.placement)
     }
 
     /// `config` with this preset's settings; segments, zoom keyframes, zoom on/off and blur masks are kept.
@@ -40,6 +47,8 @@ public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
         config.cursor = cursor
         config.zoom.defaults = zoomDefaults
         config.background = background
+        if let subtitleStyle { config.subtitles.style = subtitleStyle }
+        if let subtitlePlacement { config.subtitles.placement = subtitlePlacement }
         return config
     }
 }
