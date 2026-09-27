@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 
-import { DownloadButton, LogoMark } from "@/components/site/brand";
+import { BuyButton, DownloadButton, LogoMark } from "@/components/site/brand";
 import { site } from "@/lib/site";
 
 export function Closing() {
@@ -15,7 +15,10 @@ export function Closing() {
           <p className="mt-3.5 text-[17px] leading-[1.47] text-muted-foreground sm:mt-5 sm:text-[21px] sm:leading-[1.38]">
             Download My Screen Cam, record something, and see what the editor does with it.
           </p>
-          <DownloadButton className="mt-7 sm:mt-9" />
+          <div className="mt-7 flex flex-col items-center gap-3 sm:mt-9 sm:flex-row">
+            <DownloadButton />
+            <BuyButton />
+          </div>
           <p className="mt-3.5 text-xs text-muted-foreground sm:mt-4 sm:text-sm">
             {site.requirements}
           </p>

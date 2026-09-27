@@ -69,11 +69,11 @@ struct AutoZoomTests {
     @Test func makeInitialSeedsZoomsOnlyWhenAsked() {
         let meta = Fixtures.meta(duration: 5)
         let events = [click(1), click(4), click(5.5)]
-        let plain = EditConfig.makeInitial(meta: meta, events: events, autoZoom: false)
+        let plain = EditConfig.makeInitial(meta: meta, events: events, defaults: ProjectDefaults(autoZoom: false))
         #expect(plain == EditConfig.initial(for: meta).with(segmentIDs: plain.segments))
         #expect(plain.zoom.keyframes.isEmpty)
 
-        let seeded = EditConfig.makeInitial(meta: meta, events: events, autoZoom: true)
+        let seeded = EditConfig.makeInitial(meta: meta, events: events, defaults: ProjectDefaults())
         // The click at 5.5 would start at 5.38 ≥ duration and is dropped.
         #expect(approx(seeded.zoom.keyframes.map(\.time), [0.88, 3.88]))
         #expect(seeded.segments.count == 1 && seeded.segments[0].end == 5)

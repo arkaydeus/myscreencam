@@ -40,12 +40,13 @@ public enum AutoZoom {
 }
 
 extension EditConfig {
-    /// The config a freshly opened recording starts with: ``initial(for:)`` plus, when `autoZoom` is on,
-    /// click zooms seeded by ``AutoZoom`` from `events` using the default zoom timing. Keyframes that would
-    /// start at or after the end of the recording are dropped.
-    public static func makeInitial(meta: RecordingMeta, events: [InputEvent], autoZoom: Bool) -> EditConfig {
+    /// The config a freshly opened recording starts with: ``initial(for:)`` with `defaults` applied plus, when
+    /// `defaults.autoZoom` is on, click zooms seeded by ``AutoZoom`` from `events` using the default zoom timing.
+    /// Keyframes that would start at or after the end of the recording are dropped.
+    public static func makeInitial(meta: RecordingMeta, events: [InputEvent], defaults: ProjectDefaults) -> EditConfig {
         var config = EditConfig.initial(for: meta)
-        if autoZoom {
+        defaults.apply(to: &config)
+        if defaults.autoZoom {
             config.zoom.keyframes = AutoZoom.keyframes(from: events, defaults: config.zoom.defaults)
                 .filter { meta.duration <= 0 || $0.time < meta.duration }
         }

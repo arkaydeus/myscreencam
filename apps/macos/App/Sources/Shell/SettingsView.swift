@@ -2,11 +2,12 @@ import AppKit
 import MyScreenCamCore
 import SwiftUI
 
-/// Settings window (⌘,): General, Subtitles and Updates, in the app theme.
+/// Settings window (⌘,): General, Defaults, Subtitles and Updates, in the app theme.
 struct SettingsView: View {
     var body: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettingsView() }
+            Tab("Defaults", systemImage: "slider.horizontal.3") { DefaultsSettingsView() }
             Tab("Subtitles", systemImage: "captions.bubble") { SubtitleSettingsView() }
             Tab("Updates", systemImage: "arrow.triangle.2.circlepath") { UpdateSettingsView() }
         }

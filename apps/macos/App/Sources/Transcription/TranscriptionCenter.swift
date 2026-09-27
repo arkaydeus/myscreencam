@@ -76,6 +76,7 @@ final class TranscriptionCenter {
     @ObservationIgnored weak var editors: EditorSessions?
     @ObservationIgnored weak var exports: ExportCenter?
     @ObservationIgnored private let client: any SpeechServiceManaging
+    @ObservationIgnored private let projectDefaults: @MainActor () -> ProjectDefaults
     @ObservationIgnored private let workerGate = SpeechWorkGate()
     @ObservationIgnored private var runner: Task<Void, Never>?
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
@@ -87,11 +88,13 @@ final class TranscriptionCenter {
 
     init(
         settings: SpeechSettings = SpeechSettings(), models: SpeechModels = SpeechModels(),
-        client: (any SpeechServiceManaging)? = nil
+        client: (any SpeechServiceManaging)? = nil,
+        projectDefaults: @escaping @MainActor () -> ProjectDefaults = { ProjectDefaultsStore.load() }
     ) {
         self.settings = settings
         self.models = models
         self.client = client ?? SpeechServiceClient()
+        self.projectDefaults = projectDefaults
         finishedObserver = NotificationCenter.default.addObserver(
             forName: .recordingFinished, object: nil, queue: .main
         ) { [weak self] note in
@@ -324,7 +327,7 @@ final class TranscriptionCenter {
             return editor.receiveTranscript(revision)
         }
         // Keep the read/modify/write on the main actor. Registering an editor cannot interleave with it.
-        var edit = try package.loadEffectiveEdit(meta: meta, autoZoom: Self.autoZoom)
+        var edit = try package.loadEffectiveEdit(meta: meta, defaults: projectDefaults())
         let receipt = edit.subtitles.receive(revision)
         try package.saveEdit(edit)
         return receipt
@@ -386,14 +389,11 @@ final class TranscriptionCenter {
 
     // MARK: Helpers
 
-    /// The editor's auto-zoom preference (used when a recording has no `edit.json` yet).
-    private static var autoZoom: Bool { UserDefaults.standard.bool(forKey: EditorModel.autoZoomDefaultsKey) }
-
     private static func load(_ package: RecordingPackage) async throws -> (RecordingMeta, EditConfig) {
-        let autoZoom = Self.autoZoom
+        let defaults = ProjectDefaultsStore.load()
         return try await Task.detached {
             let meta = try package.loadMeta()
-            let edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
+            let edit = try package.loadEffectiveEdit(meta: meta, defaults: defaults)
             return (meta, edit)
         }.value
     }

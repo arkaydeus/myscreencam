@@ -36,7 +36,7 @@ while IFS= read -r path; do
     canonical_owner="$(cd -P "$owner" && pwd)"
     eligible=0
     [[ "$canonical_owner" == */build/* ]] && eligible=1
-    for root in "${roots[@]}"; do
+    for root in ${roots[@]+"${roots[@]}"}; do
       [[ "$owner" == "$root"/* || "$canonical_owner" == "$root"/* ]] && eligible=1
     done
     [[ $eligible -eq 1 ]] || continue

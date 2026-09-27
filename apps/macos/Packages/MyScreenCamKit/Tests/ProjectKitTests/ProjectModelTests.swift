@@ -56,6 +56,25 @@ struct ProjectModelTests {
         #expect(try package.loadEdit() == edit)
     }
 
+    @Test func legacyPackageAppearsInLibraryAndCanBeRenamedOrTrashed() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "pk-legacy-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let legacyURL = root.appending(path: "Recording_old.msarec", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: legacyURL, withIntermediateDirectories: true)
+        let package = RecordingPackage(url: legacyURL)
+        try package.saveMeta(sampleMeta())
+        #expect(RecordingPackage.isPackage(legacyURL))
+        let library = RecordingLibrary(root: root, trasher: { url in try FileManager.default.removeItem(at: url) })
+        let scan = try await library.scan()
+        #expect(scan.items.count == 1)
+        #expect(scan.items.first?.package.url == legacyURL)
+        try library.rename(package, to: "Old recording")
+        #expect(try package.loadMeta().name == "Old recording")
+        try library.delete(package)
+        #expect(!FileManager.default.fileExists(atPath: legacyURL.path))
+    }
+
     @Test func effectiveEditSeedsClicksAndNormalizesSavedEdit() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "pk-edit-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -63,13 +82,15 @@ struct ProjectModelTests {
         let meta = sampleMeta()
         let click = InputEvent(t: 2, kind: .down, x: 0.25, y: 0.75, button: 0)
         try InputEventLog.encodeLine(click).write(to: package.url(PackageLayout.events))
-        let initial = try package.loadEffectiveEdit(meta: meta, autoZoom: true)
+        let initial = try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults())
         #expect(initial.zoom.keyframes.count == 1)
-        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: false).zoom.keyframes.isEmpty)
+        #expect(
+            try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults(autoZoom: false)).zoom.keyframes.isEmpty
+        )
         var saved = initial
         saved.zoom.keyframes = []
         try package.saveEdit(saved)
-        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: true).zoom.keyframes.isEmpty)
+        #expect(try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults()).zoom.keyframes.isEmpty)
     }
 
     @Test func initialEditReflectsMeta() {

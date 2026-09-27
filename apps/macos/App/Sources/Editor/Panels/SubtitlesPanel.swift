@@ -20,8 +20,11 @@ struct SubtitlesPanel: View {
             StatusSection(model: model, job: job)
             if model.edit.subtitles.candidateRevisionID != nil { CandidateBanner(model: model) }
             DisclosureGroup(isExpanded: $styleExpanded) {
-                SubtitleStyleControls(model: model)
-                    .padding(.top, 6)
+                VStack(alignment: .leading, spacing: 10) {
+                    SubtitleStyleControls(source: model)
+                    CuePositionNotes(model: model)
+                }
+                .padding(.top, 6)
             } label: {
                 HStack {
                     Text("Style & Position").font(.headline)
@@ -306,164 +309,27 @@ struct ConflictSheet: View {
 
 // MARK: - Style
 
-/// Drop shadow: direction, depth (distance), blur, colour and opacity.
-private struct ShadowControls: View {
+/// Under the shared style controls: per-cue positions and how to move a cue.
+private struct CuePositionNotes: View {
     let model: EditorModel
 
-    private var shadow: SubtitleShadow { model.edit.subtitles.style.shadow }
-    private static let percent: (Double) -> String = { String(format: "%.0f%%", $0 * 100) }
-
     var body: some View {
-        HStack {
-            Toggle("Shadow", isOn: model.binding(\.subtitles.style.shadow.enabled, "Subtitle Shadow"))
-            Spacer()
-            ColorPicker("", selection: model.colorBinding(\.subtitles.style.shadow.color, "Shadow Colour"))
-                .labelsHidden()
-                .disabled(!shadow.enabled)
-        }
-        if shadow.enabled {
-            ValueSlider(
-                title: "Angle", value: model.binding(\.subtitles.style.shadow.angle, "Shadow Angle"), range: 0...360,
-                step: 1, format: { String(format: "%.0f°", $0) }, model: model
-            )
-            .help("Direction the shadow falls (90° is straight down)")
-            ValueSlider(
-                title: "Depth", value: model.binding(\.subtitles.style.shadow.distance, "Shadow Depth"),
-                range: EditLimits.subtitleShadowDistance, step: 0.01, format: Self.percent, model: model
-            )
-            .help("How far the shadow falls, as a share of the font size")
-            ValueSlider(
-                title: "Blur", value: model.binding(\.subtitles.style.shadow.blur, "Shadow Blur"),
-                range: EditLimits.subtitleShadowBlur, step: 0.01, format: Self.percent, model: model)
-            ValueSlider(
-                title: "Opacity", value: model.binding(\.subtitles.style.shadow.opacity, "Shadow Opacity"),
-                range: 0...1, step: 0.01, format: Self.percent, model: model)
-        }
-    }
-}
-
-private struct SubtitleStyleControls: View {
-    let model: EditorModel
-
-    private var style: SubtitleStyle { model.edit.subtitles.style }
-    private static let families: [String] = NSFontManager.shared.availableFontFamilies.sorted()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            LabeledContent("Font") {
-                Picker("Font", selection: model.binding(\.subtitles.style.fontFamily, "Subtitle Font")) {
-                    Text("System").tag(String?.none)
-                    Divider()
-                    ForEach(Self.families, id: \.self) { Text($0).tag(String?.some($0)) }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 170)
-            }
-            HStack(spacing: 8) {
-                Toggle(isOn: model.binding(\.subtitles.style.bold, "Bold Subtitles")) {
-                    Image(systemName: "bold")
-                }
-                .toggleStyle(.button)
-                .help("Bold")
-                Toggle(isOn: model.binding(\.subtitles.style.italic, "Italic Subtitles")) {
-                    Image(systemName: "italic")
-                }
-                .toggleStyle(.button)
-                .help("Italic")
-                Toggle("Uppercase", isOn: model.binding(\.subtitles.style.uppercase, "Uppercase Subtitles"))
-                    .toggleStyle(.button)
-                    .help("Show all subtitle text in capitals")
-                Spacer()
-                ColorPicker("Text", selection: model.colorBinding(\.subtitles.style.textColor, "Subtitle Colour"))
-            }
+        let moved = model.edit.subtitles.cues.filter { $0.position != nil }.count
+        if moved > 0 {
             HStack {
-                Toggle(
-                    "Highlight spoken word",
-                    isOn: model.binding(\.subtitles.style.highlightWords, "Word Highlight"))
-                Spacer()
-                ColorPicker("", selection: model.colorBinding(\.subtitles.style.highlightColor, "Highlight Colour"))
-                    .labelsHidden()
-                    .disabled(!style.highlightWords)
-            }
-            .help("Colour each word as it's spoken")
-            if style.highlightWords, !model.edit.subtitles.cues.isEmpty,
-                !model.edit.subtitles.cues.contains(where: { !$0.words.isEmpty })
-            {
-                Text("No word timing in these subtitles (approximate or typed by hand), so no words are highlighted.")
+                Text(moved == 1 ? "1 subtitle has its own position" : "\(moved) subtitles have their own position")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-            if style.highlightWords {
-                ValueSlider(
-                    title: "Grow", value: model.binding(\.subtitles.style.highlightGrow, "Highlight Grow"),
-                    range: EditLimits.subtitleHighlightGrow, step: 0.01,
-                    format: { $0 == 0 ? "Off" : String(format: "+%.0f%%", $0 * 100) }, model: model
-                )
-                .help("How much bigger the spoken word is drawn")
-            }
-            ValueSlider(
-                title: "Size", value: model.binding(\.subtitles.style.size, "Subtitle Size"),
-                range: EditLimits.subtitleSize, step: 0.0025, format: { String(format: "%.1f%%", $0 * 100) },
-                model: model)
-            ValueSlider(
-                title: "Width", value: model.binding(\.subtitles.style.maxWidth, "Subtitle Width"),
-                range: EditLimits.subtitleMaxWidth, step: 0.01, format: { String(format: "%.0f%%", $0 * 100) },
-                model: model
-            )
-            .help("Widest line, as a share of the video width; longer text wraps onto the next line")
-            HStack(alignment: .bottom, spacing: 10) {
-                ValueSlider(
-                    title: "Outline", value: model.binding(\.subtitles.style.outlineWidth, "Subtitle Outline"),
-                    range: EditLimits.subtitleOutline, step: 0.01,
-                    format: { $0 == 0 ? "Off" : String(format: "%.0f%%", $0 * 100) },
-                    model: model)
-                ColorPicker("", selection: model.colorBinding(\.subtitles.style.outlineColor, "Outline Colour"))
-                    .labelsHidden()
-                    .disabled(style.outlineWidth == 0)
-            }
-            HStack {
-                Toggle("Background", isOn: model.binding(\.subtitles.style.background, "Subtitle Background"))
                 Spacer()
-                ColorPicker("", selection: model.colorBinding(\.subtitles.style.backgroundColor, "Background Colour"))
-                    .labelsHidden()
-                    .disabled(!style.background)
+                Button("Reset") { model.resetAllCuePositions() }
+                    .controlSize(.small)
             }
-            if style.background {
-                ValueSlider(
-                    title: "Opacity", value: model.binding(\.subtitles.style.backgroundOpacity, "Background Opacity"),
-                    range: 0...1, step: 0.01, format: { String(format: "%.0f%%", $0 * 100) }, model: model)
-            }
-            ShadowControls(model: model)
-            Divider()
-            Picker("Position", selection: model.binding(\.subtitles.placement.anchor, "Subtitle Position")) {
-                Text("Top").tag(SubtitlePlacement.Anchor.top)
-                Text("Middle").tag(SubtitlePlacement.Anchor.middle)
-                Text("Bottom").tag(SubtitlePlacement.Anchor.bottom)
-            }
-            .pickerStyle(.segmented)
-            if model.edit.subtitles.placement.anchor != .middle {
-                ValueSlider(
-                    title: "Margin", value: model.binding(\.subtitles.placement.margin, "Subtitle Margin"),
-                    range: EditLimits.subtitleMargin, step: 0.005, format: { String(format: "%.1f%%", $0 * 100) },
-                    model: model)
-            }
-            let moved = model.edit.subtitles.cues.filter { $0.position != nil }.count
-            if moved > 0 {
-                HStack {
-                    Text(moved == 1 ? "1 subtitle has its own position" : "\(moved) subtitles have their own position")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Reset") { model.resetAllCuePositions() }
-                        .controlSize(.small)
-                }
-            }
-            Text(
-                "Drag a subtitle in the preview (while paused) to move just that one, or drag its left or right edge to change its width."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
+        Text(
+            "Drag a subtitle in the preview (while paused) to move just that one, or drag its left or right edge to change its width."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 

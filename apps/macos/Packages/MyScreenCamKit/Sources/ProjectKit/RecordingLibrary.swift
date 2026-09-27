@@ -22,7 +22,7 @@ public struct LibraryItem: Sendable, Equatable, Identifiable {
     public var id: URL { package.url }
 }
 
-/// A `.mscam` folder that couldn't be loaded. The scan skips it instead of failing.
+/// A recording package that couldn't be loaded. The scan skips it instead of failing.
 public struct LibraryFailure: Error, Sendable, Equatable, Identifiable {
     public var url: URL
     /// Human-readable reason (for logs / a "damaged recordings" UI).
@@ -56,7 +56,7 @@ public struct RecordingLibrary: Sendable {
     public enum LibraryError: Error, Sendable, Equatable {
         /// The new name is empty after trimming whitespace.
         case emptyName
-        /// The URL isn't a `.mscam` package; refused so nothing else is ever trashed.
+        /// The URL isn't a supported recording package; refused so nothing else is ever trashed.
         case notAPackage(URL)
     }
 
@@ -71,7 +71,7 @@ public struct RecordingLibrary: Sendable {
         self.trasher = trasher ?? { url in try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
     }
 
-    /// Loads every `.mscam` package directly inside ``root`` (metas are read concurrently). A missing root
+    /// Loads every `.mscam` or `.msarec` package directly inside ``root`` (metas are read concurrently). A missing root
     /// yields an empty scan.
     /// - Throws: only when the root exists but can't be listed.
     public func scan() async throws -> LibraryScan {
@@ -86,7 +86,7 @@ public struct RecordingLibrary: Sendable {
         // listing may resolve symlinks, e.g. /var → /private/var).
         let candidates =
             urls
-            .filter { $0.pathExtension == PackageLayout.packageExtension }
+            .filter { PackageLayout.supportsExtension($0.pathExtension) }
             .map { root.appending(path: $0.lastPathComponent, directoryHint: .isDirectory) }
 
         let outcomes = await withTaskGroup(of: Result<LibraryItem, LibraryFailure>.self) { group in
@@ -161,7 +161,7 @@ public struct RecordingLibrary: Sendable {
 
     /// Moves the package to the Trash (reversible from Finder).
     public func delete(_ package: RecordingPackage) throws {
-        guard package.url.pathExtension == PackageLayout.packageExtension else {
+        guard PackageLayout.supportsExtension(package.url.pathExtension) else {
             throw LibraryError.notAPackage(package.url)
         }
         try trasher(package.url)

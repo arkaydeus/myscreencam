@@ -211,6 +211,137 @@ struct AppStateTests {
         #expect(try model.package.loadEdit()?.background.padding == 0.27)
     }
 
+    @Test func resetEditsRebuildsFromDefaultsEvenWithSavedOrCorruptEdit() async throws {
+        let (root, package, meta) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var saved = EditConfig.initial(for: meta)
+        saved.zoom.enabled = false
+        try package.saveEdit(saved)
+        var defaults = ProjectDefaults()
+        defaults.zoomTiming.scale = 2.3
+        defaults.subtitleStyle.uppercase = true
+
+        let existing = try await EditorLoader.loadProject(at: package.url, defaults: defaults, resetEdit: false)
+        #expect(!existing.edit.zoom.enabled)
+        let reset = try await EditorLoader.loadProject(at: package.url, defaults: defaults, resetEdit: true)
+        #expect(reset.edit.zoom.enabled)
+        #expect(reset.edit.zoom.defaults.scale == 2.3)
+        #expect(reset.edit.subtitles.style.uppercase)
+
+        try Data("invalid json".utf8).write(to: package.url("edit.json"))
+        do {
+            _ = try await EditorLoader.loadProject(at: package.url, defaults: defaults, resetEdit: false)
+            Issue.record("Expected a corrupt edit error")
+        } catch is DecodingError {
+            Issue.record("The decoding error must be mapped to corruptEdit")
+        } catch let error as EditorLoadError {
+            guard case .corruptEdit = error else { Issue.record("Expected corruptEdit, got \(error)"); return }
+        }
+        let recovered = try await EditorLoader.loadProject(at: package.url, defaults: defaults, resetEdit: true)
+        #expect(recovered.edit.zoom.defaults.scale == 2.3)
+        #expect(recovered.edit.subtitles.style.uppercase)
+    }
+
+    @Test func firstLibraryExportPersistsDefaultsForLaterUses() throws {
+        let (root, package, meta) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var defaults = ProjectDefaults()
+        defaults.zoomTiming.scale = 2.1
+        defaults.subtitleStyle.uppercase = true
+        defaults.subtitlePlacement.anchor = .top
+        let first = try package.loadOrCreateEdit(meta: meta, defaults: defaults)
+        #expect(try package.loadEdit() == first)
+
+        defaults.zoomTiming.scale = 1.2
+        defaults.subtitleStyle.uppercase = false
+        defaults.subtitlePlacement.anchor = .bottom
+        let later = try package.loadOrCreateEdit(meta: meta, defaults: defaults)
+        #expect(later == first)
+        #expect(later.zoom.defaults.scale == 2.1)
+        #expect(later.subtitles.style.uppercase)
+        #expect(later.subtitles.placement.anchor == .top)
+    }
+
+    @Test func firstTranscriptionUsesProjectDefaults() async throws {
+        let (root, package, meta) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try InputEventLog.encodeLine(InputEvent(t: 1, kind: .down, x: 0.5, y: 0.5, button: 0))
+            .write(to: package.url(PackageLayout.events))
+        var defaults = ProjectDefaults()
+        defaults.autoZoom = true
+        defaults.zoomTiming.scale = 2.4
+        defaults.subtitleStyle.uppercase = true
+        defaults.subtitlePlacement.anchor = .top
+        let center = TranscriptionCenter(projectDefaults: { defaults })
+        #expect(try await center.commit(timedRevision(), to: package, meta: meta) == .adopted)
+        let edit = try #require(try package.loadEdit())
+        #expect(edit.zoom.defaults.scale == 2.4)
+        #expect(edit.zoom.keyframes.count == 1)
+        #expect(edit.zoom.keyframes.first?.scale == 2.4)
+        #expect(edit.subtitles.style.uppercase)
+        #expect(edit.subtitles.placement.anchor == .top)
+        #expect(!edit.subtitles.cues.isEmpty)
+    }
+
+    @Test func groupMoveClampsTogetherAndSelectedEditsUndoTogether() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = ZoomKeyframe(time: 0.4)
+        let second = ZoomKeyframe(time: 1.2)
+        model.update("Seed") { $0.zoom.keyframes = [first, second] }
+        let ids: Set<ZoomKeyframe.ID> = [first.id, second.id]
+        let original = [first.id: first.time, second.id: second.time]
+        model.moveKeyframes(original, by: -10)
+        #expect(abs(model.edit.zoom.keyframes[0].time) < 1e-9)
+        #expect(abs(model.edit.zoom.keyframes[1].time - 0.8) < 1e-9)
+        model.moveKeyframes(original, by: 10)
+        #expect(abs(model.edit.zoom.keyframes[0].time - 1.2) < 1e-9)
+        #expect(abs(model.edit.zoom.keyframes[1].time - 2) < 1e-9)
+
+        let undo = UndoManager()
+        model.undoManager = undo
+        model.updateKeyframes(ids, "Change Zooms") { $0.scale = 2.5 }
+        #expect(model.edit.zoom.keyframes.allSatisfy { $0.scale == 2.5 })
+        undo.undo()
+        #expect(model.edit.zoom.keyframes.allSatisfy { $0.scale == first.scale })
+        #expect(!undo.canUndo)
+        await model.close()
+    }
+
+    @Test func deletingZoomsPrunesSelectionAndAnchorFallsBackToEarliest() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = ZoomKeyframe(time: 0.3)
+        let second = ZoomKeyframe(time: 1.1)
+        model.update("Seed") { $0.zoom.keyframes = [first, second] }
+        model.selection = .keyframes([first.id, second.id])
+        model.keyframeAnchor = second.id
+        #expect(model.selectedKeyframe?.id == second.id)
+        model.update("Remove Second") { $0.zoom.keyframes.removeAll { $0.id == second.id } }
+        #expect(model.selectedKeyframeIDs == [first.id])
+        #expect(model.selectedKeyframe?.id == first.id)
+        model.deleteKeyframes([first.id])
+        #expect(model.selection == nil)
+        await model.close()
+    }
+
+    @Test func plainClickKeepsZoomGroupForDragAndCollapsesWithoutDrag() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = ZoomKeyframe(time: 0.3)
+        let second = ZoomKeyframe(time: 1.1)
+        model.update("Seed") { $0.zoom.keyframes = [first, second] }
+        model.selection = .keyframes([first.id, second.id])
+        #expect(KeyframeClick.begin(second.id, modifier: .replace, model: model))
+        #expect(model.selectedKeyframeIDs == [first.id, second.id])
+        KeyframeClick.end(second.id, moving: true, model: model)
+        #expect(model.selectedKeyframeIDs == [first.id, second.id])
+        #expect(KeyframeClick.begin(second.id, modifier: .replace, model: model))
+        KeyframeClick.end(second.id, moving: false, model: model)
+        #expect(model.selectedKeyframeIDs == [second.id])
+        await model.close()
+    }
+
     @Test func transcriptCommitsThroughOpenEditorAsAdoptedThenCandidate() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

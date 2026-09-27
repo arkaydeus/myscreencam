@@ -1,4 +1,4 @@
-import { DownloadButton, LogoMark, MoreLink } from "@/components/site/brand";
+import { BuyButton, DownloadButton, LogoMark, MoreLink } from "@/components/site/brand";
 import { CanvasDemo } from "@/components/site/canvas-demo";
 import { site } from "@/lib/site";
 
@@ -16,6 +16,7 @@ export function Hero() {
       </p>
       <div className="mt-7 flex flex-col items-center gap-4 sm:mt-9 sm:flex-row sm:justify-center sm:gap-7">
         <DownloadButton />
+        <BuyButton />
         <MoreLink href="#how">See how it works</MoreLink>
       </div>
       <p className="mt-4 text-xs text-muted-foreground sm:text-sm">{site.requirements}</p>

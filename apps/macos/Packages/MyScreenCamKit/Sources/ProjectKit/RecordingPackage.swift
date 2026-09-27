@@ -26,6 +26,11 @@ public enum PackageLayout {
     /// Folder extension. Declared by the app as the `com.myscreencam.recording` package type (conforms to
     /// `com.apple.package`), so Finder shows a recording as one document and Quick Look can thumbnail it.
     public static let packageExtension = "mscam"
+    public static let legacyPackageExtension = "msarec"
+
+    public static func supportsExtension(_ value: String) -> Bool {
+        [packageExtension, legacyPackageExtension].contains(value.lowercased())
+    }
     public static let packageUTType = "com.myscreencam.recording"
 
     /// `Recording_YYYYMMDD_HHMMSS_xxxxxxxx.mscam` (local time).
@@ -77,9 +82,9 @@ public struct RecordingPackage: Sendable, Hashable {
         return RecordingPackage(url: folder)
     }
 
-    /// A `.mscam` folder that contains `meta.json`.
+    /// A `.mscam` or `.msarec` folder that contains `meta.json`.
     public static func isPackage(_ url: URL) -> Bool {
-        url.pathExtension == PackageLayout.packageExtension
+        PackageLayout.supportsExtension(url.pathExtension)
             && FileManager.default.fileExists(atPath: url.appending(path: PackageLayout.meta).path)
     }
 
@@ -107,10 +112,19 @@ public struct RecordingPackage: Sendable, Hashable {
     }
 
     /// The edit shown by the editor and used for a direct Library export.
-    public func loadEffectiveEdit(meta: RecordingMeta, autoZoom: Bool) throws -> EditConfig {
+    public func loadEffectiveEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
         if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
-        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), autoZoom: autoZoom)
+        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
             .normalized(duration: meta.duration)
+    }
+
+    /// Fixes the first-use defaults for a direct Library export. An existing edit is never overwritten.
+    public func loadOrCreateEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
+        if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
+        let initial = try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
+            .normalized(duration: meta.duration)
+        try saveEdit(initial)
+        return initial
     }
 
     /// Atomic write (temp file + rename), so a crash never leaves a half-written `edit.json`.

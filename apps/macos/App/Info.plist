@@ -45,6 +45,7 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>com.myscreencam.recording</string>
+				<string>com.myscreenart.recording</string>
 			</array>
 		</dict>
 	</array>
@@ -66,6 +67,22 @@
 				<array>
 					<string>mscam</string>
 				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.myscreenart.recording</string>
+			<key>UTTypeDescription</key>
+			<string>MyScreenArt Recording</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>com.apple.package</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array><string>msarec</string></array>
 			</dict>
 		</dict>
 	</array>
