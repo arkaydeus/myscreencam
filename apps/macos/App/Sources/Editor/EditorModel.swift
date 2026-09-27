@@ -176,6 +176,15 @@ final class EditorModel {
         setEditState(next)
     }
 
+    /// Applies a change the user didn't make (data derived from the package), without an undo step.
+    func applyDerived(_ change: (inout EditConfig) -> Void) {
+        var copy = edit
+        change(&copy)
+        let next = copy.normalized(duration: meta.duration)
+        guard next != edit else { return }
+        setEditState(next)
+    }
+
     /// Mutates the edit through ``apply(_:action:coalesce:)``.
     func update(_ action: String, coalesce: AnyHashable? = nil, _ change: (inout EditConfig) -> Void) {
         var copy = edit

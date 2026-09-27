@@ -128,6 +128,8 @@ public enum SubtitleMerge {
             if unambiguous || keep.contains(cue.id) {
                 var carried = cue
                 carried.unitIDs = inside.map(\.unit.id)
+                carried.words = SubtitleWords.build(
+                    text: newText, units: inside.map { ($0.text, $0.unit.timing) })
                 pinned.append(carried)
                 claimed.formUnion(carried.unitIDs)
                 if unambiguous { reapplied += 1 }

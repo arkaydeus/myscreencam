@@ -257,6 +257,30 @@ struct AppStateTests {
         await model.close()
     }
 
+    @Test func cueWidthDragIsOneUndoStepAndCanBecomeTheDefault() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cue = SubtitleCue(start: 0, end: 1, text: "Hello there")
+        model.update("Add") { $0.subtitles.cues = [cue] }
+        let undo = UndoManager()
+        model.undoManager = undo
+
+        model.beginContinuousChange()
+        model.setCueWidth(cue.id, 0.6)
+        model.setCueWidth(cue.id, 0.45)
+        model.endContinuousChange()
+        #expect(model.edit.subtitles.cues.first?.maxWidth == 0.45)
+        undo.undo()
+        #expect(model.edit.subtitles.cues.map(\.id) == [cue.id])
+        #expect(model.edit.subtitles.cues.first?.maxWidth == nil)
+
+        model.setCueWidth(cue.id, 0.45)
+        model.useCueWidthAsDefault(cue.id)
+        #expect(model.edit.subtitles.style.maxWidth == 0.45)
+        #expect(model.edit.subtitles.cues.first?.maxWidth == nil)
+        await model.close()
+    }
+
     @Test func steppedSliderKeyboardAndDragKeepSeparateUndoSteps() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

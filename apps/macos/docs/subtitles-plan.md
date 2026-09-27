@@ -134,8 +134,36 @@ Tests cover:
   audio file with either engine and reports cold/warm load time, real-time factor, peak memory and cancellation
   latency. It also compares the 8-bit and BF16 aligners on timing fixtures, measuring the median and p95 boundary
   error. Results go in `docs/speech-integration.md`.
-- **Not built** (and not required by the spec): karaoke word highlighting, live transcription while recording,
-  translation and diarisation. The data model keeps them possible.
+- **Word highlighting** (added after the first release; *Highlight spoken word* in the Subtitles style, off by
+  default, yellow `#FFD60A`): the word being spoken is filled in the highlight colour, in preview and export.
+  Each cue stores `words` (text and source times), taken from acoustic unit timing only (TDT or forced
+  alignment), so coarse and hand-made cues are never highlighted. A word stays lit until the next one starts.
+  When drawing, the stored words are matched to the cue's current text by a longest common subsequence of
+  their letters, so a correction keeps the timing of the words it didn't change. Cues made before this get
+  their words from the transcript when the editor opens (`SubtitleSettings.fillWordTimings`). Rasters are
+  cached per highlighted word, so text is laid out again only when the word changes. Re-time doesn't
+  return word timings yet, so after it, only the words that match the old recognition stay lit.
+- **Grow, shadow and width** (style options): the highlighted word can be drawn bigger (*Grow*, 0–50%, default
+  10%). It scales about its horizontal centre on the line's baseline, so it grows upwards and shares the
+  baseline with the other words, which move apart by half the extra width each side. The box is sized once per
+  cue for whichever word is grown (each line's width plus its widest word's growth, and room above and below
+  for the top and bottom lines' ascent and descent growth), so it never changes size while the highlight moves
+  and grown text stays inside it. Line breaks are those of the text at normal size. Cues without word timing
+  get no extra room. A drop shadow (angle, depth, blur, colour,
+  opacity, lengths in ems) falls behind the text and outline together; the background box casts none. Rasters
+  carry a transparent bleed around the box for the shadow (and a small ink margin when words grow), so neither is
+  clipped and the box doesn't move. *Width* sets `maxWidth`, the widest line before text wraps (10–100% of the canvas width).
+- **Per-subtitle width**: dragging a box's left or right edge in the paused preview sets that cue's own
+  `maxWidth` (`SubtitleCue.maxWidth`, nil = the style's; `SubtitleSettings.style(for:)` applies it). Both edges
+  move together about the box's centre, so the centred text keeps its place and any own position is untouched;
+  guide lines show the wrap width while the box reflows to the text inside it. The whole drag is one undo step.
+  The cue's inspector offers *Reset Width* and *Use as Default Width*. An own width counts as a user edit, so
+  adopting a new transcript keeps it.
+- **Uppercase** (style option): cues are drawn in capitals (`SubtitleStyle.displayText`). It's display only, like
+  the font: the cue text in the editor and the .srt keep the case as written. Boxes are measured on the drawn
+  text, and highlight ranges index it, since uppercasing can change the length (ß → SS).
+- **Not built** (and not required by the spec): live transcription while recording, translation and diarisation.
+  The data model keeps them possible.
 
 ## 8. Defaults I'll use unless you say otherwise
 - Audio source: microphone, falling back to system audio. It can be changed per recording in the panel.
