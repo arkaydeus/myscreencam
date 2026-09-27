@@ -37,7 +37,7 @@ final class AppShell {
         guard !started else { return }
         started = true
         // The Midnight Glass theme is dark-only; menus, alerts and panels follow it.
-        NSApp.appearance = AppTheme.appearance
+        AppTheme.applyAppearance()
         dockIcon.start()
         observeHotkeyPreference()
         updates.start()

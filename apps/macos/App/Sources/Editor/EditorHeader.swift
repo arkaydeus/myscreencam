@@ -185,25 +185,28 @@ struct PresetNameSheet: View {
                 "Saves the webcam, audio, cursor, zoom defaults and background. A preset with the same name is replaced."
             )
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.themeSecondaryText)
             .fixedSize(horizontal: false, vertical: true)
             TextField("Preset name", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { save() }
             if let error {
-                Text(error).foregroundStyle(.red).font(.callout)
+                Text(error).foregroundStyle(Color.themeDestructive).font(.callout)
             }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(.themed)
                     .keyboardShortcut(.cancelAction)
                 Button("Save") { save() }
+                    .buttonStyle(.themedPrimary)
                     .keyboardShortcut(.defaultAction)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || saving)
             }
         }
         .padding(20)
         .frame(width: 380)
+        .themedWindow()
     }
 
     private func save() {

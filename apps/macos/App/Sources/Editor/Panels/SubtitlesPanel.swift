@@ -253,7 +253,7 @@ private struct CandidateBanner: View {
     }
 }
 
-private struct ConflictSheet: View {
+struct ConflictSheet: View {
     let model: EditorModel
 
     var body: some View {
@@ -261,7 +261,7 @@ private struct ConflictSheet: View {
             Text("Resolve Changed Subtitles").font(.headline)
             Text("The new transcript heard something different where you edited these subtitles.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.themeSecondaryText)
             if let pending = model.pendingMerge {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
@@ -292,12 +292,15 @@ private struct ConflictSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { model.pendingMerge = nil }
+                    .buttonStyle(.themed)
                 Button("Use New Transcript") { model.finishPendingMerge() }
+                    .buttonStyle(.themedPrimary)
                     .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
         .frame(width: 440)
+        .themedWindow()
     }
 }
 

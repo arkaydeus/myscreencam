@@ -8,6 +8,10 @@ enum AppTheme {
     /// The app-wide appearance: menus, alerts, save panels and system controls render dark to match.
     static var appearance: NSAppearance? { NSAppearance(named: .darkAqua) }
 
+    static func applyAppearance() {
+        NSApp.appearance = appearance
+    }
+
     // MARK: Surfaces
 
     static let windowBackground = NSColor(hex: 0x070A14)

@@ -3,7 +3,7 @@
 Unit and integration tests cover everything that doesn't need TCC permissions. This checklist covers what only a real run can prove.
 
 **Setup:**
-1. Build and launch: `mise run build:perf && scripts/dev/run.sh`, or `mise run run` for Debug.
+1. Build and launch from `apps/macos` with `mise run run`.
 2. Grant **MyScreenArt Dev** Screen & System Audio Recording, Camera, Microphone and Input Monitoring, using the Recorder's Permissions card.
 3. Relaunch after granting Screen Recording and Input Monitoring.
 
@@ -41,3 +41,10 @@ Run `scripts/perf/sample.py --match '<app path>/Contents/MacOS' --duration 60` f
 ## Editor / export (with a real recording)
 - [ ] Keyboard shortcuts with the app frontmost (Space, arrows, C, Delete, Esc), plus ⌘Z / ⇧⌘Z undo.
 - [ ] Rename, delete, presets, Export sheet progress + Cancel on a long recording, notification when finished.
+
+## Midnight Glass appearance
+- [ ] Set macOS Appearance to Light, relaunch with `mise run run`, and confirm the Library, Recorder, Editor and Settings windows still have navy backgrounds and green controls. Menus and system alerts should be dark.
+- [ ] In the editor, choose Presets > Save Current as Preset…; confirm the sheet background and title bar are navy, its description is muted blue, its Cancel button is dark and its Save button is green. If saving fails, confirm the error text uses the theme's pink.
+- [ ] Edit a subtitle, regenerate the transcript with changed words, and open Resolve Changed Subtitles. Confirm the sheet background and title bar are navy, its description is muted blue, Cancel is dark and Use New Transcript is green.
+- [ ] Open Settings and Export. Confirm both use navy backgrounds, readable text and green primary actions, including Export progress and completion states. Check the window edges and sheet margins for default gray strips.
+- [ ] If an older build stored `shell.appearance=light`, relaunch and confirm the app remains dark and Settings has no Appearance picker.
