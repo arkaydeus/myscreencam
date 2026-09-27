@@ -62,13 +62,14 @@ Installed copies pick the new version up on their next check: every 6 h in Relea
 - the working tree is dirty;
 - the releases repo is missing or private;
 - `v<version>` already exists there;
-- notarisation or the appcast is switched off.
+- notarisation, the DMG or the appcast is switched off.
 
 ### Other runs
 - `mise run release`: the full build, notarisation and appcast, but no upload (output in `build/release/`).
 - `mise run release:dmg`: a signed DMG without notarisation or an appcast, for local testing only. Gatekeeper rejects it on other Macs.
+- `mise run install`: a Developer ID Release build (no notarisation, DMG or appcast) installed as `/Applications/MyScreenArt.app`, replacing and first quitting any copy there. Locally built apps aren't quarantined, so it opens without notarisation. `mise run install -- --open` also launches it; `--skip-build` reinstalls the last build.
 
-Flags: `--publish`, `--notes FILE`, `--no-notarize`, `--no-appcast`, `--output DIR`.
+Flags: `--publish`, `--notes FILE`, `--no-notarize`, `--no-appcast`, `--no-dmg` (needs `--no-appcast`), `--output DIR`.
 
 Use `MSA_VERSION=1.2.3 scripts/release/release.sh --print-config` to inspect the resolved build paths, website DMG asset and source tag without building or publishing.
 

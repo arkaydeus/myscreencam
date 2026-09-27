@@ -82,6 +82,10 @@ run = "scripts/release/release.sh --publish"
 description = "Local Developer ID build + signed DMG, without notarisation or appcast"
 run = "scripts/release/release.sh --no-notarize --no-appcast"
 
+[tasks.install]
+description = "Build the Developer ID Release app (no notarisation or DMG) and install it to /Applications"
+run = "scripts/release/install.sh"
+
 [tasks.check]
 description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
 depends = ["lint", "test", "test:app", "test:speech-engines", "test:scripts"]

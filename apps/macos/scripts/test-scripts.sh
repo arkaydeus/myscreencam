@@ -51,6 +51,7 @@ bash -n "$root/scripts/dev/run.sh"
 bash -n "$root/scripts/dev/unregister-builds.sh"
 bash -n "$root/scripts/dev/xcodebuild.sh"
 bash -n "$root/scripts/release/release.sh"
+bash -n "$root/scripts/release/install.sh"
 run_output="$(HOME="$tmp/home" MSA_DERIVED_DATA="$tmp/DerivedData" MSA_TEST_OPEN_ARGS="$tmp/open-args" \
   MSA_LSREGISTER="$tmp/bin/lsregister" MSA_TEST_LS_ARGS="$tmp/ls-run-args" PATH="$tmp/bin:$PATH" "$root/scripts/dev/run.sh")"
 [[ "$(cat "$tmp/ls-run-args")" == "-f -R -trusted $tmp/DerivedData/Build/Products/Debug/MyScreenArt Dev.app" ]]
@@ -153,4 +154,20 @@ set -e
   "$release_archive/Contents/PlugIns/MyScreenArtThumbnail.appex" "$release_app" \
   "$release_app/Contents/PlugIns/MyScreenArtThumbnail.appex")" ]]
 
-echo 'Script checks passed.'
+# The appcast is generated from the DMG, so skipping only the DMG is refused before anything is built.
+set +e
+"$root/scripts/release/release.sh" --no-notarize --no-dmg --output "$tmp/no-dmg" >/dev/null 2>&1
+no_dmg_status=$?
+set -e
+[[ $no_dmg_status -eq 2 && ! -e "$tmp/no-dmg" ]]
+
+# install.sh replaces the installed copy with the exported build and registers it; it never builds with --skip-build.
+install_out="$tmp/install-release"
+mkdir -p "$install_out/export/MyScreenArt.app/Contents/PlugIns/MyScreenArtThumbnail.appex" "$tmp/Install/MyScreenArt.app/Old"
+MSA_INSTALL_DIR="$tmp/Install" MSA_LSREGISTER="$tmp/bin/lsregister" MSA_TEST_LS_ARGS="$tmp/ls-install-args" \
+  PATH="$tmp/bin:$PATH" "$root/scripts/release/install.sh" --skip-build --output "$install_out" >/dev/null
+[[ -d "$tmp/Install/MyScreenArt.app/Contents/PlugIns/MyScreenArtThumbnail.appex" ]]
+[[ ! -e "$tmp/Install/MyScreenArt.app/Old" && ! -e "$tmp/Install/MyScreenArt.app.installing" ]]
+[[ "$(cat "$tmp/ls-install-args")" == "-f -R -trusted $tmp/Install/MyScreenArt.app" ]]
+
+echo 'Script checks passed.' 

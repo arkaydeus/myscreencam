@@ -3,6 +3,7 @@
 #   mise //apps/macos:<task>       # macOS app (build, run, test, lint, release, ...)
 #   mise //apps/web:<task>         # marketing site (dev, build, lint, format, ...)
 #   mise run app                   # build and launch the Dev app
+#   mise run install:app           # build the Release app and install it to /Applications
 #   mise run web                   # the site's dev server
 #   mise run start                 # both of the above
 #   mise run check                 # every project's local gate
@@ -33,6 +34,10 @@ depends = ["//apps/macos:run", "//apps/web:dev"]
 [tasks.app]
 description = "Build and launch this worktree's Debug app (same as //apps/macos:run)"
 depends = ["//apps/macos:run"]
+
+[tasks."install:app"]
+description = "Build the Release app and install it to /Applications (same as //apps/macos:install)"
+depends = ["//apps/macos:install"]
 
 [tasks.web]
 description = "Start the site's Next.js dev server (same as //apps/web:dev)"

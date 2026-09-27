@@ -74,6 +74,7 @@ mise run format         # swift-format in place
 mise run doctor         # toolchain/signing/build diagnostics
 mise run perf:sample -- --match 'MyScreenArt Dev.app/Contents/MacOS' --duration 60
 mise run release:dmg    # local Developer ID build + DMG (no notarisation / appcast)
+mise run install        # Developer ID Release build installed to /Applications (-- --open to launch)
 mise run release        # full release pipeline; see docs/release.md
 mise run clean          # also unregisters stale builds
 mise run unregister     # unregister stale MyScreenArt builds from every worktree

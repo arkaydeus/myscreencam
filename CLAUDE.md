@@ -17,6 +17,7 @@ mise runs everything. The root is a mise monorepo (`monorepo_root = true`), and 
 mise run setup               # once: every project's tools (XcodeGen, bun, node) + bun install
 mise tasks ls --all          # every task in every project
 mise run app                 # build and launch the Dev app (same as mise //apps/macos:run)
+mise run install:app         # build the Release app and install it to /Applications (same as mise //apps/macos:install)
 mise run web                 # marketing site on http://localhost:3000 (same as mise //apps/web:dev)
 mise run start               # both of the above
 mise run check               # every project's local gate

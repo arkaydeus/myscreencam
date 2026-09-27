@@ -3,7 +3,7 @@
 # Sparkle appcast and (with --publish) uploads both to the public releases repo. Runs entirely on this Mac.
 # See docs/release.md.
 #
-#   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--output DIR]
+#   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--no-dmg] [--output DIR]
 #   MSA_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and source tag
 #
 # Environment:
@@ -18,6 +18,7 @@ set -euo pipefail
 
 notarize=1
 appcast=1
+dmg_enabled=1
 publish=0
 print_config=0
 notes=""
@@ -30,6 +31,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-notarize) notarize=0 ;;
     --no-appcast) appcast=0 ;;
+    --no-dmg) dmg_enabled=0 ;;
     --publish) publish=1 ;;
     --print-config) print_config=1 ;;
     --notes) notes="$2"; shift ;;
@@ -63,8 +65,12 @@ fi
 
 step() { printf '\n==> %s\n' "$*"; }
 
+# The appcast is generated from the DMG.
+[[ $dmg_enabled -eq 1 || $appcast -eq 0 ]] || { echo "--no-dmg needs --no-appcast" >&2; exit 2; }
+
 if [[ $publish -eq 1 ]]; then
-  [[ $notarize -eq 1 && $appcast -eq 1 ]] || { echo "--publish needs notarisation and the appcast" >&2; exit 2; }
+  [[ $notarize -eq 1 && $appcast -eq 1 && $dmg_enabled -eq 1 ]] \
+    || { echo "--publish needs notarisation, the DMG and the appcast" >&2; exit 2; }
   [[ -z "$notes" || -f "$notes" ]] || { echo "Release notes file not found: $notes" >&2; exit 2; }
   gh repo view "$releases_repo" --json visibility --jq .visibility | grep -qx PUBLIC \
     || { echo "$releases_repo must exist and be public (Sparkle downloads from it)" >&2; exit 2; }
@@ -124,21 +130,25 @@ else
   echo "Skipping notarisation (--no-notarize): Gatekeeper will reject this build on other Macs."
 fi
 
-step "Building $(basename "$dmg")"
-staging="$out/dmg-staging"
-mkdir -p "$staging"
-ditto "$app" "$staging/MyScreenArt.app"
-ln -s /Applications "$staging/Applications"
-rm -f "$dmg"
-hdiutil create -volname "MyScreenArt $version" -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg" -quiet
-rm -rf "$staging"
-codesign --sign "$identity" --timestamp "$dmg"
-codesign --verify --verbose=2 "$dmg"
+if [[ $dmg_enabled -eq 1 ]]; then
+  step "Building $(basename "$dmg")"
+  staging="$out/dmg-staging"
+  mkdir -p "$staging"
+  ditto "$app" "$staging/MyScreenArt.app"
+  ln -s /Applications "$staging/Applications"
+  rm -f "$dmg"
+  hdiutil create -volname "MyScreenArt $version" -srcfolder "$staging" -fs HFS+ -format UDZO -ov "$dmg" -quiet
+  rm -rf "$staging"
+  codesign --sign "$identity" --timestamp "$dmg"
+  codesign --verify --verbose=2 "$dmg"
 
-if [[ $notarize -eq 1 ]]; then
-  notarize_file "$dmg"
-  xcrun stapler staple "$dmg"
-  spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+  if [[ $notarize -eq 1 ]]; then
+    notarize_file "$dmg"
+    xcrun stapler staple "$dmg"
+    spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+  fi
+else
+  echo "Skipping the DMG (--no-dmg)."
 fi
 
 if [[ $appcast -eq 1 ]]; then
@@ -188,6 +198,6 @@ fi
 
 step "Done: MyScreenArt $version ($build)"
 echo "App: $app"
-echo "DMG: $dmg"
+[[ $dmg_enabled -eq 1 ]] && echo "DMG: $dmg"
 [[ $appcast -eq 1 ]] && echo "Appcast: $out/appcast.xml"
 exit 0
