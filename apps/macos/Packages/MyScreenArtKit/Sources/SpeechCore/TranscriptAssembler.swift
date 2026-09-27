@@ -53,7 +53,13 @@ public enum TranscriptAssembler {
         var partial = false
         let prepared = input.prepared
 
-        let ordered = input.windows.sorted(by: { $0.window.index < $1.window.index })
+        // Retry windows receive new checkpoint indices, but still belong at their audio position.
+        let ordered = input.windows.sorted {
+            if $0.window.owned.start != $1.window.owned.start {
+                return $0.window.owned.start < $1.window.owned.start
+            }
+            return $0.window.index < $1.window.index
+        }
         let owned = resolvedUnits(ordered, prepared: prepared, warnings: &warnings)
         for (position, window) in ordered.enumerated() {
             let w = window.window

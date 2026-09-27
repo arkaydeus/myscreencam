@@ -2,6 +2,12 @@ import Foundation
 import MyScreenArtCore
 import SpeechCore
 
+/// The queue owns the service lifecycle; tests can supply an in-process single-model worker.
+protocol SpeechServiceManaging: SpeechWorker {
+    func release()
+    func reset()
+}
+
 /// Talks to the `MyScreenArtSpeech` XPC service.
 ///
 /// - The service is launched on the first request and exits when the connection is invalidated, so
@@ -10,13 +16,18 @@ import SpeechCore
 ///   ``TranscriptionError/cancelled``; nothing in flight is committed.
 /// - If the service is relaunched (after a release, a crash or a memory-pressure recycle) the last `load` is
 ///   replayed before the next request, so callers don't need to know.
-nonisolated final class SpeechServiceClient: SpeechWorker, @unchecked Sendable {
+nonisolated final class SpeechServiceClient: SpeechServiceManaging, @unchecked Sendable {
     static let serviceName =
         (Bundle.main.bundleIdentifier ?? "com.myscreenart.app") + SpeechServiceIdentity.bundleSuffix
 
     private let lock = NSLock()
+    private let makeConnection: () -> NSXPCConnection
     private var connection: NSXPCConnection?
     private var loadedRequest: WorkerRequest?
+
+    init(makeConnection: (() -> NSXPCConnection)? = nil) {
+        self.makeConnection = makeConnection ?? { NSXPCConnection(serviceName: Self.serviceName) }
+    }
 
     func send(_ request: WorkerRequest) async throws -> WorkerResponse {
         let (connection, fresh) = currentConnection()
@@ -59,7 +70,7 @@ nonisolated final class SpeechServiceClient: SpeechWorker, @unchecked Sendable {
     private func currentConnection() -> (NSXPCConnection, Bool) {
         lock.withLock {
             if let connection { return (connection, false) }
-            let connection = NSXPCConnection(serviceName: Self.serviceName)
+            let connection = makeConnection()
             connection.remoteObjectInterface = NSXPCInterface(with: SpeechServiceProtocol.self)
             connection.invalidationHandler = { [weak self] in self?.connectionEnded(connection) }
             connection.interruptionHandler = { [weak self] in
@@ -82,22 +93,28 @@ nonisolated final class SpeechServiceClient: SpeechWorker, @unchecked Sendable {
         let once = OnceFlag()
         // NSXPCConnection is thread-safe; it isn't annotated Sendable.
         nonisolated(unsafe) let connection = xpc
-        let reply: Data = try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                let proxy = connection.remoteObjectProxyWithErrorHandler { _ in
-                    if once.claim() { continuation.resume(throwing: TranscriptionError.workerCrashed) }
+        let reply: Data
+        do {
+            reply = try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    let proxy = connection.remoteObjectProxyWithErrorHandler { _ in
+                        if once.claim() { continuation.resume(throwing: TranscriptionError.workerCrashed) }
+                    }
+                    guard let service = proxy as? SpeechServiceProtocol else {
+                        if once.claim() { continuation.resume(throwing: TranscriptionError.workerCrashed) }
+                        return
+                    }
+                    service.perform(data) { reply in
+                        if once.claim() { continuation.resume(returning: reply) }
+                    }
                 }
-                guard let service = proxy as? SpeechServiceProtocol else {
-                    if once.claim() { continuation.resume(throwing: TranscriptionError.workerCrashed) }
-                    return
-                }
-                service.perform(data) { reply in
-                    if once.claim() { continuation.resume(returning: reply) }
-                }
+            } onCancel: {
+                // Stops the in-flight inference by ending the service process.
+                connection.invalidate()
             }
-        } onCancel: {
-            // Stops the in-flight inference by ending the service process.
-            connection.invalidate()
+        } catch {
+            if Task.isCancelled { throw TranscriptionError.cancelled }
+            throw error
         }
         if Task.isCancelled { throw TranscriptionError.cancelled }
         return try WorkerCoding.decode(WorkerResponse.self, from: reply)
@@ -105,7 +122,7 @@ nonisolated final class SpeechServiceClient: SpeechWorker, @unchecked Sendable {
 }
 
 /// True for the first caller only.
-nonisolated private final class OnceFlag: @unchecked Sendable {
+nonisolated final class OnceFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var claimed = false
 

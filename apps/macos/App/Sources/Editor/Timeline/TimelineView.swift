@@ -39,6 +39,13 @@ struct TimelineData: Equatable {
     }
 }
 
+/// Cue gestures start on the edited ruler and cross cuts in that same coordinate space.
+enum CueDragTime {
+    static func sourceTime(editedStart: Double, editedDelta: Double, timeline: EditTimeline) -> Double {
+        timeline.sourceTime(forEdited: editedStart + editedDelta)
+    }
+}
+
 struct TimelineRepresentable: NSViewRepresentable {
     let model: EditorModel
     let data: TimelineData
@@ -794,9 +801,12 @@ final class TimelineNSView: NSView {
                 model.selection = .cue(cue.id)
                 model.inspectorTab = .subtitles
                 switch hit {
-                case .body: beginEdit(.cueMove(cue.id, start: cue.start, x: p.x))
-                case .start: beginEdit(.cueStart(cue.id, start: cue.start, x: p.x))
-                case .end: beginEdit(.cueEnd(cue.id, end: cue.end, x: p.x))
+                case .body:
+                    beginEdit(.cueMove(cue.id, start: model.timeline.editedTimeSnapping(forSource: cue.start), x: p.x))
+                case .start:
+                    beginEdit(.cueStart(cue.id, start: model.timeline.editedTimeSnapping(forSource: cue.start), x: p.x))
+                case .end:
+                    beginEdit(.cueEnd(cue.id, end: model.timeline.editedTimeSnapping(forSource: cue.end), x: p.x))
                 }
             } else {
                 model.selection = nil
@@ -852,11 +862,17 @@ final class TimelineNSView: NSView {
                 mask.end = max(min(end + seconds(from), model.meta.duration), mask.start + 0.5)
             }
         case .cueMove(let id, let start, let from):
-            model.moveCue(id, toStart: start + seconds(from))
+            model.moveCue(
+                id,
+                toStart: CueDragTime.sourceTime(
+                    editedStart: start, editedDelta: seconds(from), timeline: model.timeline))
         case .cueStart(let id, let start, let from):
-            model.setCueTiming(id, start: start + seconds(from))
+            model.setCueTiming(
+                id,
+                start: CueDragTime.sourceTime(editedStart: start, editedDelta: seconds(from), timeline: model.timeline))
         case .cueEnd(let id, let end, let from):
-            model.setCueTiming(id, end: end + seconds(from))
+            model.setCueTiming(
+                id, end: CueDragTime.sourceTime(editedStart: end, editedDelta: seconds(from), timeline: model.timeline))
         case .keyframe(let id, let time, let from, let moving):
             if !moving {
                 guard abs(p.x - from) >= 3 else { return }

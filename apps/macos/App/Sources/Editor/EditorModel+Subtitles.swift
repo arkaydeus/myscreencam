@@ -241,12 +241,23 @@ extension EditorModel {
         }
     }
 
-    /// `text` without the run of `words` (matched as whole words, separated by spaces), or nil if not found.
+    /// `text` without the run of `words` (Latin words or adjacent CJK characters), or nil if not found.
     static func removing(_ words: [String], from text: String) -> String? {
         guard !words.isEmpty else { return nil }
+        let cjk = words.allSatisfy {
+            !$0.isEmpty
+                && $0.unicodeScalars.allSatisfy { scalar in
+                    switch scalar.value {
+                    case 0x3400...0x9FFF, 0xF900...0xFAFF, 0x20000...0x2FA1F: true
+                    default: false
+                    }
+                }
+        }
+        let boundary = cjk ? "" : "(?<![\\p{L}\\p{N}'])"
+        let trailingBoundary = cjk ? "" : "(?![\\p{L}\\p{N}'])"
         let pattern =
-            "(?<![\\p{L}\\p{N}'])" + words.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "\\s+")
-            + "(?![\\p{L}\\p{N}'])"
+            boundary + words.map(NSRegularExpression.escapedPattern(for:)).joined(separator: cjk ? "\\s*" : "\\s+")
+            + trailingBoundary
         guard let regex = try? NSRegularExpression(pattern: pattern),
             let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
             let range = Range(match.range, in: text)

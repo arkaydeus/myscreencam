@@ -77,7 +77,7 @@ struct EditorWindow: View {
                 throw EditorLoadError.render(String(describing: error))
             }
             let model = EditorModel(project: project, renderer: renderer)
-            app.editors.register(model)
+            await app.editors.register(model, resetEdit: resetEdit)
             phase = .loaded(model)
             Log.app.info("Opened editor for \(packageURL.lastPathComponent, privacy: .public)")
         } catch let error as EditorLoadError {
@@ -155,11 +155,6 @@ enum EditorLoader {
             edit = saved.normalized(duration: meta.duration)
         } else {
             edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
-            do {
-                try package.saveEdit(edit)
-            } catch {
-                Log.app.error("Couldn't write the initial edit.json: \(error)")
-            }
         }
         return RenderProject(package: package, meta: meta, edit: edit, events: events, cursorIndex: cursors)
     }

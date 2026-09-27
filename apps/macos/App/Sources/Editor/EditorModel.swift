@@ -259,7 +259,6 @@ final class EditorModel {
     /// Writes pending edits now (window close, rename, delete).
     func flush() async {
         saveConfirmTask?.cancel()
-        guard hasUnsavedChanges else { return }
         let latest = edit
         do {
             try await saveQueue.flush(latest)

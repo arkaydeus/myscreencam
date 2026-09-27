@@ -169,7 +169,17 @@ public enum TranscriptionPipeline {
         var results: [RecognisedWindow] = []
         var pending: [WorkWindow] = []
         for window in windows {
-            if let saved = checkpoints.recognised(window.index) {
+            if let replacements = checkpoints.retryReplacements(for: window.index),
+                !replacements.isEmpty,
+                replacements.first?.window.owned.start == window.owned.start,
+                replacements.last?.window.owned.end == window.owned.end,
+                replacements.allSatisfy({ $0.termination == .complete || $0.termination == .silent }),
+                zip(replacements, replacements.dropFirst()).allSatisfy({
+                    $0.0.window.owned.end == $0.1.window.owned.start
+                })
+            {
+                results += replacements
+            } else if let saved = checkpoints.recognised(window.index) {
                 results.append(saved)
             } else {
                 pending.append(window)
@@ -182,7 +192,7 @@ public enum TranscriptionPipeline {
             let total = Double(prepared.sampleCount)
             var done = Double(results.reduce(Int64(0)) { $0 + $1.window.owned.count })
             progress?(.recognising(done / max(total, 1)))
-            var nextIndex = (windows.map(\.index).max() ?? 0) + 1
+            var nextIndex = max(windows.map(\.index).max() ?? 0, results.map(\.window.index).max() ?? 0) + 1
             for window in pending {
                 await admission?()
                 try checkCancelled()
@@ -200,8 +210,10 @@ public enum TranscriptionPipeline {
                         try checkCancelled()
                         retried.append(try await recognise(sub, audioPath: audioPath, hint: job.languageHint, worker))
                     }
-                    if retried.allSatisfy({ $0.termination == .complete || $0.termination == .silent }) {
-                        for sub in retried { try checkpoints.save(sub) }
+                    if !retried.isEmpty,
+                        retried.allSatisfy({ $0.termination == .complete || $0.termination == .silent })
+                    {
+                        try checkpoints.saveRetryReplacements(retried, for: window.index)
                         results += retried
                         done += Double(window.owned.count)
                         progress?(.recognising(done / max(total, 1)))
@@ -296,6 +308,7 @@ public enum TranscriptionPipeline {
         let cache = package.url(PackageLayout.transcriptionCacheDirectory)
         let prepared = try await AudioPreparation.prepare(
             package: package, meta: meta, stream: audioSource.stream, directory: cache)
+        try checkCancelled()
         let sr = Double(PreparedAudio.sampleRate)
         let origin = prepared.originSample
         let start = max(0, Int64((sourceStart - context) * sr) - origin)
@@ -309,6 +322,7 @@ public enum TranscriptionPipeline {
                 audioPath: cache.appending(path: prepared.samplesFileName).path, window: window, text: text,
                 languageTag: languageTag))
         _ = try? await worker.send(.unload)
+        try checkCancelled()
         guard case .aligned(let aligned) = response else {
             if case .failure(let failure, let message) = response {
                 throw TranscriptionError.workerFailure(failure, message)
@@ -377,9 +391,18 @@ public struct CheckpointStore: Sendable {
         read(RecognisedWindow.self, "w-\(index).json")
     }
 
+    /// A completed retry replaces one original window with several smaller windows on resume.
+    public func retryReplacements(for index: Int) -> [RecognisedWindow]? {
+        read([RecognisedWindow].self, "r-\(index).json")
+    }
+
     public func aligned(_ key: String) -> AlignedWindow? { read(AlignedWindow.self, "a-\(key).json") }
 
     public func save(_ window: RecognisedWindow) throws { try write(window, "w-\(window.window.index).json") }
+
+    public func saveRetryReplacements(_ windows: [RecognisedWindow], for index: Int) throws {
+        try write(windows, "r-\(index).json")
+    }
 
     public func save(_ window: AlignedWindow, key: String) throws { try write(window, "a-\(key).json") }
 

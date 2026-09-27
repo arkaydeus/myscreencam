@@ -65,6 +65,7 @@ mise install            # once: installs XcodeGen (or `mise run setup` at the re
 mise run build          # generate project + Debug build (signed, Apple Development)
 mise run run            # build + launch this worktree's app via LaunchServices
 mise run test           # engine package tests (Swift Testing)
+mise run test:speech-engines # speech worker path and token-mapping tests
 mise run lint           # swift-format lint --strict
 mise run check          # lint + test + build: the local gate before pushing (no GitHub CI)
 mise run format         # swift-format in place

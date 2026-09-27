@@ -1,4 +1,5 @@
 import Foundation
+import MyScreenArtCore
 import Observation
 
 /// The open editor windows' models. Other areas rely only on `hasPendingSaves`, `flushAll()`, `isAnyPlaying` and
@@ -10,6 +11,7 @@ import Observation
 @Observable
 final class EditorSessions {
     private var sessions: [URL: EditorModel] = [:]
+    @ObservationIgnored private var closing: [URL: (UUID, Task<Void, Never>)] = [:]
 
     /// True while any editor is playing (transcription holds GPU-heavy work meanwhile).
     var isAnyPlaying: Bool { sessions.values.contains { $0.clock.isPlaying } }
@@ -25,14 +27,41 @@ final class EditorSessions {
     /// The model already open for a package, if any.
     func session(for packageURL: URL) -> EditorModel? { sessions[packageURL.standardizedFileURL] }
 
-    func register(_ model: EditorModel) {
-        sessions[model.package.url.standardizedFileURL] = model
+    func register(_ model: EditorModel, resetEdit: Bool = false) async {
+        let key = model.package.url.standardizedFileURL
+        await waitForClose(of: key)
+        // The loader may have read edit.json before a transcription committed. Refresh at registration,
+        // after all background loading and rendering, before the new editor can accept user edits.
+        do {
+            if resetEdit {
+                try model.package.saveEdit(model.edit)
+            } else if let latest = try model.package.loadEdit() {
+                if latest != model.edit { model.apply(latest, action: "Load Latest Edits") }
+            } else {
+                try model.package.saveEdit(model.edit)
+            }
+        } catch {
+            Log.app.error("Couldn't refresh editor edits: \(error)")
+        }
+        sessions[key] = model
+    }
+
+    func waitForClose(of packageURL: URL) async {
+        await closing[packageURL.standardizedFileURL]?.1.value
     }
 
     /// Saves and releases a session when its window closes.
     func close(_ model: EditorModel) async {
         let key = model.package.url.standardizedFileURL
-        await model.close()
         if sessions[key] === model { sessions[key] = nil }
+        let id = UUID()
+        let previous = closing[key]?.1
+        let task = Task {
+            await previous?.value
+            await model.close()
+        }
+        closing[key] = (id, task)
+        await task.value
+        if closing[key]?.0 == id { closing[key] = nil }
     }
 }

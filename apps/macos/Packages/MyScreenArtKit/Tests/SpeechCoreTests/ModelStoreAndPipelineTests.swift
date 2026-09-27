@@ -11,7 +11,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     static let bodies = Mutex<[String: Data]>([:])
     static let requests = Mutex<[String]>([])
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canInit(with request: URLRequest) -> Bool { request.url != nil }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
@@ -132,6 +132,79 @@ struct ModelStoreTests {
         #expect(!FileManager.default.fileExists(atPath: store.installDirectory(for: catalogue.models[0]).path))
     }
 
+    @Test func lowDiskSpaceRefusesBeforeRequestingFiles() async throws {
+        let dir = try TempDir()
+        let catalogue = StoreFixtures.catalogue(files: StoreFixtures.files)
+        StubProtocol.requests.withLock { $0.removeAll() }
+        let store = ModelStore(root: dir.url, catalogue: catalogue, session: StubProtocol.session()) { _ in 0 }
+        await store.install(.parakeet)
+        await store.waitForInstall(.parakeet)
+        guard case .failed(let message) = await store.state(ModelCatalogue.parakeetID) else {
+            Issue.record("Expected a low disk error")
+            return
+        }
+        #expect(message.contains("disk space"))
+        #expect(StubProtocol.requests.withLock { $0.isEmpty })
+    }
+
+    @Test func staleResumeDataFallsBackToFreshDownload() async throws {
+        let dir = try TempDir()
+        let catalogue = StoreFixtures.catalogue(files: StoreFixtures.files)
+        let store = ModelStore(root: dir.url, catalogue: catalogue, session: StubProtocol.session())
+        let model = catalogue.models[0]
+        let file = try #require(model.files.first)
+        let staging = store.stagingDirectory(for: model)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        let resumeURL = staging.appending(path: ".resume-\(file.sha256)")
+        try Data("invalid resume data".utf8).write(to: resumeURL)
+        await store.install(.parakeet)
+        await store.waitForInstall(.parakeet)
+        #expect(await store.isInstalled(.parakeet))
+        #expect(!FileManager.default.fileExists(atPath: resumeURL.path))
+    }
+
+    @Test func downloaderPassesSavedResumeDataToTransport() async throws {
+        let dir = try TempDir()
+        let body = Data("complete payload".utf8)
+        let partial = Data("resume token".utf8)
+        let temporary = dir.url.appending(path: "temporary")
+        let destination = dir.url.appending(path: "destination")
+        let resumeURL = dir.url.appending(path: "resume")
+        try body.write(to: temporary)
+        try partial.write(to: resumeURL)
+        let seen = Mutex<[Data?]>([])
+        let response = HTTPURLResponse(
+            url: URL(string: "https://example.test/model")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let downloader = ModelDownloader { _, resumeData, _ in
+            seen.withLock { $0.append(resumeData) }
+            return (temporary, response)
+        }
+        try await downloader.download(
+            URL(string: "https://example.test/model")!, to: destination, expectedSize: Int64(body.count),
+            resumeDataURL: resumeURL, progress: { _ in })
+        #expect(seen.withLock { $0 } == [partial])
+        #expect(try Data(contentsOf: destination) == body)
+        #expect(!FileManager.default.fileExists(atPath: resumeURL.path))
+    }
+
+    @Test func downloaderPersistsCancellationResumeData() async throws {
+        let dir = try TempDir()
+        let partial = Data("resume token".utf8)
+        let resumeURL = dir.url.appending(path: "resume")
+        let downloader = ModelDownloader { _, _, _ in
+            throw URLError(.cancelled, userInfo: [NSURLSessionDownloadTaskResumeData: partial])
+        }
+        do {
+            try await downloader.download(
+                URL(string: "https://example.test/model")!, to: dir.url.appending(path: "destination"),
+                expectedSize: 10, resumeDataURL: resumeURL, progress: { _ in })
+            Issue.record("Expected cancellation")
+        } catch let error as URLError {
+            #expect(error.code == .cancelled)
+        }
+        #expect(try Data(contentsOf: resumeURL) == partial)
+    }
+
     @Test func refusesUnsafePaths() {
         #expect(!ModelStore.isSafeRelativePath("../escape"))
         #expect(!ModelStore.isSafeRelativePath("/abs"))
@@ -180,10 +253,11 @@ struct ModelStoreTests {
 /// A worker that "recognises" each window as `word<index>` spoken over its first half.
 actor FakeWorker: SpeechWorker {
     var requests: [WorkerRequest] = []
-    var truncateFirstQwenWindow = false
+    var truncatedWindowIndex: Int?
     var failAfter: Int?
 
-    func setTruncateFirstQwenWindow(_ value: Bool) { truncateFirstQwenWindow = value }
+    func setTruncateFirstQwenWindow(_ value: Bool) { truncatedWindowIndex = value ? 0 : nil }
+    func setTruncatedWindowIndex(_ index: Int) { truncatedWindowIndex = index }
 
     func send(_ request: WorkerRequest) async throws -> WorkerResponse {
         requests.append(request)
@@ -195,7 +269,7 @@ actor FakeWorker: SpeechWorker {
         case .recognise(_, let window, _, let budget):
             let text = "word\(window.index)"
             let mid = (window.owned.start + window.owned.end) / 2
-            if truncateFirstQwenWindow, window.index == 0 {
+            if truncatedWindowIndex == window.index {
                 return .recognised(
                     RecognisedWindow(
                         window: window, text: text, languageTag: "en", units: [], termination: .tokenBudgetExhausted,
@@ -279,6 +353,45 @@ struct TranscriptionPipelineTests {
         #expect(roles[alignerLoad - 1] == "unload")
         #expect(revision.aligner?.catalogueID == ModelCatalogue.qwenAlignerID)
         #expect(revision.allUnits.allSatisfy { $0.unit.timing?.method == .forcedAlignment })
+    }
+
+    @Test func middleWindowRetryKeepsChronologicalTextAndResumesWithoutRecognition() async throws {
+        let dir = try TempDir()
+        let job = try makeJob(dir, engine: .qwen, seconds: 100)
+        let worker = FakeWorker()
+        await worker.setTruncatedWindowIndex(1)
+        let revision = try await TranscriptionPipeline.run(job, worker: worker, implementation: ["fake": "retry"])
+        #expect(revision.status == .complete)
+        #expect(revision.segments.count > 3)
+        #expect(
+            revision.segments.map(\.sourceRange.startSeconds)
+                == revision.segments.map(\.sourceRange.startSeconds).sorted())
+        #expect(revision.segments.contains { $0.rawText == "word0" })
+        #expect(revision.segments.contains { $0.rawText == "word2" })
+        #expect(CueBuilder.cues(from: revision).map(\.text).joined(separator: " ").contains("word2"))
+
+        let resumed = FakeWorker()
+        let second = try await TranscriptionPipeline.run(job, worker: resumed, implementation: ["fake": "retry"])
+        #expect(await resumed.count { if case .recognise = $0 { true } else { false } } == 0)
+        #expect(second.segments.map(\.rawText) == revision.segments.map(\.rawText))
+    }
+
+    @Test func retimeAddsPreparedOriginAndWindowOffsetOnce() async throws {
+        let dir = try TempDir()
+        let job = try makeJob(dir, engine: .qwen, seconds: 20)
+        let worker = FakeWorker()
+        let aligner = try #require(job.models.last)
+        let range = try await TranscriptionPipeline.retime(
+            text: "word", sourceStart: 10, sourceEnd: 11, languageTag: "en", package: job.package, meta: job.meta,
+            audioSource: .microphone, aligner: aligner, alignerDirectory: dir.url,
+            runtimeDirectory: dir.url.appending(path: "runtime"), worker: worker)
+        #expect(abs((range?.start ?? 0) - 9) < 0.01)
+        #expect(abs((range?.end ?? 0) - 9.1) < 0.01)
+        let requests = await worker.requests
+        #expect(
+            requests.contains {
+                if case .load(role: .qwenAligner, directory: _, runtimeDirectory: _) = $0 { true } else { false }
+            })
     }
 
     @Test func cancellationStopsBeforeCommitting() async throws {

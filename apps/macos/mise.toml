@@ -41,6 +41,10 @@ run = "scripts/dev/run.sh"
 description = "Run the engine package tests"
 run = "swift test --package-path Packages/MyScreenArtKit"
 
+[tasks."test:speech-engines"]
+description = "Run speech worker path and token-mapping tests"
+run = "swift test --package-path Packages/SpeechEngines --filter InferenceEngineTests"
+
 [tasks."test:scripts"]
 description = "Check Dev launch and release paths without side effects"
 run = "bash scripts/test-scripts.sh"
@@ -80,7 +84,7 @@ run = "scripts/release/release.sh --no-notarize --no-appcast"
 
 [tasks.check]
 description = "Local gate before pushing (there is no GitHub CI): lint, engine tests, signed Debug build"
-depends = ["lint", "test", "test:app", "test:scripts"]
+depends = ["lint", "test", "test:app", "test:speech-engines", "test:scripts"]
 run = "echo 'All checks passed.'"
 
 [tasks.clean]

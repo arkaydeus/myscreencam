@@ -54,5 +54,14 @@ let package = Package(
                 .product(name: "ProjectKit", package: "MyScreenArtKit"),
             ]
         ),
+        .testTarget(
+            name: "SpeechEnginesTests",
+            dependencies: [
+                "SpeechEngines",
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "SpeechCore", package: "MyScreenArtKit"),
+                .product(name: "ProjectKit", package: "MyScreenArtKit"),
+            ]
+        ),
     ]
 )

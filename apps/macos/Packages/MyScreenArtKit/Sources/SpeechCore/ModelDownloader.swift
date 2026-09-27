@@ -7,17 +7,25 @@ import Foundation
 /// still matches; otherwise it starts again from zero. Either way the caller verifies size and SHA-256, so a bad
 /// resume can't be installed.
 public final class ModelDownloader: Sendable {
-    private let session: URLSession
+    typealias Transfer = @Sendable (URL, Data?, @escaping @Sendable (Int64) -> Void) async throws -> (URL, URLResponse)
+    private let transfer: Transfer
 
     public init(session: URLSession = .shared) {
-        self.session = session
+        transfer = { url, resumeData, progress in
+            let delegate = ProgressDelegate(progress: progress)
+            if let resumeData {
+                return try await session.download(resumeFrom: resumeData, delegate: delegate)
+            }
+            return try await session.download(from: url, delegate: delegate)
+        }
     }
+
+    init(transfer: @escaping Transfer) { self.transfer = transfer }
 
     public func download(
         _ url: URL, to destination: URL, expectedSize: Int64, resumeDataURL: URL,
         progress: @escaping @Sendable (Int64) -> Void
     ) async throws {
-        let delegate = ProgressDelegate(progress: progress)
         let resumeData = try? Data(contentsOf: resumeDataURL)
         try? FileManager.default.removeItem(at: resumeDataURL)
         let temporary: URL
@@ -25,13 +33,13 @@ public final class ModelDownloader: Sendable {
         do {
             if let resumeData {
                 do {
-                    (temporary, response) = try await session.download(resumeFrom: resumeData, delegate: delegate)
+                    (temporary, response) = try await transfer(url, resumeData, progress)
                 } catch let error as URLError where error.code != .cancelled {
                     // Stale or incompatible resume data: start over.
-                    (temporary, response) = try await session.download(from: url, delegate: delegate)
+                    (temporary, response) = try await transfer(url, nil, progress)
                 }
             } else {
-                (temporary, response) = try await session.download(from: url, delegate: delegate)
+                (temporary, response) = try await transfer(url, nil, progress)
             }
         } catch let error as URLError {
             if let data = error.userInfo[NSURLSessionDownloadTaskResumeData] as? Data {

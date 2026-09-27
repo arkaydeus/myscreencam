@@ -11,6 +11,12 @@ public struct ModelManifest: Codable, Sendable, Hashable, Identifiable {
         public var size: Int64
         /// Lower-case hex SHA-256 of the file's bytes.
         public var sha256: String
+
+        public init(path: String, size: Int64, sha256: String) {
+            self.path = path
+            self.size = size
+            self.sha256 = sha256
+        }
     }
 
     public var id: String
@@ -22,6 +28,20 @@ public struct ModelManifest: Codable, Sendable, Hashable, Identifiable {
     public var license: String
     public var attribution: String
     public var files: [File]
+
+    public init(
+        id: String, repository: String, revision: String, format: String, quantisation: String,
+        license: String, attribution: String, files: [File]
+    ) {
+        self.id = id
+        self.repository = repository
+        self.revision = revision
+        self.format = format
+        self.quantisation = quantisation
+        self.license = license
+        self.attribution = attribution
+        self.files = files
+    }
 
     public var totalBytes: Int64 { files.reduce(0) { $0 + $1.size } }
 
@@ -92,6 +112,11 @@ public struct ModelCatalogue: Codable, Sendable, Hashable {
 
     public var schemaVersion: Int
     public var models: [ModelManifest]
+
+    public init(schemaVersion: Int, models: [ModelManifest]) {
+        self.schemaVersion = schemaVersion
+        self.models = models
+    }
 
     public func manifest(_ id: String) -> ModelManifest? { models.first { $0.id == id } }
 

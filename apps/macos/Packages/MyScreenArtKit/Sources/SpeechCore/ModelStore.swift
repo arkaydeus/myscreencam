@@ -83,6 +83,7 @@ public actor ModelStore {
     public nonisolated let root: URL
     public nonisolated let catalogue: ModelCatalogue
     private let downloader: ModelDownloader
+    private let capacity: @Sendable (URL) -> Int64?
     private var states: [String: ModelInstallState] = [:]
     private var leases: [String: Int] = [:]
     private var tasks: [SpeechEngine: Task<Void, Never>] = [:]
@@ -95,10 +96,14 @@ public actor ModelStore {
             .appending(path: "Models", directoryHint: .isDirectory)
     }
 
-    public init(root: URL, catalogue: ModelCatalogue = .bundled, session: URLSession = .shared) {
+    public init(
+        root: URL, catalogue: ModelCatalogue = .bundled, session: URLSession = .shared,
+        capacity: (@Sendable (URL) -> Int64?)? = nil
+    ) {
         self.root = root
         self.catalogue = catalogue
         downloader = ModelDownloader(session: session)
+        self.capacity = capacity ?? { ModelStore.availableCapacity(at: $0) }
         for model in catalogue.models {
             states[model.id] = Self.isInstalled(model, root: root) ? .installed : .notInstalled
         }
@@ -214,7 +219,7 @@ public actor ModelStore {
 
         // Disk space: everything not yet staged, plus 5 % headroom (the final rename doesn't copy).
         let needed = model.files.reduce(Int64(0)) { $0 + max(0, $1.size - stagedSize(model, $1)) }
-        let available = Self.availableCapacity(at: root)
+        let available = capacity(root)
         if let available, needed + needed / 20 > available {
             throw ModelStoreError.insufficientDiskSpace(needed: needed, available: available)
         }

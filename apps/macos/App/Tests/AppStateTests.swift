@@ -4,6 +4,7 @@ import ExportKit
 import Foundation
 import ProjectKit
 import RenderKit
+import SpeechCore
 import Testing
 
 @testable import MyScreenArt_Dev
@@ -117,6 +118,101 @@ struct AppStateTests {
         await center.waitUntilIdle()
         #expect(job.state == .cancelled)
         #expect(ContinuousClock.now - started < .seconds(2))
+    }
+
+    @Test func failedSubtitleSidecarMarksExportFailed() throws {
+        let (root, package, meta) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sidecar = root.appending(path: "movie.srt")
+        try FileManager.default.createDirectory(at: sidecar, withIntermediateDirectories: true)
+        let center = ExportCenter()
+        let settings = ExportSettings(format: .h264)
+        let movie = root.appending(path: "movie.mp4")
+        let job = center.start(
+            package: package, name: "Movie", edit: EditConfig.initial(for: meta), settings: settings,
+            destination: movie, subtitleSidecar: "1\n00:00:00,000 --> 00:00:01,000\nHello\n")
+        let result = ExportResult(
+            url: movie, fileSize: 100, duration: 1, dimensions: CGSize(width: 320, height: 180), frameCount: 30,
+            wallTime: 1, encoder: .hardware, settings: settings)
+        center.finish(job, with: .succeeded(result))
+        guard case .failed(let message) = job.state else {
+            Issue.record("Expected the missing sidecar to fail the export")
+            return
+        }
+        #expect(message.contains("Movie saved"))
+        #expect(message.contains("subtitles"))
+    }
+
+    @Test func transcriptionQueueFailsMissingModelsAndCancelsQueuedJobs() async throws {
+        let (root, package, _) = try temporaryPackage()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let defaults = UserDefaults(suiteName: "transcription-queue-\(UUID().uuidString)")!
+        let models = SpeechModels(store: ModelStore(root: root.appending(path: "Models")))
+        let center = TranscriptionCenter(settings: SpeechSettings(defaults: defaults), models: models)
+
+        let first = try #require(center.transcribe(package.url, engine: .parakeet))
+        #expect(first.phase == .queued)
+        await center.waitUntilIdle()
+        guard case .failed = first.phase else { Issue.record("Expected missing models to fail"); return }
+
+        let second = try #require(center.transcribe(package.url, engine: .parakeet))
+        center.cancel(package.url)
+        #expect(second.phase == .cancelled)
+    }
+
+    @Test func registeringAnEditorRefreshesAnEditSavedWhileItWasLoading() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var committed = model.edit
+        committed.background.padding = 0.22
+        try model.package.saveEdit(committed)
+
+        let sessions = EditorSessions()
+        await sessions.register(model)
+        #expect(model.edit.background.padding == 0.22)
+        model.update("User Edit") { $0.background.padding = 0.27 }
+        await sessions.close(model)
+        #expect(try model.package.loadEdit()?.background.padding == 0.27)
+    }
+
+    @Test func transcriptCommitsThroughOpenEditorAsAdoptedThenCandidate() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sessions = EditorSessions()
+        await sessions.register(model)
+        let center = TranscriptionCenter()
+        center.editors = sessions
+        func revision(_ id: String, text: String) -> TranscriptRevision {
+            let range = MediaRange(
+                start: MediaTime(seconds: 0.2, timescale: 16_000),
+                end: MediaTime(seconds: 0.8, timescale: 16_000))
+            return TranscriptRevision(
+                id: id, parentRevisionID: nil, sourceMediaID: "media", audioIdentityHash: "audio",
+                recogniser: ModelIdentity(
+                    catalogueID: "test", repository: "test/model", revision: "1", manifestDigest: "digest",
+                    quantisation: "none"),
+                aligner: nil, implementationFingerprint: "test", implementation: [:], optionsFingerprint: "test",
+                options: TranscriptionOptions(
+                    engine: "parakeet", audioSource: .microphone, languageHint: nil, windowSeconds: 120,
+                    maxWindowSeconds: 150, tokenBudgetPerWindow: nil, audioRecipe: "test"),
+                sourceCoverage: [range],
+                segments: [
+                    TranscriptSegment(
+                        id: "segment-\(id)", sourceRange: range, rangeMeaning: .processingWindow, rawText: text,
+                        languageTag: "en", units: [])
+                ], status: .complete, warnings: [])
+        }
+        #expect(
+            try await center.commit(revision("first", text: "Hello"), to: model.package, meta: model.meta) == .adopted)
+        let cue = try #require(model.edit.subtitles.cues.first)
+        model.setCueText(cue.id, "User correction")
+        #expect(
+            try await center.commit(revision("second", text: "Hello again"), to: model.package, meta: model.meta)
+                == .candidate)
+        await model.flush()
+        #expect(model.edit.subtitles.candidateRevisionID == "second")
+        #expect(try model.package.loadEdit()?.subtitles.cues.first?.text == "User correction")
+        await sessions.close(model)
     }
 
     @Test func editorGroupsGestureUndoAndFlushesLatestEdit() async throws {

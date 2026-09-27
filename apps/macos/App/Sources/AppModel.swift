@@ -33,5 +33,7 @@ final class AppModel {
     }
 
     /// True while quitting or updating would lose work.
-    var isBusy: Bool { recording.isActive || exports.isExporting || editors.hasPendingSaves }
+    var isBusy: Bool {
+        recording.isActive || exports.isExporting || transcription.isWorking || editors.hasPendingSaves
+    }
 }

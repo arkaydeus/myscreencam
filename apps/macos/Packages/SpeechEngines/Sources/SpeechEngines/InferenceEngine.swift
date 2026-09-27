@@ -28,8 +28,6 @@ public actor InferenceEngine {
 
     public init(modelsRoot: URL) {
         policy = WorkerPathPolicy(modelsRoot: modelsRoot)
-        // Keep MLX's buffer cache small: we run one bounded window at a time.
-        Memory.cacheLimit = 256 << 20
     }
 
     public static var isSupportedPlatform: Bool {
@@ -62,6 +60,8 @@ public actor InferenceEngine {
         case .load(let role, let directory, let runtime):
             guard Self.isSupportedPlatform else { throw WorkerFailure.unsupportedPlatform }
             guard let modelDirectory = policy.modelDirectory(directory) else { throw WorkerFailure.pathNotAllowed }
+            // Keep MLX's buffer cache small once a model is actually used.
+            Memory.cacheLimit = 256 << 20
             unloadModel()
             let started = Date()
             do {

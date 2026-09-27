@@ -211,8 +211,7 @@ final class ExportCenter {
         }
     }
 
-    private func finish(_ job: Job, with state: Job.State) {
-        job.update(state)
+    func finish(_ job: Job, with state: Job.State) {
         job.exportJob = nil
         switch state {
         case .succeeded(let result):
@@ -221,17 +220,24 @@ final class ExportCenter {
                 do {
                     try Data(srt.utf8).write(to: url, options: .atomic)
                 } catch {
-                    Log.app.error("Couldn't write subtitles: \(error.localizedDescription, privacy: .public)")
+                    let message = "Movie saved, but subtitles couldn't be saved: \(error.localizedDescription)"
+                    job.update(.failed(message))
+                    Log.app.error("\(message, privacy: .public)")
+                    notifier.notifyFailed(name: job.name, message: message)
+                    return
                 }
             }
+            job.update(state)
             Log.app.info(
                 "Export finished: \(result.url.lastPathComponent, privacy: .public), \(result.fileSize) bytes in \(result.wallTime, format: .fixed(precision: 1)) s"
             )
             notifier.notifyFinished(name: job.name, url: result.url)
         case .failed(let message):
+            job.update(state)
             Log.app.error("Export failed: \(message, privacy: .public)")
             notifier.notifyFailed(name: job.name, message: message)
         default:
+            job.update(state)
             break
         }
     }

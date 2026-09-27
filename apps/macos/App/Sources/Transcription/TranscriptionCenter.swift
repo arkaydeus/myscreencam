@@ -75,15 +75,23 @@ final class TranscriptionCenter {
 
     @ObservationIgnored weak var editors: EditorSessions?
     @ObservationIgnored weak var exports: ExportCenter?
-    @ObservationIgnored private let client = SpeechServiceClient()
+    @ObservationIgnored private let client: any SpeechServiceManaging
+    @ObservationIgnored private let workerGate = SpeechWorkGate()
     @ObservationIgnored private var runner: Task<Void, Never>?
+    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var retimeTasks: [UUID: Task<(start: Double, end: Double)?, any Error>] = [:]
     @ObservationIgnored private var finishedObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var memorySource: (any DispatchSourceMemoryPressure)?
     private var memoryCritical = false
+    private var retimeCount = 0
 
-    init(settings: SpeechSettings = SpeechSettings(), models: SpeechModels = SpeechModels()) {
+    init(
+        settings: SpeechSettings = SpeechSettings(), models: SpeechModels = SpeechModels(),
+        client: (any SpeechServiceManaging)? = nil
+    ) {
         self.settings = settings
         self.models = models
+        self.client = client ?? SpeechServiceClient()
         finishedObserver = NotificationCenter.default.addObserver(
             forName: .recordingFinished, object: nil, queue: .main
         ) { [weak self] note in
@@ -112,6 +120,8 @@ final class TranscriptionCenter {
     }
 
     var isTranscribing: Bool { jobs.contains(where: \.isActive) }
+    var isRetiming: Bool { retimeCount > 0 }
+    var isWorking: Bool { isTranscribing || isRetiming }
 
     // MARK: Queueing
 
@@ -142,18 +152,38 @@ final class TranscriptionCenter {
         for job in jobs where job.isActive {
             if job.task == nil { job.phase = .cancelled } else { job.task?.cancel() }
         }
+        for task in retimeTasks.values { task.cancel() }
+    }
+
+    func waitUntilIdle() async {
+        guard isWorking else { return }
+        await withCheckedContinuation { idleWaiters.append($0) }
     }
 
     private func drain() async {
         while let job = jobs.first(where: { $0.phase == .queued }) {
+            await workerGate.acquire()
+            guard job.phase == .queued else {
+                workerGate.release()
+                continue
+            }
             let task = Task { await self.run(job) }
             job.task = task
             await task.value
             job.task = nil
+            workerGate.release()
         }
         runner = nil
         // Idle: end the service process so its model memory goes back to the system.
-        client.reset()
+        if !workerGate.isBusy { client.reset() }
+        resumeIdleWaitersIfNeeded()
+    }
+
+    private func resumeIdleWaitersIfNeeded() {
+        guard !isWorking else { return }
+        let waiters = idleWaiters
+        idleWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
     }
 
     // MARK: Running
@@ -285,20 +315,19 @@ final class TranscriptionCenter {
     // MARK: Committing
 
     /// Saves the revision (immutable) and lands it in the recording's subtitles.
-    private func commit(_ revision: TranscriptRevision, to package: RecordingPackage, meta: RecordingMeta) async throws
+    func commit(_ revision: TranscriptRevision, to package: RecordingPackage, meta: RecordingMeta) async throws
         -> SubtitleSettings.Receipt
     {
         try await Task.detached { try package.saveTranscript(revision) }.value
+        await editors?.waitForClose(of: package.url)
         if let editor = editors?.session(for: package.url) {
             return editor.receiveTranscript(revision)
         }
-        let autoZoom = Self.autoZoom
-        return try await Task.detached {
-            var edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
-            let receipt = edit.subtitles.receive(revision)
-            try package.saveEdit(edit)
-            return receipt
-        }.value
+        // Keep the read/modify/write on the main actor. Registering an editor cannot interleave with it.
+        var edit = try package.loadEffectiveEdit(meta: meta, autoZoom: Self.autoZoom)
+        let receipt = edit.subtitles.receive(revision)
+        try package.saveEdit(edit)
+        return receipt
     }
 
     // MARK: Retiming (Qwen)
@@ -310,18 +339,48 @@ final class TranscriptionCenter {
     )
         async throws -> (start: Double, end: Double)?
     {
+        let id = UUID()
+        let task = Task {
+            try await performRetime(
+                text: text, start: start, end: end, languageTag: languageTag, packageURL: packageURL,
+                audioSource: audioSource)
+        }
+        retimeTasks[id] = task
+        retimeCount += 1
+        defer {
+            retimeTasks[id] = nil
+            retimeCount -= 1
+            resumeIdleWaitersIfNeeded()
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private func performRetime(
+        text: String, start: Double, end: Double, languageTag: String, packageURL: URL,
+        audioSource: TranscriptAudioSource
+    ) async throws -> (start: Double, end: Double)? {
         guard models.isInstalled(.qwen) else { throw TranscriptionError.modelsMissing }
+        try Task.checkCancellation()
         let package = RecordingPackage(url: packageURL)
         let (meta, _) = try await Self.load(package)
         let manifests = try await models.store.acquireLease(.qwen)
         defer { Task { await self.models.store.releaseLease(.qwen) } }
         let aligner = manifests[1]
         let store = models.store
+        await workerGate.acquire()
+        defer {
+            workerGate.release()
+            if runner == nil && !workerGate.isBusy { client.reset() }
+        }
+        try Task.checkCancellation()
         let result = try await TranscriptionPipeline.retime(
             text: text, sourceStart: start, sourceEnd: end, languageTag: languageTag, package: package, meta: meta,
             audioSource: audioSource, aligner: aligner, alignerDirectory: store.installDirectory(for: aligner),
             runtimeDirectory: store.runtimeDirectory(for: aligner), worker: client)
-        if runner == nil { client.reset() }
         return result
     }
 
@@ -362,6 +421,31 @@ final class TranscriptionCenter {
         guard finished.count > 20 else { return }
         let drop = Set(finished.prefix(finished.count - 20).map(\.id))
         jobs.removeAll { drop.contains($0.id) }
+    }
+}
+
+/// A model load, its requests and its unload form one exclusive operation on the single-model service.
+@MainActor
+final class SpeechWorkGate {
+    private var occupied = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    var isBusy: Bool { occupied }
+
+    func acquire() async {
+        if !occupied {
+            occupied = true
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            occupied = false
+        } else {
+            waiters.removeFirst().resume()
+        }
     }
 }
 
