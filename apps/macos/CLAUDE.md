@@ -17,6 +17,7 @@ A native macOS screen recorder and editor. It records the screen, system audio, 
 ## Layout
 ```
 App/                         app target (SwiftUI/AppKit), Info.plist, entitlements
+  Resources/AppIcon.icon     app icon (Icon Composer; actool also emits the pre-Tahoe AppIcon.icns)
 QuickLookThumbnail/          Quick Look thumbnail extension for .msarec packages (embedded in the app)
 Packages/MyScreenArtKit/     engine SwiftPM package (testable with `swift test`)
   Sources/MyScreenArtCore    paths, flavor, logging/signposts, URL-command parsing, shell policies

@@ -1,6 +1,11 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { ImageResponse } from "next/og";
 
 import { site } from "@/lib/site";
+
+const iconSrc = `data:image/png;base64,${await readFile(join(process.cwd(), "src/assets/app-icon.png"), "base64")}`;
 
 export const alt = `${site.name}: screen recordings that look finished`;
 export const size = { width: 1200, height: 630 };
@@ -32,7 +37,13 @@ export default function OpengraphImage() {
           boxShadow: "0 30px 80px rgba(20, 16, 70, 0.5)",
         }}
       >
-        <div style={{ fontSize: 34, fontWeight: 700 }}>{site.name}</div>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 34, fontWeight: 700 }}
+        >
+          {/* oxlint-disable-next-line nextjs/no-img-element -- ImageResponse renders plain <img> only */}
+          <img src={iconSrc} width={64} height={64} alt="" />
+          {site.name}
+        </div>
         <div style={{ fontSize: 84, fontWeight: 800, lineHeight: 1, letterSpacing: -3 }}>
           Screen recordings that look finished.
         </div>

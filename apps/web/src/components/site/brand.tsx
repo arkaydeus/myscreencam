@@ -1,5 +1,7 @@
 import { ChevronRight, Download } from "lucide-react";
+import Image from "next/image";
 
+import appIcon from "@/assets/app-icon.png";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -7,15 +9,20 @@ import { cn } from "@/lib/utils";
 export const sectionTitle =
   "text-[32px] leading-[1.125] font-semibold tracking-[-0.005em] text-balance sm:text-[56px] sm:leading-[1.07]";
 
-/** The mark: a white "screen" framed on a painted canvas, like every MyScreenArt export. */
-export function LogoMark({ className }: { className?: string }) {
+/**
+ * The app icon. The image is the rounded shape alone, so it fills whatever square it's given.
+ * `size` is the largest CSS size it's drawn at; next/image serves 1x and 2x files for it.
+ */
+export function LogoMark({ size, className }: { size: number; className?: string }) {
   return (
-    <span
+    <Image
+      src={appIcon}
+      alt=""
       aria-hidden
-      className={cn("relative inline-block size-7 rounded-[8px] canvas-paint", className)}
-    >
-      <span className="absolute inset-[22%] rounded-[3px] bg-white shadow-[0_2px_4px_rgb(20_16_70/0.35)]" />
-    </span>
+      width={size}
+      height={size}
+      className={cn("inline-block shrink-0", className)}
+    />
   );
 }
 

@@ -14,7 +14,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-black/8 bg-white/80 backdrop-blur-xl backdrop-saturate-150">
       <div className="page-width flex h-12 items-center justify-between gap-6 sm:h-13">
         <a href="#top" className="flex items-center gap-2.5 rounded-md">
-          <LogoMark className="size-[22px] rounded-[6px] sm:size-[26px] sm:rounded-[7px]" />
+          <LogoMark size={26} className="size-[22px] sm:size-[26px]" />
           <span className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[21px]">
             {site.name}
           </span>
