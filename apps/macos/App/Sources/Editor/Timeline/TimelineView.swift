@@ -46,6 +46,23 @@ enum CueDragTime {
     }
 }
 
+/// A plain click on a selected zoom keeps the group until the gesture's outcome is known.
+enum KeyframeClick {
+    @MainActor
+    static func begin(_ id: ZoomKeyframe.ID, modifier: SelectionModifier, model: EditorModel) -> Bool {
+        let keepGroup =
+            modifier == .replace && model.selectedKeyframeIDs.count > 1
+            && model.selectedKeyframeIDs.contains(id)
+        if !keepGroup { model.selectKeyframe(id, modifier) }
+        return keepGroup
+    }
+
+    @MainActor
+    static func end(_ id: ZoomKeyframe.ID?, moving: Bool, model: EditorModel) {
+        if !moving, let id { model.selectKeyframe(id) }
+    }
+}
+
 struct TimelineRepresentable: NSViewRepresentable {
     let model: EditorModel
     let data: TimelineData
@@ -781,10 +798,7 @@ final class TimelineNSView: NSView {
         case .zoom:
             if let k = keyframe(atViewX: p.x) {
                 let modifier = SelectionModifier(event.modifierFlags)
-                let keepGroup =
-                    modifier == .replace && model.selectedKeyframeIDs.count > 1
-                    && model.selectedKeyframeIDs.contains(k.id)
-                if !keepGroup { model.selectKeyframe(k.id, modifier) }
+                let keepGroup = KeyframeClick.begin(k.id, modifier: modifier, model: model)
                 model.inspectorTab = .zoom
                 if model.selectedKeyframeIDs.contains(k.id) {
                     let times = Dictionary(uniqueKeysWithValues: model.selectedKeyframes.map { ($0.id, $0.time) })
@@ -903,8 +917,8 @@ final class TimelineNSView: NSView {
         case .keyframes(_, _, let moving, let clickSelects):
             if moving {
                 model.endContinuousChange()
-            } else if let clickSelects {
-                model.selectKeyframe(clickSelects)
+            } else {
+                KeyframeClick.end(clickSelects, moving: moving, model: model)
             }
         default:
             frozenPPS = nil

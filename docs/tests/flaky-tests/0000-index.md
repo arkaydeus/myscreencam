@@ -4,4 +4,4 @@ Open cases are recorded here when a test fails in the normal suite and its ownin
 
 | ID | Status | Test | Case |
 | --- | --- | --- | --- |
-| 0001 | open | `TranscriptionCenterTests.crashedWorkerRetriesOnceAndCommitsAdoptedThenCandidate()` | [0001-transcription-center-crashed-worker.md](0001-transcription-center-crashed-worker.md) |
+| 0001 | open | Aggregate app test host `XCTWaiter` crashes | [0001-transcription-center-crashed-worker.md](0001-transcription-center-crashed-worker.md) |

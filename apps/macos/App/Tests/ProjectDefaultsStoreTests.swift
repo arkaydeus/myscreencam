@@ -4,21 +4,35 @@ import Testing
 
 @testable import MyScreenArt_Dev
 
-@MainActor
-struct ProjectDefaultsStoreTests {
-    private func freshDefaults() -> UserDefaults {
-        let suite = "msa-defaults-test-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
+nonisolated private final class InMemoryDefaults: UserDefaults, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String: Any] = [:]
+
+    override func object(forKey defaultName: String) -> Any? {
+        lock.withLock { values[defaultName] }
     }
 
+    override func data(forKey defaultName: String) -> Data? {
+        lock.withLock { values[defaultName] as? Data }
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        lock.withLock { values[defaultName] = value }
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        _ = lock.withLock { values.removeValue(forKey: defaultName) }
+    }
+}
+
+@MainActor
+struct ProjectDefaultsStoreTests {
     @Test func startsWithBuiltInDefaults() {
-        #expect(ProjectDefaultsStore(userDefaults: freshDefaults()).defaults == ProjectDefaults())
+        #expect(ProjectDefaultsStore(userDefaults: InMemoryDefaults()).defaults == ProjectDefaults())
     }
 
     @Test func changesPersist() {
-        let userDefaults = freshDefaults()
+        let userDefaults = InMemoryDefaults()
         let store = ProjectDefaultsStore(userDefaults: userDefaults)
         store.defaults.zoomTiming.scale = 2.2
         store.defaults.subtitles.style.uppercase = true
@@ -34,7 +48,7 @@ struct ProjectDefaultsStoreTests {
     }
 
     @Test func migratesTheOldAutoZoomPreference() {
-        let userDefaults = freshDefaults()
+        let userDefaults = InMemoryDefaults()
         userDefaults.set(false, forKey: ProjectDefaultsStore.legacyAutoZoomKey)
         #expect(!ProjectDefaultsStore.load(from: userDefaults).autoZoom)
 
@@ -45,7 +59,7 @@ struct ProjectDefaultsStoreTests {
     }
 
     @Test func unreadableValueFallsBackToBuiltIns() {
-        let userDefaults = freshDefaults()
+        let userDefaults = InMemoryDefaults()
         userDefaults.set(Data("not json".utf8), forKey: ProjectDefaultsStore.key)
         #expect(ProjectDefaultsStore.load(from: userDefaults) == ProjectDefaults())
     }

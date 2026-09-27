@@ -76,6 +76,7 @@ final class TranscriptionCenter {
     @ObservationIgnored weak var editors: EditorSessions?
     @ObservationIgnored weak var exports: ExportCenter?
     @ObservationIgnored private let client: any SpeechServiceManaging
+    @ObservationIgnored private let projectDefaults: @MainActor () -> ProjectDefaults
     @ObservationIgnored private let workerGate = SpeechWorkGate()
     @ObservationIgnored private var runner: Task<Void, Never>?
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
@@ -87,11 +88,13 @@ final class TranscriptionCenter {
 
     init(
         settings: SpeechSettings = SpeechSettings(), models: SpeechModels = SpeechModels(),
-        client: (any SpeechServiceManaging)? = nil
+        client: (any SpeechServiceManaging)? = nil,
+        projectDefaults: @escaping @MainActor () -> ProjectDefaults = { ProjectDefaultsStore.load() }
     ) {
         self.settings = settings
         self.models = models
         self.client = client ?? SpeechServiceClient()
+        self.projectDefaults = projectDefaults
         finishedObserver = NotificationCenter.default.addObserver(
             forName: .recordingFinished, object: nil, queue: .main
         ) { [weak self] note in
@@ -324,7 +327,7 @@ final class TranscriptionCenter {
             return editor.receiveTranscript(revision)
         }
         // Keep the read/modify/write on the main actor. Registering an editor cannot interleave with it.
-        var edit = try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaultsStore.load())
+        var edit = try package.loadEffectiveEdit(meta: meta, defaults: projectDefaults())
         let receipt = edit.subtitles.receive(revision)
         try package.saveEdit(edit)
         return receipt

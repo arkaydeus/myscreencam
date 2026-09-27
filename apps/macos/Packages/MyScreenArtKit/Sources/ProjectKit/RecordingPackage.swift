@@ -113,6 +113,15 @@ public struct RecordingPackage: Sendable, Hashable {
             .normalized(duration: meta.duration)
     }
 
+    /// Fixes the first-use defaults for a direct Library export. An existing edit is never overwritten.
+    public func loadOrCreateEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
+        if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
+        let initial = try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
+            .normalized(duration: meta.duration)
+        try saveEdit(initial)
+        return initial
+    }
+
     /// Atomic write (temp file + rename), so a crash never leaves a half-written `edit.json`.
     public func saveEdit(_ edit: EditConfig) throws {
         try JSONEncoder.pretty.encode(edit).write(to: url(PackageLayout.edit), options: .atomic)

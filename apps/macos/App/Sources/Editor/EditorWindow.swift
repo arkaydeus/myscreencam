@@ -144,16 +144,20 @@ enum EditorLoader {
             throw EditorLoadError.unreadable(String(describing: error))
         }
         let edit: EditConfig
-        let saved: EditConfig?
-        do {
-            saved = resetEdit ? nil : try package.loadEdit()
-        } catch {
-            throw EditorLoadError.corruptEdit(String(describing: error))
-        }
-        if let saved {
-            edit = saved.normalized(duration: meta.duration)
+        if resetEdit {
+            edit = EditConfig.makeInitial(meta: meta, events: events, defaults: defaults)
+                .normalized(duration: meta.duration)
         } else {
-            edit = try package.loadEffectiveEdit(meta: meta, defaults: defaults)
+            let saved: EditConfig?
+            do {
+                saved = try package.loadEdit()
+            } catch {
+                throw EditorLoadError.corruptEdit(String(describing: error))
+            }
+            edit =
+                saved?.normalized(duration: meta.duration)
+                ?? EditConfig.makeInitial(meta: meta, events: events, defaults: defaults)
+                .normalized(duration: meta.duration)
         }
         return RenderProject(package: package, meta: meta, edit: edit, events: events, cursorIndex: cursors)
     }

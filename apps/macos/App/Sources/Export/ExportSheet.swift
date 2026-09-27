@@ -10,6 +10,8 @@ import SwiftUI
 struct ExportSheet: View {
     let package: RecordingPackage
     let edit: EditConfig
+    /// For a direct Library export, save the first edit only after a destination is chosen.
+    let prepareEdit: (() throws -> EditConfig)?
 
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -32,9 +34,10 @@ struct ExportSheet: View {
         var hasAudibleAudio: Bool
     }
 
-    init(package: RecordingPackage, edit: EditConfig) {
+    init(package: RecordingPackage, edit: EditConfig, prepareEdit: (() throws -> EditConfig)? = nil) {
         self.package = package
         self.edit = edit
+        self.prepareEdit = prepareEdit
     }
 
     var body: some View {
@@ -382,14 +385,23 @@ struct ExportSheet: View {
             response = panel.runModal()
         }
         guard response == .OK, let url = panel.url else { return }
+        let exportEdit: EditConfig
+        do {
+            exportEdit = try prepareEdit?() ?? edit
+        } catch {
+            errorMessage = "Couldn't save the recording's initial edits: \(error.localizedDescription)"
+            return
+        }
         ExportOptionsStore.rememberDirectory(of: url)
 
         errorMessage = nil
         let subtitles =
-            hasSubtitles && saveSubtitles
-            ? SubtitleExport.srt(cues: edit.subtitles.cues, timeline: EditTimeline(segments: edit.segments)) : nil
+            exportEdit.subtitles.enabled && saveSubtitles
+                && exportEdit.subtitles.cues.contains { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+            ? SubtitleExport.srt(cues: exportEdit.subtitles.cues, timeline: EditTimeline(segments: exportEdit.segments))
+            : nil
         job = model.exports.start(
-            package: package, name: info.name, edit: edit, settings: settings, destination: url,
+            package: package, name: info.name, edit: exportEdit, settings: settings, destination: url,
             subtitleSidecar: subtitles)
     }
 
