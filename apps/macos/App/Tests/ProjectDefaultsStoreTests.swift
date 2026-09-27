@@ -2,7 +2,7 @@ import Foundation
 import ProjectKit
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 nonisolated private final class InMemoryDefaults: UserDefaults, @unchecked Sendable {
     private let lock = NSLock()

@@ -3,7 +3,7 @@ import ProjectKit
 import SpeechCore
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 private actor SingleModelWorker: SpeechWorker {
     private var loaded: WorkerModelRole?

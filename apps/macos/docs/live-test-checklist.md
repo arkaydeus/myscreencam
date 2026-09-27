@@ -4,7 +4,7 @@ Unit and integration tests cover everything that doesn't need TCC permissions. T
 
 **Setup:**
 1. Build and launch from `apps/macos` with `mise run run`.
-2. Grant **MyScreenArt Dev** Screen & System Audio Recording, Camera, Microphone and Input Monitoring, using the Recorder's Permissions card.
+2. Grant **My Screen Cam Dev** Screen & System Audio Recording, Camera, Microphone and Input Monitoring, using the Recorder's Permissions card.
 3. Relaunch after granting Screen Recording and Input Monitoring.
 
 ## Recorder

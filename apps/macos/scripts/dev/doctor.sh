@@ -4,7 +4,7 @@ set -uo pipefail
 
 # The macOS app root (apps/macos in the monorepo), not the git top level.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-app="${MSA_DERIVED_DATA:-$root/build/DerivedData}/Build/Products/Debug/MyScreenArt Dev.app"
+app="${MSC_DERIVED_DATA:-$root/build/DerivedData}/Build/Products/Debug/My Screen Cam Dev.app"
 
 section() { printf '\n== %s ==\n' "$1"; }
 
@@ -34,6 +34,6 @@ else
 fi
 
 section "Permissions"
-echo "Grant Screen & System Audio Recording and Input Monitoring to 'MyScreenArt Dev' when prompted."
+echo "Grant Screen & System Audio Recording and Input Monitoring to 'My Screen Cam Dev' when prompted."
 echo "Screen:  open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'"
 echo "Input:   open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'"

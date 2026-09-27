@@ -227,7 +227,7 @@ Native adds ⌘Z / ⇧⌘Z undo/redo and ⌘E export (both were missing or broke
   - Idle: Record Display / Record Window.
   - Recording: Finish Recording.
   - Always: Show Projects, Quit.
-  - While recording, the tooltip reads "MyScreenArt — Recording".
+  - While recording, the tooltip reads "My Screen Cam — Recording".
 - **Dock menu:** the same items.
 - **Global shortcut:** ⌥⌘↩ opens a new recording.
 - **App menu:**
@@ -237,7 +237,7 @@ Native adds ⌘Z / ⇧⌘Z undo/redo and ⌘E export (both were missing or broke
 - **File menu:** Projects ⌘1, New Recording ⌥⌘↩, Finish Recording ⇧⌘R (only while recording), Open Recording… ⌘O, Export… ⌘E.
 - **Dock icon:** if the preference is on, it hides when the window closes and nothing is recording, and reappears when a recording starts.
 - **Last window closed:** the app does **not** quit.
-- **URL scheme** `myscreenart://` (dev: `myscreenart-dev://`):
+- **URL scheme** `myscreencam://` (dev: `myscreencam-dev://`):
 
   | Command | Opens |
   |---|---|

@@ -1,14 +1,14 @@
 import AppKit
 import CaptureKit
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import ProjectKit
 import RecordingKit
 
 extension Notification.Name {
     /// Posted on the main thread when a recording has been saved; `object` is the package URL.
-    static let recordingFinished = Notification.Name("MyScreenArtRecordingFinished")
+    static let recordingFinished = Notification.Name("MyScreenCamRecordingFinished")
 }
 
 /// Recording lifecycle for the whole app: countdown → `RecordingSession` → finish (open the editor) or

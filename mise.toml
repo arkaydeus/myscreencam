@@ -1,4 +1,4 @@
-# MyScreenArt monorepo root. Each project under apps/ has its own mise.toml with its tools and tasks.
+# My Screen Cam monorepo root. Each project under apps/ has its own mise.toml with its tools and tasks.
 #   mise run setup                 # once: installs every project's tools and the bun workspace
 #   mise //apps/macos:<task>       # macOS app (build, run, test, lint, release, ...)
 #   mise //apps/web:<task>         # marketing site (dev, build, lint, format, ...)

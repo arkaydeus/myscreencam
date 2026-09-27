@@ -1,4 +1,4 @@
-# MyScreenArt Native — Rewrite Plan
+# My Screen Cam Native — Rewrite Plan
 
 Status: **phases 0–6 implemented (2026-09-25)**. Engine: ProjectKit, CaptureKit, RecordingKit, RenderKit, ExportKit. App: Recorder, Library, Editor, Export, Shell (Sparkle, Quick Look, App Intents, release pipeline). Live capture awaits permission-based validation (`docs/live-test-checklist.md`). Measurements are in `docs/perf-baseline.md`.
 Source app: `/Users/arkaydeus/project/apps/myscreenart` (Electron + React + Rust daemon + FFmpeg). It was never released, so the rewrite needs no compatibility with its files, bundle ID or update feed.
@@ -7,7 +7,7 @@ Source app: `/Users/arkaydeus/project/apps/myscreenart` (Electron + React + Rust
 
 ## 1. Goal
 
-Rebuild MyScreenArt as a native macOS app that does what the current app does and uses far fewer resources. Wherever the OS provides a hardware-accelerated, zero-copy path, use it instead of a third-party layer.
+Rebuild My Screen Cam as a native macOS app that does what the current app does and uses far fewer resources. Wherever the OS provides a hardware-accelerated, zero-copy path, use it instead of a third-party layer.
 
 Guiding rules:
 
@@ -72,7 +72,7 @@ Guiding rules:
 ## 3. Target architecture
 
 ```
-┌──────────────────────────── MyScreenArt.app (single process) ────────────────────────────┐
+┌──────────────────────────── My Screen Cam.app (single process) ────────────────────────────┐
 │                                                                                           │
 │  App layer (SwiftUI + AppKit where needed)                                                │
 │   Library · Recorder · Editor · Export sheet · MenuBarExtra · Recording HUD (NSPanel)     │
@@ -251,7 +251,7 @@ Size, smoothing, click highlight, drag trail and hide-when-idle apply to all thr
   - Carbon `RegisterEventHotKey`, which needs no Accessibility permission.
   - Defaults: ⌥⌘↩ opens a new recording, and ⌘⇧R starts/stops. This fixes the current half-wired shortcut.
 - **Automation:**
-  - The `myscreenart://` URL scheme is kept (record, display, window, projects).
+  - The `myscreencam://` URL scheme is kept (record, display, window, projects).
   - **App Intents** are new: "Start Recording", "Stop Recording", "Open Library". These work from Shortcuts, Spotlight and Siri.
 - **Undo, redo and autosave:**
   - `UndoManager` covers every edit, so undo/redo is native.
@@ -273,9 +273,9 @@ Size, smoothing, click highlight, drag trail and hide-when-idle apply to all thr
 
 ### 3.6 Development signing (replaces the Electron dev-host machinery)
 
-- Debug builds are signed with a stable Apple Development identity and a fixed bundle ID `com.myscreenart.app.dev`, so TCC grants (Screen Recording, Input Monitoring, Camera, Mic) **persist across rebuilds**.
-- **Bundle IDs (new):** release `com.myscreenart.app`, debug `com.myscreenart.app.dev`.
-- Dev builds use `~/Movies/MyScreenArt Dev/<worktree-id>/` through a build-setting or environment override. Release builds use `~/Movies/MyScreenArt/`.
+- Debug builds are signed with a stable Apple Development identity and a fixed bundle ID `com.myscreencam.app.dev`, so TCC grants (Screen Recording, Input Monitoring, Camera, Mic) **persist across rebuilds**.
+- **Bundle IDs (new):** release `com.myscreencam.app`, debug `com.myscreencam.app.dev`.
+- Dev builds use `~/Movies/My Screen Cam Dev/<worktree-id>/` through a build-setting or environment override. Release builds use `~/Movies/My Screen Cam/`.
 - Hardened Runtime. Not sandboxed at first (Developer ID distribution); the sandbox can be evaluated later, since it would need the Movies-folder entitlement.
 
 ---
@@ -306,13 +306,13 @@ Recording_YYYYMMDD_HHMMSS_xxxxxxxx/
 ```
 myscreenart-native/
 ├── App/                         # XcodeGen app target
-│   ├── MyScreenArtApp.swift     # @main, scenes, MenuBarExtra, AppDelegate adaptor
+│   ├── MyScreenCamApp.swift     # @main, scenes, MenuBarExtra, AppDelegate adaptor
 │   ├── Library/ Recorder/ Editor/ Export/ Settings/
 │   ├── Editor/Timeline/         # AppKit NSView + CALayers, hosted via NSViewRepresentable
 │   ├── HUD/  Hotkeys/  Intents/  Updates/
 │   ├── Resources/ (cursors/*.svg, Assets.xcassets)
-│   ├── Info.plist  MyScreenArt.entitlements
-├── Packages/MyScreenArtKit/      # SwiftPM
+│   ├── Info.plist  MyScreenCam.entitlements
+├── Packages/MyScreenCamKit/      # SwiftPM
 │   ├── Sources/{CaptureKit,RecordingKit,ProjectKit,RenderKit,ExportKit}
 │   └── Tests/…                   # Swift Testing; golden-frame render tests
 ├── project.yml                  # XcodeGen
@@ -377,7 +377,7 @@ The `docs/todo` Screen Studio parity backlog (186 items) stays a post-v1 backlog
 | # | Decision | Outcome |
 |---|---|---|
 | 1 | Minimum macOS | **15 Sequoia** (default; not yet confirmed by the user) |
-| 2 | Bundle ID | **New**: `com.myscreenart.app` / `com.myscreenart.app.dev` (user) |
+| 2 | Bundle ID | **New**: `com.myscreencam.app` / `com.myscreencam.app.dev` (user) |
 | 3 | Old recordings | **Not supported**: the old app was never released (user) |
 | 4 | Recording codec | **HEVC** (default; not yet confirmed by the user). ProRes 422 Proxy can be offered later as a setting |
 | 5 | v1 scope | **Full parity with bugs fixed, plus extras**: region capture, pause/resume, mouse-follow zoom, background/padding/frame, GIF export, Quick Look (user) |

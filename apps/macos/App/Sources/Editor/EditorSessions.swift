@@ -1,5 +1,5 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// The open editor windows' models. Other areas rely only on `hasPendingSaves`, `flushAll()`, `isAnyPlaying` and

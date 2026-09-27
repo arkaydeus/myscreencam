@@ -1,5 +1,5 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import ServiceManagement
 
@@ -60,7 +60,7 @@ final class ShellSettings {
         let status = SMAppService.mainApp.status
         launchAtLogin = status == .enabled
         if status == .requiresApproval {
-            launchAtLoginMessage = "Approve MyScreenArt in System Settings > General > Login Items."
+            launchAtLoginMessage = "Approve My Screen Cam in System Settings > General > Login Items."
         }
     }
 }

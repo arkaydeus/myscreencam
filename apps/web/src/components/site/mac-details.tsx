@@ -26,7 +26,7 @@ const details = [
   {
     icon: Link2,
     title: "Works with Shortcuts.",
-    body: "Start, finish and open recordings from the Shortcuts app, or from scripts with myscreenart:// links.",
+    body: "Start, finish and open recordings from the Shortcuts app, or from scripts with myscreencam:// links.",
   },
   {
     icon: RefreshCw,

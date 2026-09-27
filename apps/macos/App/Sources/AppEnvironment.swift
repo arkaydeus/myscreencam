@@ -1,5 +1,5 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// Process-wide facts resolved once at launch.
@@ -15,6 +15,11 @@ final class AppEnvironment {
 
     static func live(bundle: Bundle = .main) -> AppEnvironment {
         let flavor = AppFlavor(bundleIdentifier: bundle.bundleIdentifier)
+        if let bundleIdentifier = bundle.bundleIdentifier {
+            do { try LegacyStateMigration.migrate(bundleIdentifier: bundleIdentifier) } catch {
+                Log.app.error("Legacy settings migration failed: \(error, privacy: .public)")
+            }
+        }
         let root = Result { try RecordingsLocation.prepare(flavor: flavor) }
         switch root {
         case .success(let url): Log.app.info("Recordings root: \(url.path(), privacy: .public)")

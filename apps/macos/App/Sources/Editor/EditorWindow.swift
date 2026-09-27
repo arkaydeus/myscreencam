@@ -1,4 +1,4 @@
-import MyScreenArtCore
+import MyScreenCamCore
 import ProjectKit
 import RenderKit
 import SwiftUI
@@ -110,7 +110,7 @@ enum EditorLoadError: Error {
     var message: String {
         switch self {
         case .noPackage: "Open a recording from the library."
-        case .missingMeta: "The package has no meta.json, so it isn't a MyScreenArt recording."
+        case .missingMeta: "The package has no meta.json, so it isn't a My Screen Cam recording."
         case .unreadable(let detail): "The recording's files couldn't be read.\n\(detail)"
         case .corruptEdit(let detail):
             "edit.json couldn't be read. Resetting starts the edit over (the recording itself is untouched).\n\(detail)"

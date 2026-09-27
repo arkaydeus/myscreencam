@@ -1,7 +1,7 @@
 import AppKit
 import ExportKit
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import ProjectKit
 

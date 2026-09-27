@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the speech-model catalogue (pinned revisions, file inventory, sizes, SHA-256) from Hugging Face.
 
-    scripts/speech/make-catalogue.py > Packages/MyScreenArtKit/Sources/SpeechCore/Resources/catalogue.json
+    scripts/speech/make-catalogue.py > Packages/MyScreenCamKit/Sources/SpeechCore/Resources/catalogue.json
     scripts/speech/make-catalogue.py --download DIR   # also fetch every file into DIR/<id>/ and verify it
 
 LFS files carry their SHA-256 in the tree listing; small git files are downloaded and hashed. Revisions are pinned

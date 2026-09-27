@@ -1,5 +1,5 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import UserNotifications
 
 /// Posts "export finished" banners with a "Show in Finder" action when the app isn't frontmost.
@@ -19,7 +19,7 @@ final class ExportNotifier: NSObject {
     private static var isDisabled: Bool {
         let environment = ProcessInfo.processInfo.environment
         return environment["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil
-            || environment["MYSCREENART_DISABLE_NOTIFICATIONS"] == "1"
+            || environment["MYSCREENCAM_DISABLE_NOTIFICATIONS"] == "1"
     }
 
     /// Registers the category and asks for authorization once. Called when an export starts.

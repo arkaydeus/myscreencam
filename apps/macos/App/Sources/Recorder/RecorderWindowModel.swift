@@ -1,6 +1,6 @@
 import AppKit
 import CaptureKit
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// State of the New Recording window while it is visible: sources, thumbnails, devices, permissions, the live

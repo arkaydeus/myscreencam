@@ -1,6 +1,6 @@
 import AppKit
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import ProjectKit
 import SpeechCore

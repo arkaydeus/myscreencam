@@ -1,9 +1,9 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import ProjectKit
 
 /// AppKit lifecycle hooks SwiftUI doesn't cover: quit guards, Dock menu, reopen, URL scheme and
-/// document opens. `MyScreenArtApp.init` hands it the `AppShell` before launch finishes.
+/// document opens. `MyScreenCamApp.init` hands it the `AppShell` before launch finishes.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var shell: AppShell?

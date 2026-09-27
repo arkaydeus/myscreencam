@@ -1,5 +1,5 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import Sparkle
 
@@ -7,7 +7,7 @@ import Sparkle
 /// `SPARKLE_PUBLIC_ED_KEY` build setting in `project.yml`. Until a real key is set, the updater isn't
 /// started (Sparkle would refuse to run and show an error) and "Check for Updates…" is disabled.
 ///
-/// Automatic checks are off in Debug builds (`MSA_SPARKLE_AUTOMATIC_CHECKS`). A downloaded update never
+/// Automatic checks are off in Debug builds (`MSC_SPARKLE_AUTOMATIC_CHECKS`). A downloaded update never
 /// relaunches the app while `AppModel.isBusy` (recording, exporting or saving): the relaunch is postponed
 /// until the model becomes idle.
 @MainActor

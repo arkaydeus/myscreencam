@@ -1,9 +1,9 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import SpeechCore
 import SpeechEngines
 
-// `MyScreenArtSpeech.xpc`: the one owner of loaded speech models. Started on demand by the app; it exits when its
+// `MyScreenCamSpeech.xpc`: the one owner of loaded speech models. Started on demand by the app; it exits when its
 // connection goes away (the app cancelled, went idle, or quit), which is how every byte of Core ML / MLX memory is
 // returned to the system. Requests are handled one at a time by `InferenceEngine`; `shutdown` is answered
 // immediately, outside the engine.
@@ -48,7 +48,7 @@ final class ServiceDelegate: NSObject, NSXPCListenerDelegate {
         return true
     }
 
-    static let teamIdentifier = Bundle.main.object(forInfoDictionaryKey: "MSATeamIdentifier") as? String ?? "QWD87G9T3P"
+    static let teamIdentifier = Bundle.main.object(forInfoDictionaryKey: "MSCTeamIdentifier") as? String ?? "QWD87G9T3P"
 }
 
 let delegate = ServiceDelegate()

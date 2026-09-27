@@ -1,5 +1,5 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import ProjectKit
 import UniformTypeIdentifiers
 
@@ -53,7 +53,7 @@ final class ShellActions {
         let panel = NSOpenPanel()
         panel.title = "Open Recording"
         panel.prompt = "Open"
-        panel.allowedContentTypes = [.myScreenArtRecording]
+        panel.allowedContentTypes = [.myScreenCamRecording, .myScreenArtRecording]
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
@@ -65,7 +65,7 @@ final class ShellActions {
     }
 
     func openRecording(at url: URL) {
-        guard url.pathExtension.lowercased() == PackageLayout.packageExtension else {
+        guard PackageLayout.supportsExtension(url.pathExtension) else {
             Log.app.error("Not a recording package: \(url.path(), privacy: .public)")
             return
         }
@@ -74,6 +74,7 @@ final class ShellActions {
 }
 
 extension UTType {
-    /// A `.msarec` recording package, declared in `App/Info.plist` (`UTExportedTypeDeclarations`).
-    static let myScreenArtRecording = UTType(exportedAs: PackageLayout.packageUTType, conformingTo: .package)
+    /// A `.mscam` recording package, declared in `App/Info.plist` (`UTExportedTypeDeclarations`).
+    static let myScreenCamRecording = UTType(exportedAs: PackageLayout.packageUTType, conformingTo: .package)
+    static let myScreenArtRecording = UTType(importedAs: "com.myscreenart.recording", conformingTo: .package)
 }

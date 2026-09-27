@@ -2,7 +2,7 @@
 // Replaces a recording's microphone track with synthesised speech and writes ground-truth start times for the first
 // word of every phrase, for timing benchmarks (docs/speech-integration.md).
 //
-//   swift scripts/speech/make-timing-fixture.swift <package.msarec> "<text>" [voice-language, default en-US]
+//   swift scripts/speech/make-timing-fixture.swift <package.mscam> "<text>" [voice-language, default en-US]
 //
 // The text is split into phrases at punctuation; each phrase is synthesised separately (AVSpeechSynthesizer), its
 // real onset measured from the audio, and the phrases are joined with 0.35 s pauses. Speech within a phrase is

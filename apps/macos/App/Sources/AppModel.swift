@@ -1,4 +1,4 @@
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 import SwiftUI
 

@@ -1,7 +1,7 @@
 import AVFoundation
 import ExportKit
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import ProjectKit
 import RenderKit
 

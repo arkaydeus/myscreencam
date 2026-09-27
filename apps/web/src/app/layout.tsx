@@ -8,13 +8,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
     default: `${site.name}: screen recordings that look finished`,
-    template: `%s | ${site.name}`,
+    template: `%s | ${site.brand}`,
   },
   description: site.description,
   applicationName: site.name,
   openGraph: {
     type: "website",
-    siteName: site.name,
+    siteName: site.brand,
     title: `${site.name}: screen recordings that look finished`,
     description: site.description,
   },

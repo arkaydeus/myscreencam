@@ -1,5 +1,5 @@
 import AppKit
-import MyScreenArtCore
+import MyScreenCamCore
 import SwiftUI
 
 /// Settings window (⌘,): General, Defaults, Subtitles and Updates, in the app theme.

@@ -61,7 +61,7 @@ What this shows:
 
 Other things observed while measuring:
 - The busy recording (`Recording_20260925_002446_35f69cf2`) showed a **black preview and never advanced the playhead** in the old editor, although all four files probe fine (73.6 s, 4416 frames). The static recording played normally. The cause wasn't investigated.
-- Two recordings made during these runs remain in `~/Movies/MyScreenArt Dev/d804a0b921f0/`. They contain real screen, webcam and mic content.
+- Two recordings made during these runs remain in `~/Movies/My Screen Cam Dev/d804a0b921f0/`. They contain real screen, webcam and mic content.
 
 ### Native recording and editor targets (phases 1 and 4)
 
@@ -77,7 +77,7 @@ Other things observed while measuring:
 
 ### Export (RenderKit + ExportKit), measured 2026-09-25
 
-**Method:** `msa-tool import-legacy` wraps the same legacy recording (`123dc5953d43/…130609`: 52.4 s, 3008×1692 @60, webcam, system + mic audio) as a `.msarec`. Auto-zoom seeding produced the same **10 zooms**, and the webcam overlay is on. Then `msa-tool export`, sampled with `sample.py`. Hardware VideoToolbox encoders; Core Image compositor on the GPU.
+**Method:** `msc-tool import-legacy` wraps the same legacy recording (`123dc5953d43/…130609`: 52.4 s, 3008×1692 @60, webcam, system + mic audio) as a `.mscam`. Auto-zoom seeding produced the same **10 zooms**, and the webcam overlay is on. Then `msc-tool export`, sampled with `sample.py`. Hardware VideoToolbox encoders; Core Image compositor on the GPU.
 
 | Export | Wall | CPU time (process) | Memory peak | vs legacy |
 |---|---:|---:|---:|---|
@@ -135,7 +135,7 @@ Findings:
 
 | Measurement | CPU (1 core = 100%) | Memory | Legacy |
 |---|---:|---:|---|
-| Headless (`msa-tool play`, 1938×1090 preview), legacy clip | 16.3% | 240 MB | – |
+| Headless (`msc-tool play`, 1938×1090 preview), legacy clip | 16.3% | 240 MB | – |
 | Headless, real 4112×2658 recording | 19.9% | 275 MB | – |
 | **In the app** (optimised Dev build, legacy clip, 4 editor windows open) | **20.6%** | **358 MB** avg / 538 MB peak | 50.6% / 767 MB |
 | In the app, idle with 4 editors open (paused) | 0.1% | 150 MB | 0.2% / 387 MB |

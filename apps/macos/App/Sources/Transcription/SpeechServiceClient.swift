@@ -1,5 +1,5 @@
 import Foundation
-import MyScreenArtCore
+import MyScreenCamCore
 import SpeechCore
 
 /// The queue owns the service lifecycle; tests can supply an in-process single-model worker.
@@ -8,7 +8,7 @@ protocol SpeechServiceManaging: SpeechWorker {
     func reset()
 }
 
-/// Talks to the `MyScreenArtSpeech` XPC service.
+/// Talks to the `MyScreenCamSpeech` XPC service.
 ///
 /// - The service is launched on the first request and exits when the connection is invalidated, so
 ///   ``release()`` returns every byte of model memory to the system.
@@ -18,7 +18,7 @@ protocol SpeechServiceManaging: SpeechWorker {
 ///   replayed before the next request, so callers don't need to know.
 nonisolated final class SpeechServiceClient: SpeechServiceManaging, @unchecked Sendable {
     static let serviceName =
-        (Bundle.main.bundleIdentifier ?? "com.myscreenart.app") + SpeechServiceIdentity.bundleSuffix
+        (Bundle.main.bundleIdentifier ?? "com.myscreencam.app") + SpeechServiceIdentity.bundleSuffix
 
     private let lock = NSLock()
     private let makeConnection: () -> NSXPCConnection

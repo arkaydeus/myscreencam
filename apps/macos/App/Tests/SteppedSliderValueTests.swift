@@ -1,7 +1,7 @@
 import SwiftUI
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 @MainActor
 struct SteppedSliderValueTests {

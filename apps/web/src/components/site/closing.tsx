@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 
-import { DownloadButton, LogoMark } from "@/components/site/brand";
+import { BuyButton, DownloadButton, LogoMark } from "@/components/site/brand";
 import { site } from "@/lib/site";
 
 export function Closing() {
@@ -13,9 +13,12 @@ export function Closing() {
             Make your next recording look finished.
           </h2>
           <p className="mt-3.5 text-[17px] leading-[1.47] text-muted-foreground sm:mt-5 sm:text-[21px] sm:leading-[1.38]">
-            Download MyScreenArt, record something, and see what the editor does with it.
+            Download My Screen Cam, record something, and see what the editor does with it.
           </p>
-          <DownloadButton className="mt-7 sm:mt-9" />
+          <div className="mt-7 flex flex-col items-center gap-3 sm:mt-9 sm:flex-row">
+            <DownloadButton />
+            <BuyButton />
+          </div>
           <p className="mt-3.5 text-xs text-muted-foreground sm:mt-4 sm:text-sm">
             {site.requirements}
           </p>
@@ -45,11 +48,11 @@ export function SiteFooter() {
         <div className="flex items-center gap-2 border-b border-rule py-4 text-ink">
           <LogoMark size={16} className="size-4" />
           <ChevronRight aria-hidden className="size-3 text-[#86868b]" strokeWidth={2} />
-          <span>{site.name}</span>
+          <span>{site.brand}</span>
         </div>
         <div className="flex flex-col-reverse gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            Copyright © {new Date().getFullYear()} {site.name}. All rights reserved.
+            Copyright © {new Date().getFullYear()} {site.brand}. All rights reserved.
           </p>
           <nav aria-label="Footer" className="flex gap-5">
             {footerLinks.map((link) => (

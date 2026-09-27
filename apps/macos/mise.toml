@@ -1,4 +1,4 @@
-# Tool versions and developer tasks for the MyScreenArt macOS app (//apps/macos in the monorepo).
+# Tool versions and developer tasks for the My Screen Cam macOS app (//apps/macos in the monorepo).
 # Run `mise install` once here (or `mise run setup` at the repo root). From this directory run `mise run <task>`; from anywhere else
 # run `mise //apps/macos:<task>` (`mise tasks ls --all` lists them).
 
@@ -8,29 +8,29 @@
 [env]
 # Use full Xcode even when xcode-select points at the Command Line Tools. Override by exporting DEVELOPER_DIR.
 DEVELOPER_DIR = "{{ get_env(name='DEVELOPER_DIR', default='/Applications/Xcode.app/Contents/Developer') }}"
-MSA_DERIVED_DATA = "{{config_root}}/build/DerivedData"
+MSC_DERIVED_DATA = "{{config_root}}/build/DerivedData"
 # mlx-swift (speech service) ships a SwiftPM build-tool plugin and swift-syntax macros; command-line xcodebuild
 # refuses unvalidated plugins/macros. They come from the pinned, reviewed revisions in Package.resolved.
-MSA_XCODEBUILD_TRUST = "-skipPackagePluginValidation -skipMacroValidation"
+MSC_XCODEBUILD_TRUST = "-skipPackagePluginValidation -skipMacroValidation"
 
 [tasks.generate]
-description = "Generate MyScreenArt.xcodeproj from project.yml"
+description = "Generate MyScreenCam.xcodeproj from project.yml"
 run = "xcodegen generate --quiet"
 
 [tasks.build]
 description = "Build the Debug app (signed with the Apple Development identity)"
 depends = ["generate"]
-run = "scripts/dev/xcodebuild.sh -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet build"
+run = "scripts/dev/xcodebuild.sh -project MyScreenCam.xcodeproj -scheme MyScreenCam -configuration Debug -derivedDataPath \"$MSC_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSC_XCODEBUILD_TRUST -quiet build"
 
 [tasks."build:unsigned"]
 description = "Build the Debug app without code signing; separate DerivedData so it never replaces the signed dev app"
 depends = ["generate"]
-run = "scripts/dev/xcodebuild.sh -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet CODE_SIGNING_ALLOWED=NO build"
+run = "scripts/dev/xcodebuild.sh -project MyScreenCam.xcodeproj -scheme MyScreenCam -configuration Debug -derivedDataPath \"$MSC_DERIVED_DATA-unsigned\" -destination 'platform=macOS,arch=arm64' $MSC_XCODEBUILD_TRUST -quiet CODE_SIGNING_ALLOWED=NO build"
 
 [tasks."build:perf"]
 description = "Build the Dev app (same bundle ID/signing/TCC grants) with full optimisation, for perf measurements"
 depends = ["generate"]
-run = "scripts/dev/xcodebuild.sh -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO build"
+run = "scripts/dev/xcodebuild.sh -project MyScreenCam.xcodeproj -scheme MyScreenCam -configuration Debug -derivedDataPath \"$MSC_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSC_XCODEBUILD_TRUST -quiet SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule GCC_OPTIMIZATION_LEVEL=s ENABLE_TESTABILITY=NO build"
 
 [tasks.run]
 description = "Build and launch this worktree's Debug app via LaunchServices"
@@ -39,7 +39,7 @@ run = "scripts/dev/run.sh"
 
 [tasks.test]
 description = "Run the engine package tests"
-run = "swift test --package-path Packages/MyScreenArtKit"
+run = "swift test --package-path Packages/MyScreenCamKit"
 
 [tasks."test:speech-engines"]
 description = "Run speech worker path and token-mapping tests"
@@ -52,7 +52,7 @@ run = "bash scripts/test-scripts.sh"
 [tasks."test:app"]
 description = "Run app-target state and lifecycle tests"
 depends = ["build"]
-run = "scripts/dev/xcodebuild.sh -project MyScreenArt.xcodeproj -scheme MyScreenArt -configuration Debug -derivedDataPath \"$MSA_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSA_XCODEBUILD_TRUST -quiet test"
+run = "scripts/dev/xcodebuild.sh -project MyScreenCam.xcodeproj -scheme MyScreenCam -configuration Debug -derivedDataPath \"$MSC_DERIVED_DATA\" -destination 'platform=macOS,arch=arm64' $MSC_XCODEBUILD_TRUST -quiet test"
 
 [tasks.format]
 description = "Format Swift sources in place"
@@ -93,8 +93,8 @@ run = "echo 'All checks passed.'"
 
 [tasks.clean]
 description = "Remove build artifacts and the generated project"
-run = ["rm -rf build MyScreenArt.xcodeproj Packages/MyScreenArtKit/.build", "scripts/dev/unregister-builds.sh"]
+run = ["rm -rf build MyScreenCam.xcodeproj Packages/MyScreenCamKit/.build", "scripts/dev/unregister-builds.sh"]
 
 [tasks.unregister]
-description = "Unregister stale MyScreenArt builds (from every worktree) from LaunchServices and Login Items & Extensions"
+description = "Unregister stale My Screen Cam builds (from every worktree) from LaunchServices and Login Items & Extensions"
 run = "scripts/dev/unregister-builds.sh"

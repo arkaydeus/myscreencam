@@ -1,5 +1,5 @@
 import CaptureKit
-import MyScreenArtCore
+import MyScreenCamCore
 import Observation
 
 /// Owns the one open camera, shared by the recorder's live preview and the recording (so the device isn't

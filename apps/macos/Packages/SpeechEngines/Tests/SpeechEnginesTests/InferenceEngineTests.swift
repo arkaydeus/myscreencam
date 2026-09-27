@@ -8,7 +8,7 @@ import Testing
 
 struct InferenceEngineTests {
     @Test func rejectsUnverifiedModelPath() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "msa-engine-test-\(UUID().uuidString)")
+        let root = FileManager.default.temporaryDirectory.appending(path: "msc-engine-test-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let engine = InferenceEngine(modelsRoot: root)
@@ -19,7 +19,7 @@ struct InferenceEngineTests {
     }
 
     @Test func recognitionRequiresLoadedModel() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "msa-engine-test-\(UUID().uuidString)")
+        let root = FileManager.default.temporaryDirectory.appending(path: "msc-engine-test-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let package = try RecordingPackage.create(in: root)
         let cache = package.url(PackageLayout.transcriptionCacheDirectory)

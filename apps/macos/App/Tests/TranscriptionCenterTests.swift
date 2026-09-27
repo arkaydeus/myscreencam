@@ -6,7 +6,7 @@ import ProjectKit
 import SpeechCore
 import Testing
 
-@testable import MyScreenArt_Dev
+@testable import MyScreenCam
 
 /// A worker with exactly one loaded role; the first recognition can be held while re-time is requested.
 nonisolated private final class PausingSpeechClient: SpeechServiceManaging, @unchecked Sendable {
@@ -129,7 +129,7 @@ nonisolated private final class PausingSpeechClient: SpeechServiceManaging, @unc
 @MainActor
 struct TranscriptionCenterTests {
     private func fixture() async throws -> (root: URL, package: RecordingPackage, models: SpeechModels) {
-        let root = FileManager.default.temporaryDirectory.appending(path: "msa-center-test-\(UUID().uuidString)")
+        let root = FileManager.default.temporaryDirectory.appending(path: "msc-center-test-\(UUID().uuidString)")
         let package = try RecordingPackage.create(in: root)
         let meta = RecordingMeta(
             name: "Speech", duration: 2.5, source: .display(displayID: 1, name: "Test"),
