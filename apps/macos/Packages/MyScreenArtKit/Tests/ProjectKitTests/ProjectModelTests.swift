@@ -63,13 +63,15 @@ struct ProjectModelTests {
         let meta = sampleMeta()
         let click = InputEvent(t: 2, kind: .down, x: 0.25, y: 0.75, button: 0)
         try InputEventLog.encodeLine(click).write(to: package.url(PackageLayout.events))
-        let initial = try package.loadEffectiveEdit(meta: meta, autoZoom: true)
+        let initial = try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults())
         #expect(initial.zoom.keyframes.count == 1)
-        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: false).zoom.keyframes.isEmpty)
+        #expect(
+            try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults(autoZoom: false)).zoom.keyframes.isEmpty
+        )
         var saved = initial
         saved.zoom.keyframes = []
         try package.saveEdit(saved)
-        #expect(try package.loadEffectiveEdit(meta: meta, autoZoom: true).zoom.keyframes.isEmpty)
+        #expect(try package.loadEffectiveEdit(meta: meta, defaults: ProjectDefaults()).zoom.keyframes.isEmpty)
     }
 
     @Test func initialEditReflectsMeta() {

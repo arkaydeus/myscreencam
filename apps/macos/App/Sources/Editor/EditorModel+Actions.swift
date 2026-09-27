@@ -55,7 +55,7 @@ extension EditorModel {
     func deleteSelection() {
         switch selection {
         case .segment: deleteSelectedSegment()
-        case .keyframe(let id): deleteKeyframe(id)
+        case .keyframes(let ids): deleteKeyframes(ids)
         case .blur(let id): deleteBlur(id)
         case .cue(let id): deleteCue(id)
         case nil: break
@@ -64,9 +64,28 @@ extension EditorModel {
 
     // MARK: Zoom keyframes
 
+    var selectedKeyframeIDs: Set<ZoomKeyframe.ID> {
+        if case .keyframes(let ids) = selection { ids } else { [] }
+    }
+
+    /// The selected keyframes, in time order.
+    var selectedKeyframes: [ZoomKeyframe] {
+        let ids = selectedKeyframeIDs
+        return edit.zoom.keyframes.filter { ids.contains($0.id) }
+    }
+
+    /// The selected keyframe the inspector and preview show: the anchor, or the earliest when it isn't selected.
     var selectedKeyframe: ZoomKeyframe? {
-        guard case .keyframe(let id) = selection else { return nil }
-        return edit.zoom.keyframes.first { $0.id == id }
+        let selected = selectedKeyframes
+        return selected.first { $0.id == keyframeAnchor } ?? selected.first
+    }
+
+    /// Selects a keyframe from a click (plain, ⌘ or ⇧).
+    func selectKeyframe(_ id: ZoomKeyframe.ID, _ modifier: SelectionModifier = .replace) {
+        let next = SelectionModifier.select(
+            id, modifier, current: selectedKeyframeIDs, anchor: keyframeAnchor, ordered: edit.zoom.keyframes.map(\.id))
+        keyframeAnchor = next.anchor
+        selection = next.ids.isEmpty ? nil : .keyframes(next.ids)
     }
 
     func addKeyframeAtPlayhead() {
@@ -75,16 +94,31 @@ extension EditorModel {
             time: currentSourceTime, scale: d.scale, target: .center, mode: .manual, easeIn: d.easeIn, hold: d.hold,
             easeOut: d.easeOut)
         update("Add Zoom") { $0.zoom.keyframes.append(keyframe) }
-        selection = .keyframe(keyframe.id)
+        selectKeyframe(keyframe.id)
         inspectorTab = .zoom
     }
 
-    func updateKeyframe(
-        _ id: ZoomKeyframe.ID, _ action: String, coalesce: AnyHashable? = nil, _ change: (inout ZoomKeyframe) -> Void
+    /// Applies one change to every keyframe in `ids` as a single undoable edit.
+    func updateKeyframes(
+        _ ids: Set<ZoomKeyframe.ID>, _ action: String, coalesce: AnyHashable? = nil,
+        _ change: (inout ZoomKeyframe) -> Void
     ) {
         update(action, coalesce: coalesce) { edit in
-            guard let i = edit.zoom.keyframes.firstIndex(where: { $0.id == id }) else { return }
-            change(&edit.zoom.keyframes[i])
+            for i in edit.zoom.keyframes.indices where ids.contains(edit.zoom.keyframes[i].id) {
+                change(&edit.zoom.keyframes[i])
+            }
+        }
+    }
+
+    /// Moves keyframes together from their source times at the start of a drag (wrap in a continuous change).
+    /// The shift is clamped so the whole group stays inside the recording.
+    func moveKeyframes(_ original: [ZoomKeyframe.ID: Double], by delta: Double) {
+        guard let first = original.values.min(), let last = original.values.max() else { return }
+        let shift = min(max(delta, -first), meta.duration - last)
+        update(original.count == 1 ? "Move Zoom" : "Move Zooms") { edit in
+            for i in edit.zoom.keyframes.indices {
+                if let time = original[edit.zoom.keyframes[i].id] { edit.zoom.keyframes[i].time = time + shift }
+            }
         }
     }
 
@@ -99,18 +133,18 @@ extension EditorModel {
             return
         }
         update("Duplicate Zoom") { $0.zoom.keyframes.append(copy) }
-        selection = .keyframe(copy.id)
+        selectKeyframe(copy.id)
     }
 
-    func deleteKeyframe(_ id: ZoomKeyframe.ID) {
-        update("Delete Zoom") { $0.zoom.keyframes.removeAll { $0.id == id } }
-        if selection == .keyframe(id) { selection = nil }
+    func deleteKeyframes(_ ids: Set<ZoomKeyframe.ID>) {
+        update(ids.count == 1 ? "Delete Zoom" : "Delete Zooms") { $0.zoom.keyframes.removeAll { ids.contains($0.id) } }
     }
 
-    /// Sets the selected keyframe's target from a point on the preview (normalised source coordinates).
+    /// Sets the selected keyframes' target from a point on the preview (normalised source coordinates).
     func setZoomTarget(_ point: NormPoint) {
-        guard let keyframe = selectedKeyframe else { return }
-        updateKeyframe(keyframe.id, "Set Zoom Target") {
+        let ids = selectedKeyframeIDs
+        guard !ids.isEmpty else { return }
+        updateKeyframes(ids, "Set Zoom Target") {
             $0.target = point.clamped
             if $0.mode == .click { $0.mode = .manual }
         }

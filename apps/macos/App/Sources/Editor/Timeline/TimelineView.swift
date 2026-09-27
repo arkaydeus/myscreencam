@@ -46,6 +46,23 @@ enum CueDragTime {
     }
 }
 
+/// A plain click on a selected zoom keeps the group until the gesture's outcome is known.
+enum KeyframeClick {
+    @MainActor
+    static func begin(_ id: ZoomKeyframe.ID, modifier: SelectionModifier, model: EditorModel) -> Bool {
+        let keepGroup =
+            modifier == .replace && model.selectedKeyframeIDs.count > 1
+            && model.selectedKeyframeIDs.contains(id)
+        if !keepGroup { model.selectKeyframe(id, modifier) }
+        return keepGroup
+    }
+
+    @MainActor
+    static func end(_ id: ZoomKeyframe.ID?, moving: Bool, model: EditorModel) {
+        if !moving, let id { model.selectKeyframe(id) }
+    }
+}
+
 struct TimelineRepresentable: NSViewRepresentable {
     let model: EditorModel
     let data: TimelineData
@@ -115,7 +132,9 @@ final class TimelineNSView: NSView {
         case cueMove(SubtitleCue.ID, start: Double, x: CGFloat)
         case cueStart(SubtitleCue.ID, start: Double, x: CGFloat)
         case cueEnd(SubtitleCue.ID, end: Double, x: CGFloat)
-        case keyframe(ZoomKeyframe.ID, time: Double, x: CGFloat, moving: Bool)
+        /// Moves every keyframe in `times` (their source times at mouse-down). `clickSelects`: a click without a drag
+        /// selects just this keyframe (the mouse-down kept a multi-selection so it could be dragged as a group).
+        case keyframes(times: [ZoomKeyframe.ID: Double], x: CGFloat, moving: Bool, clickSelects: ZoomKeyframe.ID?)
     }
 
     private var drag: Drag?
@@ -523,6 +542,8 @@ final class TimelineNSView: NSView {
             shape.lineWidth = 1.5
             return shape
         }
+        let selectedIDs: Set<ZoomKeyframe.ID>
+        if case .keyframes(let ids) = data.selection { selectedIDs = ids } else { selectedIDs = [] }
         for (i, k) in data.keyframes.enumerated() {
             let shape = keyframeLayers[i]
             guard let e = model.timeline.editedTime(forSource: k.time) else {
@@ -531,7 +552,7 @@ final class TimelineNSView: NSView {
             }
             shape.frame = CGRect(x: 0, y: 0, width: content.bounds.width, height: bounds.height)
             shape.path = keyframeShape(k, editedStart: e, frame: frame)
-            let selected = data.selection == .keyframe(k.id)
+            let selected = selectedIDs.contains(k.id)
             let base = k.enabled && data.zoomEnabled ? AppTheme.zoomTrack : AppTheme.tertiaryText
             shape.fillColor = base.withAlphaComponent(selected ? 0.85 : 0.5).cgColor
             shape.strokeColor = selected ? NSColor.white.cgColor : base.cgColor
@@ -776,9 +797,13 @@ final class TimelineNSView: NSView {
             }
         case .zoom:
             if let k = keyframe(atViewX: p.x) {
-                model.selection = .keyframe(k.id)
+                let modifier = SelectionModifier(event.modifierFlags)
+                let keepGroup = KeyframeClick.begin(k.id, modifier: modifier, model: model)
                 model.inspectorTab = .zoom
-                drag = .keyframe(k.id, time: k.time, x: p.x, moving: false)
+                if model.selectedKeyframeIDs.contains(k.id) {
+                    let times = Dictionary(uniqueKeysWithValues: model.selectedKeyframes.map { ($0.id, $0.time) })
+                    drag = .keyframes(times: times, x: p.x, moving: false, clickSelects: keepGroup ? k.id : nil)
+                }
             } else {
                 model.selection = nil
                 beginScrub(at: t)
@@ -873,14 +898,13 @@ final class TimelineNSView: NSView {
         case .cueEnd(let id, let end, let from):
             model.setCueTiming(
                 id, end: CueDragTime.sourceTime(editedStart: end, editedDelta: seconds(from), timeline: model.timeline))
-        case .keyframe(let id, let time, let from, let moving):
+        case .keyframes(let times, let from, let moving, _):
             if !moving {
                 guard abs(p.x - from) >= 3 else { return }
-                self.drag = .keyframe(id, time: time, x: from, moving: true)
+                self.drag = .keyframes(times: times, x: from, moving: true, clickSelects: nil)
                 model.beginContinuousChange()
             }
-            let value = min(max(time + seconds(from), 0), model.meta.duration)
-            model.updateKeyframe(id, "Move Zoom") { $0.time = value }
+            model.moveKeyframes(times, by: seconds(from))
         }
     }
 
@@ -890,8 +914,12 @@ final class TimelineNSView: NSView {
         switch drag {
         case .scrub:
             model.seek(to: time(atViewX: convert(event.locationInWindow, from: nil).x), exact: true)
-        case .keyframe(_, _, _, let moving):
-            if moving { model.endContinuousChange() }
+        case .keyframes(_, _, let moving, let clickSelects):
+            if moving {
+                model.endContinuousChange()
+            } else {
+                KeyframeClick.end(clickSelects, moving: moving, model: model)
+            }
         default:
             frozenPPS = nil
             model.endContinuousChange()

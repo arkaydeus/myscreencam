@@ -8,9 +8,48 @@ import SwiftUI
 /// What is selected in the timeline / preview. Delete removes it; Esc clears it.
 enum EditorSelection: Hashable {
     case segment(Segment.ID)
-    case keyframe(ZoomKeyframe.ID)
+    /// One or more zooms (⇧-click selects a range, ⌘-click adds or removes one).
+    case keyframes(Set<ZoomKeyframe.ID>)
     case blur(BlurMask.ID)
     case cue(SubtitleCue.ID)
+}
+
+/// How a click changes a multi-selection.
+enum SelectionModifier: Equatable {
+    /// Plain click: select just the item.
+    case replace
+    /// ⌘-click: add the item, or remove it if it's already selected.
+    case toggle
+    /// ⇧-click: select every item from the anchor to this one.
+    case range
+
+    init(_ flags: NSEvent.ModifierFlags) {
+        if flags.contains(.shift) {
+            self = .range
+        } else if flags.contains(.command) {
+            self = .toggle
+        } else {
+            self = .replace
+        }
+    }
+
+    /// The selection and anchor after clicking `id`. `ordered` is every item in display order.
+    static func select<ID: Hashable>(
+        _ id: ID, _ modifier: SelectionModifier, current: Set<ID>, anchor: ID?, ordered: [ID]
+    ) -> (ids: Set<ID>, anchor: ID?) {
+        switch modifier {
+        case .replace:
+            return ([id], id)
+        case .toggle:
+            if current.contains(id) { return (current.subtracting([id]), anchor == id ? nil : anchor) }
+            return (current.union([id]), id)
+        case .range:
+            guard let anchor, current.contains(anchor), let from = ordered.firstIndex(of: anchor),
+                let to = ordered.firstIndex(of: id)
+            else { return ([id], id) }
+            return (Set(ordered[min(from, to)...max(from, to)]), anchor)
+        }
+    }
 }
 
 enum InspectorTab: String, CaseIterable, Identifiable {
@@ -51,8 +90,6 @@ enum InspectorTab: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class EditorModel {
-    static let autoZoomDefaultsKey = "autoZoomFromClicks"
-
     let package: RecordingPackage
     private(set) var meta: RecordingMeta
     private(set) var edit: EditConfig
@@ -74,7 +111,9 @@ final class EditorModel {
     var inspectorTab: InspectorTab = .zoom
     /// Timeline zoom, 0.5…4 (1 = the whole edited duration fits).
     var timelineZoom: Double = 1
-    /// The next click on the preview sets the selected keyframe's target.
+    /// The zoom last picked by a plain or ⌘-click: ⇧-click selects from here, and the inspector shows its values.
+    @ObservationIgnored var keyframeAnchor: ZoomKeyframe.ID?
+    /// The next click on the preview sets the selected keyframes' target.
     var isPickingZoomTarget = false
     /// A short message shown in the transport bar ("Too close to edge").
     private(set) var transientMessage: String?
@@ -295,7 +334,9 @@ final class EditorModel {
     private func validateSelection() {
         switch selection {
         case .segment(let id): if !edit.segments.contains(where: { $0.id == id }) { selection = nil }
-        case .keyframe(let id): if !edit.zoom.keyframes.contains(where: { $0.id == id }) { selection = nil }
+        case .keyframes(let ids):
+            let live = ids.filter { id in edit.zoom.keyframes.contains { $0.id == id } }
+            if live != ids { selection = live.isEmpty ? nil : .keyframes(live) }
         case .blur(let id): if !edit.blur.contains(where: { $0.id == id }) { selection = nil }
         case .cue(let id): if !edit.subtitles.cues.contains(where: { $0.id == id }) { selection = nil }
         case nil: break

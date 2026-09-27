@@ -41,13 +41,13 @@ Engine modules are added as their phase starts. The layering is in the comment a
   - Change the model only when it's genuinely needed, and update every user of it.
 - **App areas** each own one directory under `App/Sources/`:
   - `Recorder/`: `RecordingController`, recorder window, HUD, menu-bar content, region overlay.
-  - `Editor/`: `EditorSessions`, editor window, preview, timeline, panels.
+  - `Editor/`: `EditorSessions`, editor window, preview, timeline, panels, and the defaults for new recordings (`ProjectDefaultsStore`, persisted in `UserDefaults`; ProjectKit's `ProjectDefaults` applies them in `EditConfig.makeInitial`).
   - `Library/`: the library window.
   - `Export/`: `ExportCenter`, `ExportSheet`.
   - `Transcription/`: `TranscriptionCenter` (the one transcription queue and speech-service owner), `SpeechModels` (downloads), `SpeechSettings`, the XPC client, Settings › Subtitles.
   - `Shell/`: `AppRouter`, app delegate, commands, URL scheme, intents, updates, settings.
   - `Theme/`: `AppTheme` (shared, not an area): colour tokens, `ThemeButtonStyle`/`ThemeIconButtonStyle`, `ThemeGroupBoxStyle`, `themePanel()`. Every window and sheet root applies `.themedWindow()`; the app is always dark.
-- **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll/isAnyPlaying/session(for:)`, `EditorModel.receiveTranscript(_:)` (transcription commits through an open editor), `TranscriptionCenter.job(for:)/transcribe/cancel/cancelAll/isAvailable/retime`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`.
+- **Cross-area calls** go only through the documented skeleton APIs: `AppModel`, `AppRouter`, `RecordingController.state/isActive/stop/togglePause`, `ExportCenter.isExporting/cancelAll/waitUntilIdle`, `EditorSessions.hasPendingSaves/flushAll/isAnyPlaying/session(for:)`, `EditorModel.receiveTranscript(_:)` (transcription commits through an open editor), `TranscriptionCenter.job(for:)/transcribe/cancel/cancelAll/isAvailable/retime`, `ExportSheet(package:edit:)`, `EditorWindow(packageURL:)`, `ProjectDefaultsStore.load()` (the defaults a recording's first edit is built from), `DefaultsSettingsView` (Settings › Defaults).
 - **Shell hooks for other areas** (`App/Sources/Shell/`):
   - **Export… (⌘E)** is driven by the focused-scene value `\.exportAction: (() -> Void)?` (declared in `Shell/AppCommands.swift`). The editor window publishes it with `.focusedSceneValue(\.exportAction) { showExport = true }`; the menu item is disabled when no focused scene sets it.
   - Opening windows: `AppRouter.showLibrary()`, `showRecorder(source:)` (sets `recorderSourceRequest`, which the recorder reads when it opens), `openEditor(for:)`. Requests made before any scene has appeared are queued and replayed once `bindRouter` binds `openWindowAction`. Every root scene view must use `.bindRouter(model.router)`.

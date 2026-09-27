@@ -62,9 +62,9 @@ struct EditorWindow: View {
         }
         if case .loaded = phase { return }
         phase = .loading
-        let autoZoom = UserDefaults.standard.object(forKey: EditorModel.autoZoomDefaultsKey) as? Bool ?? true
+        let defaults = ProjectDefaultsStore.load()
         do {
-            let project = try await EditorLoader.loadProject(at: packageURL, autoZoom: autoZoom, resetEdit: resetEdit)
+            let project = try await EditorLoader.loadProject(at: packageURL, defaults: defaults, resetEdit: resetEdit)
             let renderer: ProjectRenderer
             do {
                 // A first guess at the preview size; the preview view reports its real backing size once laid out.
@@ -123,9 +123,9 @@ enum EditorLoadError: Error {
 /// File I/O for opening a recording, off the main actor.
 enum EditorLoader {
     /// Reads meta, events and cursors, and the saved edit. With no `edit.json` (or `resetEdit`), creates the
-    /// initial edit (auto-zooms from clicks when `autoZoom`) and saves it.
+    /// initial edit from `defaults` (the defaults for new recordings) and saves it.
     @concurrent
-    static func loadProject(at url: URL, autoZoom: Bool, resetEdit: Bool) async throws -> RenderProject {
+    static func loadProject(at url: URL, defaults: ProjectDefaults, resetEdit: Bool) async throws -> RenderProject {
         let package = RecordingPackage(url: url)
         let meta: RecordingMeta
         do {
@@ -144,16 +144,20 @@ enum EditorLoader {
             throw EditorLoadError.unreadable(String(describing: error))
         }
         let edit: EditConfig
-        let saved: EditConfig?
-        do {
-            saved = resetEdit ? nil : try package.loadEdit()
-        } catch {
-            throw EditorLoadError.corruptEdit(String(describing: error))
-        }
-        if let saved {
-            edit = saved.normalized(duration: meta.duration)
+        if resetEdit {
+            edit = EditConfig.makeInitial(meta: meta, events: events, defaults: defaults)
+                .normalized(duration: meta.duration)
         } else {
-            edit = try package.loadEffectiveEdit(meta: meta, autoZoom: autoZoom)
+            let saved: EditConfig?
+            do {
+                saved = try package.loadEdit()
+            } catch {
+                throw EditorLoadError.corruptEdit(String(describing: error))
+            }
+            edit =
+                saved?.normalized(duration: meta.duration)
+                ?? EditConfig.makeInitial(meta: meta, events: events, defaults: defaults)
+                .normalized(duration: meta.duration)
         }
         return RenderProject(package: package, meta: meta, edit: edit, events: events, cursorIndex: cursors)
     }

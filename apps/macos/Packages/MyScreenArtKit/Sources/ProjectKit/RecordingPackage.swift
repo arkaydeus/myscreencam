@@ -107,10 +107,19 @@ public struct RecordingPackage: Sendable, Hashable {
     }
 
     /// The edit shown by the editor and used for a direct Library export.
-    public func loadEffectiveEdit(meta: RecordingMeta, autoZoom: Bool) throws -> EditConfig {
+    public func loadEffectiveEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
         if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
-        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), autoZoom: autoZoom)
+        return try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
             .normalized(duration: meta.duration)
+    }
+
+    /// Fixes the first-use defaults for a direct Library export. An existing edit is never overwritten.
+    public func loadOrCreateEdit(meta: RecordingMeta, defaults: ProjectDefaults) throws -> EditConfig {
+        if let saved = try loadEdit() { return saved.normalized(duration: meta.duration) }
+        let initial = try EditConfig.makeInitial(meta: meta, events: loadEvents(), defaults: defaults)
+            .normalized(duration: meta.duration)
+        try saveEdit(initial)
+        return initial
     }
 
     /// Atomic write (temp file + rename), so a crash never leaves a half-written `edit.json`.

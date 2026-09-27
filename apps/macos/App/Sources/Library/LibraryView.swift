@@ -48,6 +48,7 @@ private struct LibraryContent: View {
     private struct ExportRequest: Identifiable {
         let package: RecordingPackage
         let edit: EditConfig
+        let prepareEdit: (() throws -> EditConfig)?
         var id: URL { package.url }
     }
 
@@ -81,7 +82,7 @@ private struct LibraryContent: View {
                 Text("MyScreenArt can't undo this, but you can put the recording back from the Trash in Finder.")
             }
             .sheet(item: $exportRequest) { request in
-                ExportSheet(package: request.package, edit: request.edit)
+                ExportSheet(package: request.package, edit: request.edit, prepareEdit: request.prepareEdit)
             }
             .alert("Something Went Wrong", isPresented: isPresented($actionError), presenting: actionError) { _ in
                 Button("OK", role: .cancel) {}
@@ -252,11 +253,15 @@ private struct LibraryContent: View {
     /// Exports with the recording's saved edit (or the initial edit when it has never been edited).
     private func export(_ item: ProjectKit.LibraryItem) {
         do {
-            let autoZoom = UserDefaults.standard.object(forKey: EditorModel.autoZoomDefaultsKey) as? Bool ?? true
+            let session = app.editors.session(for: item.package.url)
+            let defaults = ProjectDefaultsStore.load()
             let edit =
-                try app.editors.session(for: item.package.url)?.edit
-                ?? item.package.loadEffectiveEdit(meta: item.meta, autoZoom: autoZoom)
-            exportRequest = ExportRequest(package: item.package, edit: edit)
+                try session?.edit
+                ?? item.package.loadEffectiveEdit(meta: item.meta, defaults: defaults)
+            let prepareEdit: (() throws -> EditConfig)? =
+                session == nil
+                ? { try item.package.loadOrCreateEdit(meta: item.meta, defaults: defaults) } : nil
+            exportRequest = ExportRequest(package: item.package, edit: edit, prepareEdit: prepareEdit)
         } catch {
             actionError = "Couldn't read the edits of “\(item.meta.name)”: \(error.localizedDescription)"
         }
