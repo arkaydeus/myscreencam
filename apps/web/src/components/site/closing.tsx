@@ -8,6 +8,7 @@ export function Closing() {
     <section id="download" className="scroll-mt-13 px-4 pb-18 sm:px-0 sm:pb-30">
       <div className="mx-auto max-w-[1160px] rounded-3xl p-5 canvas-paint sm:[width:calc(100%-2*var(--gutter))] sm:rounded-[36px] sm:p-[clamp(2rem,7vw,5.5rem)]">
         <div className="mx-auto flex max-w-[680px] flex-col items-center rounded-[18px] bg-white px-6 py-10 text-center shadow-[0_24px_60px_-12px_rgb(20_16_70/0.55)] sm:rounded-[28px] sm:px-14 sm:py-16">
+          <LogoMark size={80} className="mb-5 size-16 sm:mb-6 sm:size-20" />
           <h2 className="text-[32px] leading-[1.12] font-semibold tracking-[-0.005em] text-balance sm:text-5xl sm:leading-[1.08]">
             Make your next recording look finished.
           </h2>
@@ -42,7 +43,7 @@ export function SiteFooter() {
           </li>
         </ol>
         <div className="flex items-center gap-2 border-b border-rule py-4 text-ink">
-          <LogoMark className="size-4 rounded-[4px]" />
+          <LogoMark size={16} className="size-4" />
           <ChevronRight aria-hidden className="size-3 text-[#86868b]" strokeWidth={2} />
           <span>{site.name}</span>
         </div>

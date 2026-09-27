@@ -24,6 +24,7 @@ A single-page marketing site for the MyScreenArt Mac app. It's statically render
 - `src/app/page.tsx` composes the sections in `src/components/site/`.
 - `src/components/site/canvas-demo.tsx` is the hero. Its zoom blocks and click times must match the `msa-*` keyframes in `globals.css` (one 12 s loop).
 - `src/lib/site.ts` holds the shared facts: download URL, requirements, description.
+- The app icon is `src/assets/app-icon.png` (drawn by `LogoMark`, and in the OG image). `src/app/icon.png` and `apple-icon.png` are copies made from the same artwork as `apps/macos/App/Resources/AppIcon.icon`.
 - Measured figures carry a footnote marker (`FootnoteRef`) that links to the numbered note in `SiteFooter`.
 
 ## Design

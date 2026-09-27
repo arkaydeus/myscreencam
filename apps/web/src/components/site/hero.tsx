@@ -1,10 +1,11 @@
-import { DownloadButton, MoreLink } from "@/components/site/brand";
+import { DownloadButton, LogoMark, MoreLink } from "@/components/site/brand";
 import { CanvasDemo } from "@/components/site/canvas-demo";
 import { site } from "@/lib/site";
 
 export function Hero() {
   return (
     <section className="page-width pt-14 pb-18 text-center sm:pt-22 sm:pb-30">
+      <LogoMark size={96} className="mx-auto mb-3 block size-18 sm:mb-4 sm:size-24" />
       <p className="text-[19px] font-semibold sm:text-2xl">{site.name}</p>
       <h1 className="mx-auto mt-2.5 max-w-[980px] text-[40px] leading-[1.1] font-semibold tracking-[-0.015em] text-balance sm:text-[64px] lg:text-[80px] lg:leading-[1.05]">
         Screen recordings that look finished.
