@@ -29,23 +29,37 @@ export function isValidSigningKey(value: string): boolean {
   }
 }
 
-export function licenceForSession(session: Stripe.Checkout.Session, signingKey: string): string {
-  if (session.payment_status !== "paid") throw new Error("Session is not paid");
-  const email = session.customer_details?.email;
-  if (!email) throw new Error("Paid session has no customer email");
-  const payload = Buffer.from(
-    JSON.stringify({
-      v: 1,
-      id: `lic_${base32(createHash("sha256").update(session.id).digest()).slice(0, 16)}`,
-      email,
-      product: "myscreencam",
-      issued: new Date(session.created * 1000).toISOString().slice(0, 10),
-    }),
-  );
+export type LicencePayload = {
+  v: number;
+  id: string;
+  email: string;
+  product: string;
+  issued: string;
+};
+
+/** Signs the exact payload bytes, so the app never has to re-serialise the JSON to verify them. */
+export function signLicence(payload: LicencePayload, signingKey: string): string {
+  const bytes = Buffer.from(JSON.stringify(payload));
   const key = createPrivateKey({
     key: Buffer.from(signingKey, "base64"),
     format: "der",
     type: "pkcs8",
   });
-  return `MSC1.${payload.toString("base64url")}.${sign(null, payload, key).toString("base64url")}`;
+  return `MSC1.${bytes.toString("base64url")}.${sign(null, bytes, key).toString("base64url")}`;
+}
+
+export function licenceForSession(session: Stripe.Checkout.Session, signingKey: string): string {
+  if (session.payment_status !== "paid") throw new Error("Session is not paid");
+  const email = session.customer_details?.email;
+  if (!email) throw new Error("Paid session has no customer email");
+  return signLicence(
+    {
+      v: 1,
+      id: `lic_${base32(createHash("sha256").update(session.id).digest()).slice(0, 16)}`,
+      email,
+      product: "myscreencam",
+      issued: new Date(session.created * 1000).toISOString().slice(0, 10),
+    },
+    signingKey,
+  );
 }
