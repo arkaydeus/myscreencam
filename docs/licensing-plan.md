@@ -53,7 +53,7 @@ public key built into the app, the same way the Sparkle key is handled:
 | | Signs | App that accepts it | Stripe mode |
 |---|---|---|---|
 | **Production** | Private key in the Production environment variables, backed up in a password manager | Release | Live |
-| **Development** | Private key committed in the repo; it only unlocks Debug builds | Debug | Test |
+| **Development** | Private key in each developer's git-ignored `.env` (`bun run licence:dev-key`); never committed. It only unlocks that developer's Debug builds | Debug | Test |
 
 Losing the production private key means no new keys that shipped apps accept, until an update adds a new
 public key. Back it up.
@@ -103,7 +103,7 @@ The landing page stays static. New dynamic pieces (Node runtime):
 | Piece | Where | Notes |
 |---|---|---|
 | Buy button | A form posting to `src/app/api/checkout/route.ts` (**built**), which creates a Managed Payments Checkout Session and redirects to it; `site.ts` gains the price; hero, closing section and product bar | Content rule: the price on the site is the real Stripe price. Setup: `STRIPE_INTEGRATION_TODO.md`. |
-| Webhook | `src/app/api/stripe/webhook/route.ts` | Verifies the Stripe signature on the raw body. Handles `checkout.session.completed` when `payment_status == "paid"`, and `checkout.session.async_payment_succeeded`. Signs the key and emails it (Resend, using the event ID as the idempotency key). Stripe retries are harmless because the key is deterministic. |
+| Webhook | `src/app/api/stripe/webhook/route.ts` | Verifies the Stripe signature on the raw body. Handles `checkout.session.completed` when `payment_status == "paid"`, and `checkout.session.async_payment_succeeded`. Signs the key and emails it (Shipmail, using the Checkout Session ID as the idempotency key). Stripe retries are harmless because the key is deterministic. |
 | Thanks page | `src/app/thanks/page.tsx` | Checkout's `success_url` is `/thanks?session_id={CHECKOUT_SESSION_ID}`. Server-side it retrieves the session. Paid: shows the key, Copy, **Activate in My Screen Cam** and a download link. Otherwise: "Payment still processing — we'll email your key". `noindex`. |
 | Lost-key page | `src/app/licence/page.tsx` + a server action | Looks up paid Checkout Sessions for the email address and emails the keys. It always answers "If there's a purchase for that address, we've emailed it", so it doesn't reveal who has bought. Rate-limited per IP. |
 | Signing | `src/lib/licence.ts` | Encodes and signs. The one place the private key is used. |
@@ -113,12 +113,12 @@ The landing page stays static. New dynamic pieces (Node runtime):
 - `STRIPE_SECRET_KEY`: a *restricted* key with write access to Checkout Sessions only (create and read).
 - `STRIPE_WEBHOOK_SECRET`
 - `LICENCE_SIGNING_KEY`: Ed25519 PKCS#8, base64.
-- `RESEND_API_KEY`
-- `LICENCE_EMAIL_FROM`
+- `SHIPMAIL_API_KEY` (live) and `SHIPMAIL_API_KEY_TEST`: `messages:send` only, limited to the sending mailbox
+- `LICENCE_EMAIL_FROM`: the sending mailbox, as an address or `Name <address>` (`My Screen Cam <info@myscreen.cam>`)
 
-Preview deployments use the Stripe test mode keys and the development keypair.
+Preview deployments use the Stripe test mode keys and a development signing key set in the host's preview environment.
 
-New dependencies: `stripe` and `resend` (npm). Nothing new in the app.
+New dependency: `stripe` (npm). Email goes through Shipmail's REST API with `fetch`. Nothing new in the app.
 
 ## 6. Phases
 
@@ -126,17 +126,19 @@ New dependencies: `stripe` and `resend` (npm). Nothing new in the app.
    - Turn on Managed Payments and confirm a UK business is eligible.
    - Create the product "My Screen Cam" with Managed Payments' digital-software tax code, a **£9.99 GBP** price
      (tax-inclusive) and a **$9.99 USD** price.
-   - Put the Price ID in the checkout route and a test secret key in `apps/web/.env.local` (`STRIPE_INTEGRATION_TODO.md`).
-   - Resend: an account and a verified sending domain on `myscreen.cam`.
+   - Put the Price ID and a test secret key in the root `.env` (`STRIPE_INTEGRATION_TODO.md`).
+   - Shipmail: `myscreen.cam` verified, an `info@myscreen.cam` mailbox, and API keys (test and live).
    - Hosting for the site's server routes (Q4).
 1. **Licence format.**
-   - A keypair script (`bun apps/web/scripts/licence-keygen.ts`) and the development keypair.
+   - A keypair script (`bun apps/web/scripts/licence-keygen.ts`). No private key is committed: tests use throwaway keys,
+     and each developer's dev key lives in `.env` (`licence/README.md`).
    - `src/lib/licence.ts` and `MyScreenCamCore/Licence.swift`.
    - One shared test-vector file that both test suites read, so the TypeScript signer and the Swift verifier can't
      drift apart.
 2. **App licence.**
    - `LicenceStore`, Settings › Licence, the URL command, the menu items and the revoked list.
-   - `mise run licence:dev` prints a development key and activation link for Debug builds.
+   - `mise run licence:dev` mints a licence with the `.env` dev key, derives its public key for the Debug build setting,
+     and prints an activation link.
 3. **Watermark.**
    - Renderer, layout, preview, export and the export-sheet banner.
    - Measure an export with `scripts/perf/sample.py` before and after, and record it in `perf-baseline.md` (it
@@ -173,5 +175,5 @@ New dependencies: `stripe` and `resend` (npm). Nothing new in the app.
    charge for a future major version if you ever want to.
 4. **Hosting for the webhook and pages**: **Vercel**, since the site is Next.js. Where is myscreen.cam hosted
    today?
-5. **Email**: **Resend**. Postmark is the main alternative.
+5. **Email**: **Shipmail** (decided; the plan first assumed Resend). Licence emails are sent from `info@myscreen.cam`, so each one also lands in that mailbox's Sent folder. A Shipmail transactional sender on a subdomain (`notify.myscreen.cam`) would keep app mail and its reputation apart from the main domain; it's a later option.
 6. **Revocation**: **a bundled revoked list, updated in releases**, or no revocation at all.

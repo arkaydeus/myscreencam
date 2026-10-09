@@ -21,7 +21,7 @@ App/                         app target (SwiftUI/AppKit), Info.plist, entitlemen
 QuickLookThumbnail/          Quick Look thumbnail extension for .mscam packages (embedded in the app)
 SpeechService/               MyScreenCamSpeech.xpc: on-device speech recognition (the one owner of loaded models)
 Packages/MyScreenCamKit/     engine SwiftPM package (testable with `swift test`)
-  Sources/MyScreenCamCore    paths, flavor, logging/signposts, URL-command parsing, shell policies
+  Sources/MyScreenCamCore    paths, flavor, logging/signposts, URL-command parsing, shell policies, licence-key verification (`Licence.swift`; fixtures in the repo's `licence/`)
   Sources/SpeechCore         speech-model catalogue/downloads, audio preparation, worker protocol, transcript pipeline
 Packages/SpeechEngines/      Parakeet (FluidAudio) and Qwen (MLX) adapters + `speech-tool`; build with xcodebuild only
 project.yml                  XcodeGen spec (bundle IDs, signing, settings, Sparkle package)

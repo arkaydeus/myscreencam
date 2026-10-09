@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 
 import { isValidSigningKey } from "./licence";
+import { isSenderAddress, shipmailApiKey } from "./licence-email";
 
 export type CreateSession = (
   options: Stripe.Checkout.SessionCreateParams,
@@ -57,7 +58,7 @@ export function isCheckoutReady(config: Record<string, string | undefined> = pro
     !!config.LICENCE_SIGNING_KEY &&
     isValidSigningKey(config.LICENCE_SIGNING_KEY) &&
     !!config.STRIPE_WEBHOOK_SECRET &&
-    !!config.RESEND_API_KEY &&
-    !!config.LICENCE_EMAIL_FROM
+    !!shipmailApiKey(config) &&
+    isSenderAddress(config.LICENCE_EMAIL_FROM)
   );
 }

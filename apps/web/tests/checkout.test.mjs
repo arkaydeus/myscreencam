@@ -2,7 +2,8 @@ import { generateKeyPairSync } from "node:crypto";
 
 import { describe, expect, test } from "bun:test";
 
-import { handleCheckout } from "../src/lib/checkout";
+import { handleCheckout, isCheckoutReady } from "../src/lib/checkout";
+import { shipmailApiKey } from "../src/lib/licence-email";
 
 const request = new Request("https://myscreen.cam/api/checkout", { method: "POST" });
 const configured = {
@@ -13,8 +14,9 @@ const configured = {
     .privateKey.export({ format: "der", type: "pkcs8" })
     .toString("base64"),
   STRIPE_WEBHOOK_SECRET: "whsec_example",
-  RESEND_API_KEY: "re_example",
-  LICENCE_EMAIL_FROM: "licences@myscreen.cam",
+  SHIPMAIL_API_KEY_TEST: "sm_test_example",
+  SHIPMAIL_API_KEY: "sm_live_example",
+  LICENCE_EMAIL_FROM: "My Screen Cam <info@myscreen.cam>",
 };
 
 describe("checkout", () => {
@@ -41,6 +43,25 @@ describe("checkout", () => {
         return { url: "https://checkout.stripe.com/a" };
       },
       { ...configured, LICENCE_SIGNING_KEY: "invalid" },
+    );
+    expect(response.status).toBe(503);
+    expect(called).toBe(false);
+  });
+
+  test.each([
+    ["a missing email API key", { SHIPMAIL_API_KEY_TEST: undefined }],
+    ["a From that isn't an address", { LICENCE_EMAIL_FROM: "licences" }],
+    ["a From with two addresses", { LICENCE_EMAIL_FROM: "a@b.co, c@d.co" }],
+    ["a From with a name but no address", { LICENCE_EMAIL_FROM: "My Screen Cam <>" }],
+  ])("%s never opens paid Checkout", async (_name, override) => {
+    let called = false;
+    const response = await handleCheckout(
+      request,
+      async () => {
+        called = true;
+        return { url: "https://checkout.stripe.com/a" };
+      },
+      { ...configured, ...override },
     );
     expect(response.status).toBe(503);
     expect(called).toBe(false);
@@ -90,5 +111,26 @@ describe("checkout", () => {
     } finally {
       console.error = original;
     }
+  });
+
+  test("a From is a bare address or Name <address>", () => {
+    for (const from of ["info@myscreen.cam", "My Screen Cam <info@myscreen.cam>"]) {
+      expect(isCheckoutReady({ ...configured, LICENCE_EMAIL_FROM: from })).toBe(true);
+    }
+  });
+
+  test("development uses the test email key and production the live one, with no fallback", () => {
+    expect(shipmailApiKey({ ...configured, NODE_ENV: "development" })).toBe("sm_test_example");
+    expect(shipmailApiKey({ ...configured, NODE_ENV: "test" })).toBe("sm_test_example");
+    expect(shipmailApiKey({ ...configured, NODE_ENV: "production" })).toBe("sm_live_example");
+    expect(
+      shipmailApiKey({ ...configured, NODE_ENV: "development", SHIPMAIL_API_KEY_TEST: undefined }),
+    ).toBeUndefined();
+    expect(
+      shipmailApiKey({ ...configured, NODE_ENV: "production", SHIPMAIL_API_KEY: "" }),
+    ).toBeUndefined();
+    expect(
+      isCheckoutReady({ ...configured, NODE_ENV: "development", SHIPMAIL_API_KEY_TEST: undefined }),
+    ).toBe(false);
   });
 });

@@ -1,20 +1,17 @@
 import { Stripe } from "stripe";
 
 import { licenceForSession } from "@/lib/licence";
+import { sendLicenceEmail, shipmailApiKey } from "@/lib/licence-email";
 
 export async function POST(request: Request) {
-  const {
-    STRIPE_SECRET_KEY,
-    STRIPE_WEBHOOK_SECRET,
-    LICENCE_SIGNING_KEY,
-    RESEND_API_KEY,
-    LICENCE_EMAIL_FROM,
-  } = process.env;
+  const { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, LICENCE_SIGNING_KEY, LICENCE_EMAIL_FROM } =
+    process.env;
+  const shipmailKey = shipmailApiKey();
   if (
     !STRIPE_SECRET_KEY ||
     !STRIPE_WEBHOOK_SECRET ||
     !LICENCE_SIGNING_KEY ||
-    !RESEND_API_KEY ||
+    !shipmailKey ||
     !LICENCE_EMAIL_FROM
   ) {
     return new Response("Fulfilment isn't configured.", { status: 503 });
@@ -44,21 +41,13 @@ export async function POST(request: Request) {
     const key = licenceForSession(session, LICENCE_SIGNING_KEY);
     const email = session.customer_details?.email;
     if (!email) throw new Error("Paid session has no email");
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `myscreencam-licence-${session.id}`,
-      },
-      body: JSON.stringify({
-        from: LICENCE_EMAIL_FROM,
-        to: [email],
-        subject: "Your My Screen Cam licence",
-        text: `Thanks for buying My Screen Cam. Your licence key is:\n\n${key}\n\nKeep this email so you can activate again later.`,
-      }),
+    await sendLicenceEmail({
+      apiKey: shipmailKey,
+      from: LICENCE_EMAIL_FROM,
+      to: email,
+      licence: key,
+      idempotencyKey: `myscreencam-licence-${session.id}`,
     });
-    if (!response.ok) throw new Error(`Email service returned ${response.status}`);
     return new Response("OK");
   } catch (error) {
     console.error("Licence fulfilment failed", { eventId: event.id, sessionId: session.id, error });
