@@ -26,7 +26,6 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .env*
-!.env.example
 .vercel
 
 # Playwright MCP screenshots
