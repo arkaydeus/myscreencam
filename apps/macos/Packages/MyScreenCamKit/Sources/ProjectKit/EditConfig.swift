@@ -104,7 +104,7 @@ public struct ZoomTiming: Codable, Sendable, Equatable {
     public var hold: Double
     public var easeOut: Double
 
-    public init(scale: Double = 1.6, easeIn: Double = 0.16, hold: Double = 0.85, easeOut: Double = 0.24) {
+    public init(scale: Double = 1.6, easeIn: Double = 0.32, hold: Double = 0.85, easeOut: Double = 0.48) {
         self.scale = scale
         self.easeIn = easeIn
         self.hold = hold
@@ -137,7 +137,7 @@ public struct ZoomKeyframe: Codable, Sendable, Hashable, Identifiable {
 
     public init(
         id: UUID = UUID(), time: Double, scale: Double = 1.6, target: NormPoint = .center, mode: ZoomMode = .manual,
-        easeIn: Double = 0.16, hold: Double = 0.85, easeOut: Double = 0.24, enabled: Bool = true, instant: Bool = false
+        easeIn: Double = 0.32, hold: Double = 0.85, easeOut: Double = 0.48, enabled: Bool = true, instant: Bool = false
     ) {
         self.id = id
         self.time = time
