@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 
-import { BuyButton, DownloadButton, LogoMark } from "@/components/site/brand";
+import { DownloadButton, LogoMark } from "@/components/site/brand";
 import { site } from "@/lib/site";
 
 export function Closing() {
@@ -17,7 +17,6 @@ export function Closing() {
           </p>
           <div className="mt-7 flex flex-col items-center gap-3 sm:mt-9 sm:flex-row">
             <DownloadButton />
-            <BuyButton />
           </div>
           <p className="mt-3.5 text-xs text-muted-foreground sm:mt-4 sm:text-sm">
             {site.requirements}

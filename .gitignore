@@ -26,12 +26,7 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .env*
-!.env.example
 .vercel
 
 # Playwright MCP screenshots
 .playwright-mcp/
-
-# Licence signing keys never go in git; see licence/README.md.
-licence/*keypair*
-licence/*private*
