@@ -1,7 +1,8 @@
 {
   "setupLocal": [
     "mise trust --yes . && mise trust --yes apps/macos && mise trust --yes apps/web",
-    "mise run setup"
+    "mise run setup",
+    "if find node_modules/.bun -maxdepth 1 -type l | grep -q .; then echo 'node_modules/.bun links into the global Bun store, which Turbopack cannot follow. Keep install.globalStore = false in bunfig.toml.' >&2; exit 1; fi"
   ],
   "run": ["mise run start"]
 }

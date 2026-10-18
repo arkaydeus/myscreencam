@@ -1,0 +1,4 @@
+[install]
+# Turbopack refuses symlinks that leave the project root, so keep the package store
+# inside node_modules even when a user-level bunfig enables Bun's global store.
+globalStore = false
