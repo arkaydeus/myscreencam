@@ -31,7 +31,3 @@ next-env.d.ts
 
 # Playwright MCP screenshots
 .playwright-mcp/
-
-# Licence signing keys never go in git; see licence/README.md.
-licence/*keypair*
-licence/*private*

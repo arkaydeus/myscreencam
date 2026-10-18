@@ -2,7 +2,6 @@ import { ChevronRight, Download } from "lucide-react";
 import Image from "next/image";
 
 import appIcon from "@/assets/app-icon.png";
-import { isCheckoutReady } from "@/lib/checkout";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -53,21 +52,6 @@ export function DownloadButton({
         "Download"
       )}
     </a>
-  );
-}
-
-/** Purchase a licence through hosted Checkout. The server validates payment and fulfilment configuration. */
-export function BuyButton({ className }: { className?: string }) {
-  if (!isCheckoutReady()) return null;
-  return (
-    <form action="/api/checkout" method="POST" className={className}>
-      <button
-        type="submit"
-        className="inline-flex h-12 items-center justify-center rounded-full border border-primary px-6 text-[17px] font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        Buy a licence
-      </button>
-    </form>
   );
 }
 

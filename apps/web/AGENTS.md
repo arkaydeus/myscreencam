@@ -37,7 +37,7 @@ A single-page marketing site for the My Screen Cam Mac app. It's statically rend
 
 ## Content rules
 
-Every claim about the app must be true of `apps/macos`: export presets (`ExportKit/ExportPreset.swift`), shortcuts, permissions and measured performance (`apps/macos/docs/perf-baseline.md`). Update the copy when those change. Don't invent pricing, testimonials or logos.
+Every claim about the app must be true of `apps/macos`: export presets (`ExportKit/ExportPreset.swift`), shortcuts, permissions and measured performance (`apps/macos/docs/perf-baseline.md`). Update the copy when those change. The app is free, with no checkout or licence keys. Don't invent testimonials or logos.
 
 ## Tasks
 

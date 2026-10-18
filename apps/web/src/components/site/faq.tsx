@@ -11,6 +11,10 @@ import { site } from "@/lib/site";
 
 const questions = [
   {
+    q: "How much does it cost?",
+    a: "Nothing. My Screen Cam is free, with no licence key, account, watermark or time limit.",
+  },
+  {
     q: "What do I need to run it?",
     a: `${site.requirements}. It’s a single app of its own, with nothing else to install.`,
   },
