@@ -18,6 +18,27 @@
   --color-rose: #f0668f;
   --color-viridian: #16876f;
   --color-rule: #d2d2d7;
+
+  /* The app's own "Midnight Glass" theme (apps/macos AppTheme.swift), used only inside app mocks. */
+  --color-ui-window: #070a14;
+  --color-ui-panel: #0f1526;
+  --color-ui-stage: #0b1020;
+  --color-ui-row: #141b30;
+  --color-ui-section: #161d31;
+  --color-ui-fg: #e6eaf5;
+  --color-ui-fg-2: #9aa5c2;
+  --color-ui-fg-3: #66718f;
+  --color-ui-accent: #3ddc97;
+  --color-ui-on-accent: #03140c;
+  --color-ui-destructive: #ff8fa3;
+  --color-ui-record: #ff4d6a;
+  --color-ui-webcam: #5b7cff;
+  --color-ui-system: #b18cff;
+  --color-ui-mic: #7cb8ff;
+  --color-ui-zoom: #ffb25b;
+  --color-ui-blur: #ff6fae;
+  --color-ui-click: #ffe066;
+  --color-ui-playhead: #ff5c8a;
 }
 
 @theme inline {
@@ -128,191 +149,24 @@
 }
 
 /*
- * Hero demo: one 12 s loop shared by the camera (zoom), cursor, click rings and timeline playhead, so the
- * zoom blocks on the timeline line up with what the preview does.
+ * App mocks (`app-ui.tsx`): the hero editor and the window illustrations are drawn in the app's own points.
+ * Inside `ui-units`, Tailwind's spacing step is one point of a window `--ui-width` points wide, measured
+ * against the nearest @container, so `w-320` is the inspector's 320 pt at any size. `ui-text-*` and
+ * `ui-rounded-*` are font sizes and radii in the same points.
  */
-@keyframes msc-camera {
-  0%,
-  14% {
-    transform: scale(1);
-    transform-origin: 76% 73%;
-  }
-  24%,
-  46% {
-    transform: scale(1.85);
-    transform-origin: 76% 73%;
-  }
-  56%,
-  64% {
-    transform: scale(1);
-    transform-origin: 76% 73%;
-  }
-  65%,
-  73% {
-    transform: scale(1);
-    transform-origin: 30% 44%;
-  }
-  81%,
-  90% {
-    transform: scale(1.7);
-    transform-origin: 30% 44%;
-  }
-  98%,
-  100% {
-    transform: scale(1);
-    transform-origin: 30% 44%;
-  }
+@utility ui-units {
+  --spacing: calc(100cqw / var(--ui-width));
+}
+@utility ui-text-* {
+  font-size: calc(var(--spacing) * --value(number));
+}
+@utility ui-rounded-* {
+  border-radius: calc(var(--spacing) * --value(number));
 }
 
-@keyframes msc-cursor {
-  0% {
-    left: 46%;
-    top: 30%;
-  }
-  12%,
-  40% {
-    left: 76%;
-    top: 73%;
-  }
-  48%,
-  60% {
-    left: 58%;
-    top: 58%;
-  }
-  70%,
-  92% {
-    left: 30%;
-    top: 44%;
-  }
-  100% {
-    left: 46%;
-    top: 30%;
-  }
-}
-
-@keyframes msc-click-publish {
-  0%,
-  13% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.2);
-  }
-  13.5% {
-    opacity: 0.95;
-    transform: translate(-50%, -50%) scale(0.2);
-  }
-  20%,
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.6);
-  }
-}
-
-@keyframes msc-click-check {
-  0%,
-  72% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.2);
-  }
-  72.5% {
-    opacity: 0.95;
-    transform: translate(-50%, -50%) scale(0.2);
-  }
-  79%,
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.6);
-  }
-}
-
-@keyframes msc-published {
-  0%,
-  13.5% {
-    opacity: 0;
-  }
-  14%,
-  97% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes msc-checked {
-  0%,
-  72.5% {
-    opacity: 0;
-  }
-  73%,
-  97% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes msc-playhead {
-  from {
-    left: 0%;
-  }
-  to {
-    left: 100%;
-  }
-}
-
-@utility demo-camera {
-  animation: msc-camera 12s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-@utility demo-cursor {
-  animation: msc-cursor 12s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-}
-@utility demo-click-publish {
-  animation: msc-click-publish 12s linear infinite;
-}
-@utility demo-click-check {
-  animation: msc-click-check 12s linear infinite;
-}
-@utility demo-published {
-  animation: msc-published 12s linear infinite;
-}
-@utility demo-checked {
-  animation: msc-checked 12s linear infinite;
-}
-@utility demo-playhead {
-  animation: msc-playhead 12s linear infinite;
-}
-
-/* Reduced motion: a still frame of the first zoom, with the click already made. */
+/* Reduced motion: no smooth scrolling (the hero editor shows a still frame; see editor-demo.tsx). */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-  .demo-camera,
-  .demo-cursor,
-  .demo-click-publish,
-  .demo-click-check,
-  .demo-playhead,
-  .demo-published,
-  .demo-checked {
-    animation: none;
-  }
-  .demo-camera {
-    transform: scale(1.4);
-    transform-origin: 76% 73%;
-  }
-  .demo-cursor {
-    left: 76%;
-    top: 73%;
-  }
-  .demo-click-publish,
-  .demo-click-check {
-    opacity: 0;
-  }
-  .demo-published {
-    opacity: 1;
-  }
-  .demo-playhead {
-    left: 30%;
   }
 }

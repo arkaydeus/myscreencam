@@ -1,5 +1,5 @@
 import { DownloadButton, LogoMark, MoreLink } from "@/components/site/brand";
-import { CanvasDemo } from "@/components/site/canvas-demo";
+import { EditorDemo } from "@/components/site/editor-demo";
 import { site } from "@/lib/site";
 
 export function Hero() {
@@ -19,7 +19,7 @@ export function Hero() {
         <MoreLink href="#how">See how it works</MoreLink>
       </div>
       <p className="mt-4 text-xs text-muted-foreground sm:text-sm">{site.requirements}</p>
-      <CanvasDemo className="mx-auto mt-11 max-w-[1120px] text-left sm:mt-18" />
+      <EditorDemo className="mx-auto mt-11 max-w-[1160px] text-left sm:mt-18" />
     </section>
   );
 }
