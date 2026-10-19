@@ -42,13 +42,18 @@ depends = ["install"]
 run = "bun run typecheck"
 
 [tasks.test]
-description = "Check the download and hero timeline contracts"
+description = "Verify hero runtime, narration and download contracts"
 depends = ["install"]
 run = "bun run test"
 
+[tasks."test:browser"]
+description = "Verify illustration bounds and both hero cycles in Chromium (install with mise exec -- bunx playwright install chromium)"
+depends = ["build"]
+run = "bun run test:browser"
+
 [tasks.check]
-description = "Local gate before pushing: format check, lint, typecheck, production build"
-depends = ["format:check", "lint", "typecheck", "test", "build"]
+description = "Local gate: formatting, lint, types, runtime tests and production browser checks"
+depends = ["format:check", "lint", "typecheck", "test", "test:browser"]
 run = "echo 'Web checks passed.'"
 
 [tasks.clean]
