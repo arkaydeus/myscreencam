@@ -106,6 +106,23 @@ export function cameraAt(
   return { scale: 1, origin };
 }
 
+/** The shared recording snapshot for the live hero and paused illustrations. */
+export function recordingAt(t: number, scaleOf?: (zoom: Zoom) => number) {
+  return {
+    camera: cameraAt(t, scaleOf),
+    cursor: cursorAt(t),
+    on: {
+      published: t >= clicks[0],
+      ticked: t >= clicks[1],
+      progress: t >= clicks[1],
+      "progress-text": t >= clicks[1],
+      "progress-text-done": t >= clicks[1],
+      popover: popoverOpen(t),
+      email: t >= blurMask.start && t < blurMask.end,
+    },
+  };
+}
+
 /* The visitor's pointer. */
 
 export type Tab = "zoom" | "webcam" | "audio" | "blur" | "cursor" | "background" | "subtitles";

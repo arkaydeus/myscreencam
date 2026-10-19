@@ -32,16 +32,19 @@ import { cn } from "@/lib/utils";
  */
 
 const WIDTH = 904;
-const HEIGHT = 560;
+// Leave room for all three cue cards, including CSS-pixel borders at mobile scales.
+const HEIGHT = 624;
 /** The left column (the preview, transport and timeline) and its timeline lane. */
 const COLUMN = WIDTH - 16 - 8 - 320;
 const LANE = COLUMN - 78 - 14;
-const PLAYHEAD = 13.2;
+export const ANNOTATE_TIME = 13.2;
+const PLAYHEAD = ANNOTATE_TIME;
 const x = (t: number) => (t / LOOP) * LANE;
 
 /** The cue under the playhead, and the word being spoken in it. */
 const active = narration.findIndex((cue) => PLAYHEAD >= cue.start && PLAYHEAD < cue.end);
-const spoken = "progress";
+export const ANNOTATE_WORD = "progress";
+const spoken = ANNOTATE_WORD;
 
 export function SubtitlesWindow({ className }: { className?: string }) {
   return (
@@ -72,7 +75,7 @@ function Preview() {
   return (
     <div className="absolute top-1/2 left-0 aspect-video w-full -translate-y-1/2 overflow-hidden bg-[linear-gradient(45deg,#4f46e5,#db2777)]">
       <div className="@container absolute top-1/2 left-1/2 h-[88%] w-[79.2%] -translate-1/2 overflow-hidden ui-rounded-6 bg-white shadow-[0_1cqw_2.6cqw_-0.4cqw_rgb(10_8_40/0.6)]">
-        <DemoRecording cursorLarge={false} />
+        <DemoRecording cursorLarge={false} time={PLAYHEAD} />
       </div>
       <p className="absolute inset-x-[10%] bottom-[7%] flex justify-center">
         <span className="max-w-full ui-rounded-5 bg-black/55 px-8 py-3 text-center ui-text-15.75 leading-[1.3] font-bold text-white [-webkit-text-stroke:calc(var(--spacing)*0.9)_black] [paint-order:stroke_fill]">

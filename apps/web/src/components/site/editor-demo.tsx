@@ -53,7 +53,6 @@ import {
   type Step,
   type Tab,
   blurMask,
-  cameraAt,
   clicks,
   clock,
   cursorAt,
@@ -63,7 +62,7 @@ import {
   micLevel,
   noise,
   peaks,
-  popoverOpen,
+  recordingAt,
   script,
   talking,
   waveformPath,
@@ -708,7 +707,7 @@ function WebcamPanel({ ui }: { ui: Ui }) {
   const square = ui.webcamAspect === "Square";
   const circle = ui.webcamShape === "Circle";
   return (
-    <Form thumb={{ top: 6, height: 420 }}>
+    <Form offset={100} thumb={{ top: 90, height: 420 }}>
       <FormSection>
         <FormRow label="Show webcam">
           <Toggle on />
@@ -895,7 +894,11 @@ type Point = { x: number; y: number };
  * Starts the demo on `root` (the 1280 pt stage) and returns a cleanup. Pauses while the demo is off screen
  * or the page is hidden; with reduced motion it draws one still frame and stops.
  */
-function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => Ui) => void) {
+export function runDemo(
+  root: HTMLElement,
+  values: Values,
+  setUi: (update: (ui: Ui) => Ui) => void,
+) {
   const one = (name: string) => root.querySelector<HTMLElement>(`[data-el="${name}"]`);
   const pointer = one("pointer")!;
   const camera = one("camera")!;
@@ -903,15 +906,17 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
   const ring = one("ring")!;
   const playhead = one("playhead")!;
   const time = one("time")!;
-  const toggles = [
-    "published",
-    "ticked",
-    "progress",
-    "progress-text",
-    "progress-text-done",
-    "popover",
-    "email",
-  ].map((name) => [name, one(name)] as const);
+  const toggles = (
+    [
+      "published",
+      "ticked",
+      "progress",
+      "progress-text",
+      "progress-text-done",
+      "popover",
+      "email",
+    ] as const
+  ).map((name) => [name, one(name)] as const);
 
   let elapsed = 0;
   let lastLoopTime = 0;
@@ -955,9 +960,11 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
     pointer.style.top = `calc(var(--spacing) * ${p.y})`;
   };
 
+  let pressTimer: number | undefined;
   const press = () => {
+    window.clearTimeout(pressTimer);
     pointer.setAttribute("data-pressed", "");
-    window.setTimeout(() => pointer.removeAttribute("data-pressed"), 140);
+    pressTimer = window.setTimeout(() => pointer.removeAttribute("data-pressed"), 140);
   };
 
   const begin = (step: Step, odd: boolean) => {
@@ -1047,11 +1054,12 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
     }
 
     // The recording.
-    const cam = cameraAt(t, (z) => (z.id === "z1" ? values.zoomScale : z.scale));
+    const snapshot = recordingAt(t, (z) => (z.id === "z1" ? values.zoomScale : z.scale));
+    const cam = snapshot.camera;
     // As in the app (RenderKit Zoom.swift), a click or manual zoom scales about its target.
     camera.style.transformOrigin = `${cam.origin[0]}% ${cam.origin[1]}%`;
     camera.style.transform = `scale(${cam.scale})`;
-    const [cx, cy] = cursorAt(t);
+    const [cx, cy] = snapshot.cursor;
     cursor.style.left = `${cx}%`;
     cursor.style.top = `${cy}%`;
     const lastClick = clicks.findLast((c) => c <= t);
@@ -1067,16 +1075,7 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
     } else {
       ring.style.opacity = "0";
     }
-    const on: Record<string, boolean> = {
-      published: t >= clicks[0],
-      ticked: t >= clicks[1],
-      progress: t >= clicks[1],
-      "progress-text": t >= clicks[1],
-      "progress-text-done": t >= clicks[1],
-      popover: popoverOpen(t),
-      email: t >= blurMask.start && t < blurMask.end,
-    };
-    for (const [name, el] of toggles) el?.toggleAttribute("data-on", on[name]);
+    for (const [name, el] of toggles) el?.toggleAttribute("data-on", snapshot.on[name]);
 
     // The editor around it.
     playhead.style.left = `${(t / LOOP) * 100}%`;
@@ -1096,24 +1095,17 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
   };
 
   const still = window.matchMedia("(prefers-reduced-motion: reduce)");
-  if (still.matches) {
-    elapsed = 0.9;
-    lastLoopTime = 0.9;
-    frame(0.9);
-    return () => {};
-  }
-
   let raf = 0;
   let last = 0;
   let visible = false;
   const tick = (now: number) => {
-    elapsed += Math.min(0.1, (now - last) / 1000);
+    elapsed += Math.max(0, Math.min(0.1, (now - last) / 1000));
     last = now;
     frame(elapsed % LOOP);
     raf = requestAnimationFrame(tick);
   };
   const update = () => {
-    const run = visible && !document.hidden;
+    const run = visible && !document.hidden && !still.matches;
     if (run && !raf) {
       last = performance.now();
       raf = requestAnimationFrame(tick);
@@ -1122,6 +1114,12 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
       raf = 0;
     }
   };
+  // Freeze the current frame when the preference changes; resume from the same edit state.
+  if (still.matches) {
+    elapsed = lastLoopTime = 0.9;
+    frame(0.9);
+  }
+  still.addEventListener("change", update);
   const observer = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
     update();
@@ -1130,6 +1128,9 @@ function runDemo(root: HTMLElement, values: Values, setUi: (update: (ui: Ui) => 
   document.addEventListener("visibilitychange", update);
   return () => {
     observer.disconnect();
+    still.removeEventListener("change", update);
+    window.clearTimeout(pressTimer);
+    pointer.removeAttribute("data-pressed");
     document.removeEventListener("visibilitychange", update);
     cancelAnimationFrame(raf);
   };

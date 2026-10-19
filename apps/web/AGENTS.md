@@ -42,4 +42,4 @@ Every claim about the app must be true of `apps/macos`: export presets (`ExportK
 
 ## Tasks
 
-Run these from `apps/web` with `mise run <task>`, or from anywhere with `mise //apps/web:<task>`: `dev`, `build`, `start`, `lint`, `format`, `format:check`, `typecheck`, and `check` (all of them, then a production build).
+Run these from `apps/web` with `mise run <task>`, or from anywhere with `mise //apps/web:<task>`: `dev`, `build`, `start`, `lint`, `format`, `format:check`, `typecheck`, `test`, `test:browser`, and `check` (format, lint, types, runtime/contract tests, and browser tests against a production build). `test:browser` checks illustration clipping and both hero cycles at desktop and mobile widths. Install its Chromium browser once with `mise exec -- bunx playwright install chromium`.

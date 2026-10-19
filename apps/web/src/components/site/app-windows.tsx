@@ -171,7 +171,7 @@ export function ExportSheetWindow({ className }: { className?: string }) {
   ];
 
   return (
-    <AppFrame width={480} height={418} className={className}>
+    <AppFrame width={480} height={432} className={className}>
       <div className="absolute inset-0 overflow-hidden ui-rounded-14 bg-ui-window shadow-[0_0_0_1px_rgb(255_255_255/0.1),0_3cqw_7cqw_-1cqw_rgb(4_6_20/0.6)]">
         <div className="flex items-center gap-10 px-20 py-14">
           <span className="grid size-32 place-items-center ui-rounded-8 bg-ui-accent text-ui-on-accent shadow-[0_3px_8px_rgb(61_220_151/0.3)]">

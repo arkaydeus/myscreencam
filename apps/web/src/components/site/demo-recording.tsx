@@ -1,5 +1,6 @@
 import { Bell, Check, Inbox, Link, ListTodo, Search } from "lucide-react";
 
+import { recordingAt } from "@/components/site/editor-demo-script";
 import { cn } from "@/lib/utils";
 
 /*
@@ -22,16 +23,24 @@ const avatarTint: Record<string, string> = {
   AM: "bg-[#2f46e8]",
 };
 
-export function DemoRecording({ cursorLarge }: { cursorLarge: boolean }) {
+export function DemoRecording({ cursorLarge, time = 0 }: { cursorLarge: boolean; time?: number }) {
+  const snapshot = recordingAt(time);
   return (
     <div className="absolute inset-0 bg-white ui-text-13 text-[#23263f] [--ui-width:1000] ui-units">
-      <div data-el="camera" className="absolute inset-0 will-change-transform">
+      <div
+        data-el="camera"
+        className="absolute inset-0 will-change-transform"
+        style={{
+          transform: `scale(${snapshot.camera.scale})`,
+          transformOrigin: `${snapshot.camera.origin[0]}% ${snapshot.camera.origin[1]}%`,
+        }}
+      >
         <TitleBar />
         <Sidebar />
-        <Main />
-        <SharePopover />
+        <Main on={snapshot.on} />
+        <SharePopover on={snapshot.on} />
         <ClickRing />
-        <Cursor large={cursorLarge} />
+        <Cursor large={cursorLarge} at={snapshot.cursor} />
       </div>
     </div>
   );
@@ -111,7 +120,9 @@ function Sidebar() {
   );
 }
 
-function Main() {
+type RecordingState = ReturnType<typeof recordingAt>["on"];
+
+function Main({ on }: { on: RecordingState }) {
   return (
     <div className="absolute top-44 right-0 bottom-0 left-200 px-40 pt-34">
       <p className="ui-text-12 font-medium text-[#8a8ea3]">Projects / Onboarding</p>
@@ -120,15 +131,21 @@ function Main() {
         <span className="relative h-6 w-260 overflow-hidden rounded-full bg-[#e9eaf0]">
           <span
             data-el="progress"
+            data-on={on["progress"] ? "" : undefined}
             className="absolute inset-y-0 left-0 w-[60%] rounded-full bg-[#16876f] transition-[width] duration-500 data-on:w-[80%]"
           />
         </span>
         <span className="relative ui-text-12 whitespace-nowrap">
-          <span data-el="progress-text" className="data-on:opacity-0">
+          <span
+            data-el="progress-text"
+            data-on={on["progress-text"] ? "" : undefined}
+            className="data-on:opacity-0"
+          >
             3 of 5 done
           </span>
           <span
             data-el="progress-text-done"
+            data-on={on["progress-text-done"] ? "" : undefined}
             className="absolute left-0 opacity-0 data-on:opacity-100"
           >
             4 of 5 done
@@ -153,6 +170,7 @@ function Main() {
               {task.ticked && (
                 <span
                   data-el="ticked"
+                  data-on={on["ticked"] ? "" : undefined}
                   className="absolute -inset-2 grid place-items-center ui-rounded-6 bg-[#16876f] text-white opacity-0 transition-opacity duration-150 data-on:opacity-100"
                 >
                   <Check className="size-13" strokeWidth={3.2} />
@@ -181,6 +199,7 @@ function Main() {
           Publish changes
           <span
             data-el="published"
+            data-on={on["published"] ? "" : undefined}
             className="absolute inset-0 flex items-center justify-center gap-8 ui-rounded-10 bg-[#16876f] opacity-0 transition-opacity duration-150 data-on:opacity-100"
           >
             <Check className="size-15" strokeWidth={3} />
@@ -192,7 +211,7 @@ function Main() {
   );
 }
 
-function SharePopover() {
+function SharePopover({ on }: { on: RecordingState }) {
   const people = [
     { who: "PS", name: "Priya Shah", role: "Owner" },
     { who: "SL", name: "Sam Lee", role: "Can edit" },
@@ -200,12 +219,17 @@ function SharePopover() {
   return (
     <div
       data-el="popover"
+      data-on={on["popover"] ? "" : undefined}
       className="absolute top-52 right-16 w-310 origin-top-right scale-95 ui-rounded-12 border border-[#e3e4ea] bg-white p-16 opacity-0 shadow-[0_12px_32px_-8px_rgb(20_24_60/0.3)] transition-[opacity,scale] duration-150 data-on:scale-100 data-on:opacity-100"
     >
       <p className="ui-text-14 font-semibold">Share “Onboarding launch”</p>
       <div className="mt-12 flex gap-8">
         <span className="flex h-32 flex-1 items-center ui-rounded-8 border border-[#d6d8e2] px-10">
-          <span data-el="email" className="transition-[filter] duration-150 data-on:blur-[3px]">
+          <span
+            data-el="email"
+            data-on={on["email"] ? "" : undefined}
+            className="transition-[filter] duration-150 data-on:blur-[3px]"
+          >
             alex.morgan@launchpad.dev
           </span>
         </span>
@@ -245,9 +269,13 @@ function ClickRing() {
   );
 }
 
-function Cursor({ large }: { large: boolean }) {
+function Cursor({ large, at }: { large: boolean; at: readonly [number, number] }) {
   return (
-    <span data-el="cursor" className="pointer-events-none absolute top-[30%] left-[52%]">
+    <span
+      data-el="cursor"
+      className="pointer-events-none absolute"
+      style={{ left: `${at[0]}%`, top: `${at[1]}%` }}
+    >
       {/* The arrow's tip sits at (4, 4) of its 32 px box. */}
       {/* oxlint-disable-next-line nextjs/no-img-element -- tiny static SVG, no optimisation needed */}
       <img

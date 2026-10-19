@@ -17,13 +17,15 @@ import {
   zoomEnd,
   zooms,
 } from "../src/components/site/editor-demo-script";
+import {
+  ANNOTATE_TIME,
+  ANNOTATE_WORD,
+  SubtitlesWindow,
+} from "../src/components/site/subtitles-window";
+import { recordingAt } from "../src/components/site/editor-demo-script";
 import { site } from "../src/lib/site";
 
 const css = readFileSync(resolve(import.meta.dir, "../src/app/globals.css"), "utf8");
-const demoSource = readFileSync(
-  resolve(import.meta.dir, "../src/components/site/editor-demo.tsx"),
-  "utf8",
-);
 
 test("Download for Mac points at the stable DMG asset while Releases opens the release page", () => {
   const download = renderToStaticMarkup(createElement(DownloadButton));
@@ -55,7 +57,7 @@ test("hero timeline draws a block per zoom and a marker per click", () => {
 
   for (const z of zooms) expect(demo).toContain(`d="M${(z.start / LOOP) * lane} `);
   for (const c of clicks) expect(demo).toContain(`cx="${(c / LOOP) * lane}"`);
-  for (const tab of ["zoom", "webcam", "audio", "cursor", "background"]) {
+  for (const tab of ["zoom", "webcam", "audio", "blur", "cursor", "background", "subtitles"]) {
     expect(demo).toContain(`data-target="tab-${tab}"`);
   }
 });
@@ -78,8 +80,27 @@ test("subtitle cues are in order, inside the loop and clear of each other", () =
   }
 });
 
-test("reduced motion stops smooth scrolling and the hero loop", () => {
+test("reduced motion stops smooth scrolling", () => {
   const reducedMotion = css.split("@media (prefers-reduced-motion: reduce) {")[1];
   expect(reducedMotion).toMatch(/html\s*\{\s*scroll-behavior: auto;/);
-  expect(demoSource).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+});
+
+test("Annotate uses the recording snapshot and highlighted narration at its playhead", () => {
+  const cue = narration.find((entry) => ANNOTATE_TIME >= entry.start && ANNOTATE_TIME < entry.end);
+  expect(cue).toBeDefined();
+  expect(cue.text.split(" ")).toContain(ANNOTATE_WORD);
+  const markup = renderToStaticMarkup(createElement(SubtitlesWindow));
+  const snapshot = recordingAt(ANNOTATE_TIME);
+  for (const name of ["published", "ticked", "progress", "progress-text", "progress-text-done"]) {
+    expect(snapshot.on[name]).toBe(true);
+    expect(markup).toContain(`data-el="${name}" data-on=""`);
+  }
+  expect(markup).toContain("4 of 5 done");
+  expect(markup).toContain(`left:${snapshot.cursor[0]}%;top:${snapshot.cursor[1]}%`);
+  expect(markup).toContain(`transform:scale(${snapshot.camera.scale})`);
+  expect(markup).toContain(
+    `transform-origin:${snapshot.camera.origin[0]}% ${snapshot.camera.origin[1]}%`,
+  );
+  expect(markup).toContain(`>${ANNOTATE_WORD}</span>`);
+  expect(markup).toContain("0:13.20");
 });
