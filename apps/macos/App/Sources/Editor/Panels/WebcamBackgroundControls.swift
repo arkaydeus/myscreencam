@@ -32,7 +32,7 @@ extension EditorModel: WebcamBackgroundSource {
 struct WebcamBackgroundControls<Source: WebcamBackgroundSource>: View {
     let source: Source
 
-    private enum FillKind: String, CaseIterable, Identifiable {
+    enum FillKind: String, CaseIterable, Identifiable {
         case clear, solid, gradient, image
         var id: Self { self }
         var title: String { rawValue.capitalized }
@@ -91,11 +91,11 @@ struct WebcamBackgroundControls<Source: WebcamBackgroundSource>: View {
         }
     }
 
-    private var fillKinds: [FillKind] {
+    var fillKinds: [FillKind] {
         source.recording == nil ? [.clear, .solid, .gradient] : FillKind.allCases
     }
 
-    private var fillKind: Binding<FillKind> {
+    var fillKind: Binding<FillKind> {
         let fill = source.webcamBackgroundBinding(\.fill, "Webcam Background Fill")
         return Binding(
             get: {

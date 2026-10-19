@@ -65,7 +65,6 @@ public struct ProjectDefaults: Codable, Sendable, Equatable {
         config.subtitles.enabled = subtitlesEnabled
         config.subtitles.style = subtitleStyle
         config.subtitles.placement = subtitlePlacement
-        config.webcam.background = webcamBackground
-        if case .image = webcamBackground.fill { config.webcam.background.fill = nil }
+        config.webcam.background = webcamBackground.withoutRecordingAssets
     }
 }

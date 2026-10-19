@@ -104,7 +104,7 @@ public struct ZoomTiming: Codable, Sendable, Equatable {
     public var hold: Double
     public var easeOut: Double
 
-    public init(scale: Double = 1.6, easeIn: Double = 0.45, hold: Double = 0.85, easeOut: Double = 0.45) {
+    public init(scale: Double = 1.6, easeIn: Double = 0.32, hold: Double = 0.85, easeOut: Double = 0.48) {
         self.scale = scale
         self.easeIn = easeIn
         self.hold = hold
@@ -137,7 +137,7 @@ public struct ZoomKeyframe: Codable, Sendable, Hashable, Identifiable {
 
     public init(
         id: UUID = UUID(), time: Double, scale: Double = 1.6, target: NormPoint = .center, mode: ZoomMode = .manual,
-        easeIn: Double = 0.45, hold: Double = 0.85, easeOut: Double = 0.45, enabled: Bool = true, instant: Bool = false
+        easeIn: Double = 0.32, hold: Double = 0.85, easeOut: Double = 0.48, enabled: Bool = true, instant: Bool = false
     ) {
         self.id = id
         self.time = time
@@ -273,6 +273,13 @@ public struct WebcamBackground: Codable, Sendable, Equatable {
     /// True when the screen shows through around the person (a cut-out, or a frame with no fill), so the shadow
     /// follows the person instead of the frame.
     public var isSeeThrough: Bool { effect == .remove && (removalStyle == .cutout || fill == nil) }
+
+    /// Reusable look settings. Image paths belong to one recording and cannot travel with defaults or presets.
+    public var withoutRecordingAssets: Self {
+        var background = self
+        if case .image = fill { background.fill = nil }
+        return background
+    }
 }
 
 // MARK: - Cursor
@@ -447,7 +454,7 @@ public enum BackgroundFill: Codable, Sendable, Hashable {
     case solid(RGBAColor)
     /// Linear gradient; angle in degrees, 0 = left→right, 90 = top→bottom.
     case linearGradient(from: RGBAColor, to: RGBAColor, angle: Double)
-    /// An image file (absolute path), scaled to fill.
+    /// An image file relative to the recording package, scaled to fill.
     case image(path: String)
 }
 

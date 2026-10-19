@@ -152,7 +152,7 @@ Native adds ⌘Z / ⇧⌘Z undo/redo and ⌘E export (both were missing or broke
 - **Auto-zoom from left clicks:**
   - `t = max(0, click.t − 0.12)`.
   - Skip a click if `t < previousEnd + 0.18`.
-  - Scale 1.6; in 0.16 / hold 0.85 / out 0.24. The native app's built-in defaults use in 0.45 / out 0.45 instead (a gentler zoom; changed 2026-10-19).
+  - Scale 1.6; in 0.16 / hold 0.85 / out 0.24. The native app's built-in defaults use in 0.32 / out 0.48 instead (a gentler zoom; reconciled with main's timing change on 2026-10-19).
   - Target = the click position, clamped to 0–1.
 
 **Webcam:**
@@ -164,6 +164,7 @@ Native adds ⌘Z / ⇧⌘Z undo/redo and ⌘E export (both were missing or broke
   - Square = a centre crop.
 - Corner radius is a fraction (0–0.5) of the shorter side; 0.5 gives a circle or pill.
 - Anti-aliased edges, with a soft shadow `0 4 12 rgba(0,0,0,.3)`.
+- Webcam background image fills belong to their recording. Defaults and reusable edit presets drop the image fill while retaining the effect, removal style and other webcam settings; an in-frame removal becomes see-through.
 
 **Blur:**
 - A rectangle in normalised source coordinates, active on `[start, end]` in source time.
