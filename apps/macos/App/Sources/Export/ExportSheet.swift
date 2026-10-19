@@ -105,36 +105,66 @@ struct ExportSheet: View {
     private var optionsView: some View {
         VStack(alignment: .leading, spacing: 16) {
             presetPicker
-            Form {
-                Picker("Format", selection: formatBinding) {
-                    ForEach(ExportFormat.allCases, id: \.self) { format in
-                        Text(format.displayName).tag(format)
+            // A grid rather than a `.columns` Form: the form sized its label column to the longest label and pushed
+            // the rows wider than the sheet. Short labels keep every row inside the sheet's padding.
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                optionRow("Format") {
+                    Picker("Format", selection: formatBinding) {
+                        ForEach(ExportFormat.allCases, id: \.self) { format in
+                            Text(format.displayName).tag(format)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                optionRow("Quality") {
+                    Picker("Quality", selection: $choice.settings.quality) {
+                        ForEach(ExportQuality.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(!usesQuality)
+                    .help(usesQuality ? "" : "\(choice.settings.format.displayName) doesn't use a quality setting.")
+                }
+                optionRow("Frame rate") {
+                    Picker("Frame rate", selection: $choice.settings.frameRate) {
+                        ForEach(choice.frameRateChoices, id: \.self) { Text("\($0.framesPerSecond) fps").tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                optionRow("Resolution") {
+                    Picker("Resolution", selection: $choice.settings.scale) {
+                        ForEach(ExportScale.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                if choice.settings.format != .gif {
+                    optionRow("Audio") {
+                        Toggle("Include audio", isOn: $choice.settings.includesAudio)
+                            .labelsHidden()
+                            .disabled(info?.hasAudibleAudio == false)
+                            .help(
+                                info?.hasAudibleAudio == false
+                                    ? "This recording has no audible audio." : "Include the audio in the export")
                     }
                 }
-                Picker("Quality", selection: $choice.settings.quality) {
-                    ForEach(ExportQuality.allCases, id: \.self) { Text($0.displayName).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .disabled(!usesQuality)
-                .help(usesQuality ? "" : "\(choice.settings.format.displayName) doesn't use a quality setting.")
-                Picker("Frame rate", selection: $choice.settings.frameRate) {
-                    ForEach(choice.frameRateChoices, id: \.self) { Text("\($0.framesPerSecond) fps").tag($0) }
-                }
-                .pickerStyle(.segmented)
-                Picker("Resolution", selection: $choice.settings.scale) {
-                    ForEach(ExportScale.allCases, id: \.self) { Text($0.displayName).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                if choice.settings.format != .gif {
-                    Toggle("Include audio", isOn: $choice.settings.includesAudio)
-                        .disabled(info?.hasAudibleAudio == false)
-                }
                 if hasSubtitles {
-                    Toggle("Also save subtitles (.srt)", isOn: $saveSubtitles)
+                    optionRow("Subtitles") {
+                        HStack(spacing: 8) {
+                            Toggle("Also save subtitles (.srt)", isOn: $saveSubtitles)
+                                .labelsHidden()
+                            Text("Also save an .srt file")
+                                .foregroundStyle(Color.themeSecondaryText)
+                        }
                         .help("Subtitles are burned into the video; this also writes them as a SubRip file beside it.")
+                    }
                 }
             }
-            .formStyle(.columns)
 
             summary
 
@@ -156,6 +186,15 @@ struct ExportSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(info == nil || isChoosingDestination)
             }
+        }
+    }
+
+    /// One options row: a right-aligned label and its control.
+    private func optionRow(_ title: String, @ViewBuilder control: () -> some View) -> some View {
+        GridRow(alignment: .center) {
+            Text(title)
+                .gridColumnAlignment(.trailing)
+            control()
         }
     }
 

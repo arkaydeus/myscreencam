@@ -25,6 +25,8 @@ struct EditNormalizationTests {
         config.webcam.origin = NormPoint(x: -0.5, y: 1.5)
         config.webcam.cornerRadius = 2
         config.webcam.syncOffset = -12
+        config.webcam.background.blurAmount = 3
+        config.webcam.background.edgeSoftness = .nan
         config.cursor.idleDelay = -3
         config.cursor.clickHighlight.radius = 500
         config.cursor.clickHighlight.duration = 0
@@ -86,6 +88,8 @@ struct EditNormalizationTests {
         #expect(n.webcam.origin == NormPoint(x: 0, y: 1))
         #expect(n.webcam.cornerRadius == 0.5)
         #expect(n.webcam.syncOffset == -5)
+        #expect(n.webcam.background.blurAmount == 1)
+        #expect(n.webcam.background.edgeSoftness == WebcamBackground().edgeSoftness)
 
         #expect(n.cursor.idleDelay == 0)
         #expect(n.cursor.clickHighlight.radius == 100)
@@ -121,5 +125,39 @@ struct EditNormalizationTests {
         config.zoom.keyframes = [ZoomKeyframe(time: 1), ZoomKeyframe(time: 5, scale: 2)]
         config.blur = [BlurMask(start: 1, end: 3)]
         #expect(config.normalized(duration: 10) == config)
+    }
+}
+
+struct WebcamBackgroundModelTests {
+    @Test func webcamWrittenBeforeBackgroundsDecodesWithNone() throws {
+        let json = #"""
+            {"enabled":true,"origin":{"x":0.78,"y":0.72},"width":0.2,"aspect":"wide","cornerRadius":0.1,
+             "mirrored":false,"shadow":true,"syncOffset":0}
+            """#
+        let webcam = try JSONDecoder().decode(WebcamSettings.self, from: Data(json.utf8))
+        #expect(webcam == WebcamSettings())
+        #expect(webcam.background.effect == .none)
+    }
+
+    @Test func roundTripsAndFillsMissingKeys() throws {
+        var webcam = WebcamSettings()
+        webcam.background = WebcamBackground(
+            effect: .remove, blurAmount: 0.7, edgeSoftness: 0.2, removalStyle: .framed,
+            fill: .linearGradient(from: RGBAColor(hex: "#000000")!, to: RGBAColor(hex: "#FFFFFF")!, angle: 10))
+        let data = try JSONEncoder().encode(webcam)
+        #expect(try JSONDecoder().decode(WebcamSettings.self, from: data) == webcam)
+
+        let partial = try JSONDecoder().decode(WebcamBackground.self, from: Data(#"{"effect":"blur"}"#.utf8))
+        #expect(partial == WebcamBackground(effect: .blur))
+    }
+
+    @Test func seeThroughAndCutout() {
+        #expect(!WebcamBackground(effect: .blur).isSeeThrough)
+        #expect(WebcamBackground(effect: .remove, removalStyle: .cutout).isCutout)
+        #expect(WebcamBackground(effect: .remove, removalStyle: .cutout).isSeeThrough)
+        #expect(WebcamBackground(effect: .remove, removalStyle: .framed).isSeeThrough)
+        let filled = WebcamBackground(effect: .remove, removalStyle: .framed, fill: .solid(RGBAColor(hex: "#FF0000")!))
+        #expect(!filled.isSeeThrough)
+        #expect(!filled.isCutout)
     }
 }

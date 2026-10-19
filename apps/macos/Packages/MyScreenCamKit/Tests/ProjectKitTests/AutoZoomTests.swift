@@ -4,7 +4,7 @@ import Testing
 @testable import ProjectKit
 
 struct AutoZoomTests {
-    let defaults = ZoomTiming()  // 1.6, in 0.16, hold 0.85, out 0.24 → a keyframe lasts 1.25 s
+    let defaults = ZoomTiming()  // 1.6, in 0.45, hold 0.85, out 0.45 → a keyframe lasts 1.75 s
 
     func click(_ t: Double, x: Double = 0.5, y: Double = 0.5, button: Int = 0) -> InputEvent {
         InputEvent(t: t, kind: .down, x: x, y: y, button: button)
@@ -17,7 +17,7 @@ struct AutoZoomTests {
         #expect(abs(k.time - 1.88) < 1e-9)
         #expect(k.mode == .click)
         #expect(k.scale == 1.6)
-        #expect(k.easeIn == 0.16 && k.hold == 0.85 && k.easeOut == 0.24)
+        #expect(k.easeIn == 0.45 && k.hold == 0.85 && k.easeOut == 0.45)
         #expect(k.target == NormPoint(x: 0.25, y: 0.75))
         #expect(k.enabled && !k.instant)
     }
@@ -28,18 +28,18 @@ struct AutoZoomTests {
     }
 
     @Test func minimumGapRule() {
-        // First: t=0.88, end=2.13. Next allowed start ≥ 2.31 → click ≥ 2.43.
-        let justTooSoon = AutoZoom.keyframes(from: [click(1), click(2.42)], defaults: defaults)
+        // First: t=0.88, end=2.63. Next allowed start ≥ 2.81 → click ≥ 2.93.
+        let justTooSoon = AutoZoom.keyframes(from: [click(1), click(2.92)], defaults: defaults)
         #expect(justTooSoon.count == 1)
-        let justEnough = AutoZoom.keyframes(from: [click(1), click(2.44)], defaults: defaults)
+        let justEnough = AutoZoom.keyframes(from: [click(1), click(2.94)], defaults: defaults)
         #expect(justEnough.count == 2)
     }
 
     @Test func skippedClickDoesNotExtendTheWindow() {
-        // Click 2 is skipped; click 3 is measured against click 1's end (2.13), not click 2's.
-        let keyframes = AutoZoom.keyframes(from: [click(1), click(1.5), click(2.5)], defaults: defaults)
+        // Click 2 is skipped; click 3 is measured against click 1's end (2.63), not click 2's (3.13).
+        let keyframes = AutoZoom.keyframes(from: [click(1), click(1.5), click(3)], defaults: defaults)
         #expect(keyframes.count == 2)
-        #expect(abs(keyframes[1].time - 2.38) < 1e-9)
+        #expect(abs(keyframes[1].time - 2.88) < 1e-9)
     }
 
     @Test func targetsAreClamped() {

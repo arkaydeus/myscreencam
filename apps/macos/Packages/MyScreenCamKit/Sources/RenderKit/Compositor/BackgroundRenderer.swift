@@ -107,9 +107,11 @@ struct BackgroundRenderer {
         return CIHelpers.roundedRect(contentRectCI, radius: radius, color: CIColor(red: 1, green: 1, blue: 1))
     }
 
-    private func fill() -> CIImage {
-        let rect = canvasRect
-        switch settings.fill {
+    private func fill() -> CIImage { Self.fill(settings.fill, in: canvasRect, resources: resources) }
+
+    /// `fill` covering `rect` (Core Image space). An image is scaled to fill and centred, over black.
+    static func fill(_ fill: BackgroundFill, in rect: CGRect, resources: ProjectResources) -> CIImage {
+        switch fill {
         case .solid(let color):
             return CIImage(color: CIHelpers.color(color)).cropped(to: rect)
         case .linearGradient(let from, let to, let angle):
@@ -137,7 +139,8 @@ struct BackgroundRenderer {
             let w = e.width * s
             let h = e.height * s
             return placed.transformed(
-                by: CGAffineTransform(translationX: (rect.width - w) / 2, y: (rect.height - h) / 2)
+                by: CGAffineTransform(
+                    translationX: rect.minX + (rect.width - w) / 2, y: rect.minY + (rect.height - h) / 2)
             )
             .composited(over: black).cropped(to: rect)
         }

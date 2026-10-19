@@ -413,7 +413,7 @@ private struct OptionsSection: View {
                 .font(.caption)
                 .foregroundStyle(Color.themeSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-                DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
+                DisclosureGroup(isExpanded: $showsAdvanced) {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Frame rate", selection: $preferences.frameRate) {
                             Text("30 fps").tag(30)
@@ -425,6 +425,11 @@ private struct OptionsSection: View {
                         }
                     }
                     .padding(.top, 6)
+                } label: {
+                    // On macOS only the chevron toggles a DisclosureGroup; make the title toggle it too.
+                    Text("Advanced")
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation { showsAdvanced.toggle() } }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

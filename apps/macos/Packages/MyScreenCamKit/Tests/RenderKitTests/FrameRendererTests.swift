@@ -98,6 +98,67 @@ struct FrameRendererTests {
         #expect(close(square.pixel(470, 300), (0, 255, 0), tolerance: 20))
     }
 
+    /// The test camera has no person in it, so person segmentation finds only background.
+    @Test func webcamBackgroundWithoutAPerson() async throws {
+        var edit = try await TestMedia.plainEdit()
+        edit.webcam = WebcamSettings(
+            enabled: true, origin: NormPoint(x: 0.5, y: 0.5), width: 0.25, cornerRadius: 0, shadow: false)
+        // Rect x 320…480, y 180…270; the red/green boundary is at x 400.
+        edit.webcam.background = WebcamBackground(effect: .blur, blurAmount: 1, edgeSoftness: 0)
+        let blurred = try await render(edit, webcam: camera)
+        let edge = blurred.pixel(398, 225)
+        #expect(edge.r > 40 && edge.g > 40)
+        #expect(close(blurred.pixel(330, 225), (255, 0, 0), tolerance: 20))
+
+        edit.webcam.background = WebcamBackground(
+            effect: .remove, removalStyle: .framed, fill: .solid(RGBAColor(r: 0, g: 0, b: 1)))
+        let filled = try await render(edit, webcam: camera)
+        #expect(close(filled.pixel(340, 225), (0, 0, 255), tolerance: 20))
+        #expect(close(filled.pixel(460, 225), (0, 0, 255), tolerance: 20))
+
+        edit.webcam.background.removalStyle = .cutout
+        let cutout = try await render(edit, webcam: camera)
+        let screen = cutout.pixel(10, 10)
+        #expect(close(cutout.pixel(340, 225), (screen.r, screen.g, screen.b), tolerance: 4))
+        #expect(close(cutout.pixel(460, 225), (screen.r, screen.g, screen.b), tolerance: 4))
+    }
+
+    @Test func personMaskCoversTheCameraFrame() throws {
+        let frame = camera.transformed(by: CGAffineTransform(translationX: 7, y: 3))
+        let mask = try #require(FrameRenderer.personMask(for: frame))
+        #expect(abs(mask.extent.minX - 7) < 0.01)
+        #expect(abs(mask.extent.minY - 3) < 0.01)
+        #expect(abs(mask.extent.width - 160) < 0.01)
+        #expect(abs(mask.extent.height - 90) < 0.01)
+    }
+
+    @Test func personMasksAreMadeOncePerCameraFrame() throws {
+        func frame() throws -> CIImage {
+            var buffer: CVPixelBuffer?
+            CVPixelBufferCreate(
+                nil, 64, 36, kCVPixelFormatType_32BGRA, [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+                &buffer)
+            return CIImage(cvPixelBuffer: try #require(buffer))
+        }
+        let cache = PersonMaskCache()
+        var made = 0
+        let make = { (image: CIImage) -> CIImage? in
+            made += 1
+            return CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(to: image.extent)
+        }
+        let a = try frame()
+        let b = try frame()
+        _ = cache.mask(for: a, make: make)
+        _ = cache.mask(for: a, make: make)
+        #expect(made == 1)
+        _ = cache.mask(for: b, make: make)
+        #expect(made == 2)
+        // Images that aren't a decoded frame aren't cached.
+        _ = cache.mask(for: camera, make: make)
+        _ = cache.mask(for: camera, make: make)
+        #expect(made == 4)
+    }
+
     @Test func webcamDisabledOrMissingDrawsNothing() async throws {
         var edit = try await TestMedia.plainEdit()
         edit.webcam = WebcamSettings(enabled: false, origin: NormPoint(x: 0.5, y: 0.5), width: 0.25)

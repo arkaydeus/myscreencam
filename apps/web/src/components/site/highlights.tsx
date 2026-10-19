@@ -134,7 +134,7 @@ export function Highlights() {
         <Card
           eyebrow="Webcam"
           title="Your face, framed and in sync."
-          body="A rounded, shadowed overlay you can drag anywhere, size and shape. It stays in sync through every cut."
+          body="A rounded, shadowed overlay you can drag anywhere, size and shape. Blur or remove the background behind you, and it stays in sync through every cut."
         >
           <Visual className="relative h-[180px] overflow-hidden rounded-2xl p-4 canvas-paint sm:h-55 sm:rounded-[18px]">
             <div className="h-full w-[78%] rounded-lg bg-white/95 shadow-[0_8px_24px_rgb(20_16_70/0.35)]" />

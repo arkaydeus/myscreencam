@@ -152,7 +152,7 @@ Native adds ⌘Z / ⇧⌘Z undo/redo and ⌘E export (both were missing or broke
 - **Auto-zoom from left clicks:**
   - `t = max(0, click.t − 0.12)`.
   - Skip a click if `t < previousEnd + 0.18`.
-  - Scale 1.6; in 0.16 / hold 0.85 / out 0.24.
+  - Scale 1.6; in 0.16 / hold 0.85 / out 0.24. The native app's built-in defaults use in 0.45 / out 0.45 instead (a gentler zoom; changed 2026-10-19).
   - Target = the click position, clamped to 0–1.
 
 **Webcam:**
