@@ -201,3 +201,48 @@ export function clock(seconds: number): string {
   const s = Math.floor(hundredths / 100);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}.${String(hundredths % 100).padStart(2, "0")}`;
 }
+
+/* The narration: what the microphone hears, as the subtitles transcribe it. */
+
+/** Subtitle cues, in seconds: the narrator talks only inside them. */
+export const narration = [
+  { start: 0.4, end: 3.8, text: "Here’s the onboarding launch. First, publish the changes." },
+  { start: 4.5, end: 8.9, text: "Publishing sends the new checklist to the whole team." },
+  { start: 10.1, end: 14.6, text: "Tick off the product tour and the progress bar updates." },
+  { start: 15.3, end: 19.9, text: "Then share the project with a teammate." },
+  { start: 20.7, end: 23.5, text: "That’s it. The launch is ready to go." },
+] as const;
+
+export const talking = (t: number) => narration.some((cue) => t > cue.start && t < cue.end);
+
+/** A repeatable 0…1 value per column (an integer hash, so server and browser agree exactly). */
+export const noise = (i: number) => {
+  let h = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
+/** `count` waveform peaks (0…1) across the loop, one per 2 pt timeline column. */
+export function peaks(count: number, level: (t: number, i: number) => number) {
+  return Array.from({ length: count }, (_, i) => {
+    const t = (i * LOOP) / count;
+    return Math.min(1, Math.max(0, level(t, i)));
+  });
+}
+
+/** The microphone's level: speech while the narrator talks, near silence between. */
+export const micLevel = (t: number, i: number) =>
+  talking(t) ? 0.25 + 0.6 * noise(i) * (0.6 + 0.4 * Math.sin(t * 7)) : 0.02 * noise(i);
+
+/** An SVG path of 1.5 pt bars, one per peak, centred in a row `height` tall at `top`. */
+export function waveformPath(values: number[], top: number, height: number) {
+  const mid = top + height / 2;
+  const half = height / 2 - 2;
+  return values
+    .map((v, i) => {
+      if (v < 0.004) return "";
+      const h = Math.round(Math.max(0.5, v * half) * 10) / 10;
+      return `M${i * 2} ${(mid - h).toFixed(1)}h1.5v${(h * 2).toFixed(1)}h-1.5z`;
+    })
+    .join("");
+}

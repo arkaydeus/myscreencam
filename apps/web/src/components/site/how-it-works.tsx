@@ -2,6 +2,7 @@ import { AudioLines, EyeOff, Layers } from "lucide-react";
 
 import { RecorderWindow, ExportSheetWindow, TimelineWindow } from "@/components/site/app-windows";
 import { sectionTitle } from "@/components/site/brand";
+import { SubtitlesWindow } from "@/components/site/subtitles-window";
 import { cn } from "@/lib/utils";
 
 /** Presets as shipped in apps/macos (ExportKit/ExportPreset.swift). */
@@ -39,6 +40,19 @@ const steps = [
     ],
   },
   {
+    title: "Annotate.",
+    visual: <SubtitlesWindow />,
+    alt: "The editor’s Subtitles tab: the transcript as timed subtitles, style controls with Highlight spoken word turned on, and the preview showing a subtitle with the spoken word in yellow.",
+    lead: "Subtitles from your narration, transcribed on your Mac.",
+    points: [
+      "Generate subtitles with a speech model that runs on your Mac: Parakeet Ultra for 25 European languages, or Qwen for 30.",
+      "Fix a word, adjust a subtitle’s timing, or drag it into place on the preview.",
+      "Pick the font, colours, outline and background, and highlight each word as it’s spoken.",
+      "Select a stumble in the transcript to cut those words from the video.",
+      "Subtitles are burned into the export, with an .srt file beside it if you want one.",
+    ],
+  },
+  {
     title: "Export.",
     visual: <ExportSheetWindow className="mx-auto max-w-[420px]" />,
     alt: "The Export sheet: preset, format, quality, frame rate, resolution and audio, with the output size and an estimate of the file size.",
@@ -70,7 +84,7 @@ export function HowItWorks() {
     <section id="how" className="scroll-mt-13 py-18 sm:py-30">
       <div className="page-width">
         <h2 className={sectionTitle}>
-          Record. Edit. Export.
+          Record. Edit. Annotate. Export.
           <br />
           <span className="text-muted-foreground">Raw take to shareable video.</span>
         </h2>

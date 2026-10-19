@@ -12,6 +12,7 @@ import {
   blurMask,
   cameraAt,
   clicks,
+  narration,
   script,
   zoomEnd,
   zooms,
@@ -67,6 +68,14 @@ test("the pointer's script runs in order inside one loop, one action at a time",
     busyUntil = step.at + ("dur" in step ? step.dur : 0);
   }
   expect(busyUntil).toBeLessThanOrEqual(LOOP);
+});
+
+test("subtitle cues are in order, inside the loop and clear of each other", () => {
+  for (const [i, cue] of narration.entries()) {
+    expect(cue.end).toBeGreaterThan(cue.start);
+    expect(cue.start).toBeGreaterThan(i === 0 ? 0 : narration[i - 1].end);
+    expect(cue.end).toBeLessThan(LOOP);
+  }
 });
 
 test("reduced motion stops smooth scrolling and the hero loop", () => {

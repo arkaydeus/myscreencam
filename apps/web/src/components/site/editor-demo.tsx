@@ -60,8 +60,13 @@ import {
   dragged,
   easeInOut,
   flipped,
+  micLevel,
+  noise,
+  peaks,
   popoverOpen,
   script,
+  talking,
+  waveformPath,
   zoomEnd,
   zooms,
 } from "@/components/site/editor-demo-script";
@@ -238,11 +243,11 @@ function Preview({ ui }: { ui: Ui }) {
   );
 }
 
-function Transport({ time = 0, playing = true }: { time?: number; playing?: boolean }) {
+export function Transport({ time = 0, playing = true }: { time?: number; playing?: boolean }) {
   const icon = "grid size-30 place-items-center";
   return (
     <div className="flex h-full items-center gap-14 px-12">
-      <span className="flex h-26 w-170 items-center ui-rounded-6 border border-white/9 bg-white/6 px-10 font-mono ui-text-12">
+      <span className="flex h-26 w-170 items-center ui-rounded-6 border border-white/9 bg-white/6 px-10 font-mono ui-text-12 whitespace-nowrap">
         <span data-el="time">{clock(time)}</span>
         <span className="text-ui-fg-2">&nbsp;/ {clock(LOOP)}</span>
       </span>
@@ -331,51 +336,12 @@ const rowTop = (() => {
 const rowHeight = (title: RowTitle) => rows.find((r) => r.title === title)!.height;
 const x = (t: number) => (t / LOOP) * LANE;
 
-/** Deterministic waveform peaks (0…1) for one column every 2 pt. */
-function peaks(level: (t: number, i: number) => number) {
-  return Array.from({ length: Math.floor(LANE / 2) }, (_, i) => {
-    const t = (i * 2 * LOOP) / LANE;
-    return Math.min(1, Math.max(0, level(t, i)));
-  });
-}
-
-/** A repeatable 0…1 value per column (an integer hash, so server and browser agree exactly). */
-const noise = (i: number) => {
-  let h = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-};
-
-/** When the narrator is talking, in seconds. */
-const speech = [
-  [0.4, 3.8],
-  [4.5, 8.9],
-  [10.1, 14.6],
-  [15.3, 19.9],
-  [20.7, 23.5],
-] as const;
-
-const talking = (t: number) => speech.some(([a, b]) => t > a && t < b);
-
-const micPeaks = peaks((t, i) =>
-  talking(t) ? 0.25 + 0.6 * noise(i) * (0.6 + 0.4 * Math.sin(t * 7)) : 0.02 * noise(i),
-);
-const systemPeaks = peaks((t, i) => {
+const columns = (level: (t: number, i: number) => number) => peaks(Math.floor(LANE / 2), level);
+const micPeaks = columns(micLevel);
+const systemPeaks = columns((t, i) => {
   const near = clicks.find((c) => t >= c && t < c + 0.35);
   return near === undefined ? 0 : (0.55 - (t - near)) * (0.6 + 0.4 * noise(i));
 });
-
-function waveform(values: number[], top: number, height: number) {
-  const mid = top + height / 2;
-  const half = height / 2 - 2;
-  return values
-    .map((v, i) => {
-      if (v < 0.004) return "";
-      const h = Math.round(Math.max(0.5, v * half) * 10) / 10;
-      return `M${i * 2} ${(mid - h).toFixed(1)}h1.5v${(h * 2).toFixed(1)}h-1.5z`;
-    })
-    .join("");
-}
 
 function Timeline({
   selectedZoom,
@@ -466,11 +432,11 @@ function Timeline({
           ))}
 
           <path
-            d={waveform(systemPeaks, rowTop.System, rowHeight("System"))}
+            d={waveformPath(systemPeaks, rowTop.System, rowHeight("System"))}
             fill="rgb(177 140 255 / 0.75)"
           />
           <path
-            d={waveform(micPeaks, rowTop.Mic, rowHeight("Mic"))}
+            d={waveformPath(micPeaks, rowTop.Mic, rowHeight("Mic"))}
             fill="rgb(124 184 255 / 0.75)"
           />
 
