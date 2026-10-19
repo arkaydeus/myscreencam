@@ -424,6 +424,72 @@ struct AppStateTests {
         await model.close()
     }
 
+    @Test func webcamFillSwitchingAndColourChangesCoalesceUndo() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let controls = WebcamBackgroundControls(source: model)
+        #expect(controls.fillKinds == [.clear, .solid, .gradient, .image])
+        #expect(controls.fillKind.wrappedValue == .clear)
+
+        undo.beginUndoGrouping()
+        controls.fillKind.wrappedValue = .solid
+        // Close the first event's group: later colour updates must coalesce even across event boundaries.
+        undo.endUndoGrouping()
+        #expect(controls.fillKind.wrappedValue == .solid)
+        let fill = model.webcamBackgroundBinding(\.fill, "Webcam Background Fill")
+        fill.wrappedValue = .solid(RGBAColor(r: 0.8, g: 0.2, b: 0.1))
+        fill.wrappedValue = .solid(RGBAColor(r: 0.2, g: 0.8, b: 0.1))
+        undo.undo()
+        #expect(model.edit.webcam.background.fill == nil)
+        #expect(!undo.canUndo)
+        undo.redo()
+        #expect(model.edit.webcam.background.fill == .solid(RGBAColor(r: 0.2, g: 0.8, b: 0.1)))
+
+        undo.beginUndoGrouping()
+        controls.fillKind.wrappedValue = .gradient
+        #expect(controls.fillKind.wrappedValue == .gradient)
+        #expect(model.edit.webcam.background.fill == BackgroundSettings().fill)
+        controls.fillKind.wrappedValue = .clear
+        #expect(model.edit.webcam.background.fill == nil)
+        undo.endUndoGrouping()
+        await model.close()
+    }
+
+    @Test func webcamSlidersGroupEachDragAndKeepSeparateFieldsUndoable() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let original = model.webcamBackground
+        let blur = model.webcamBackgroundBinding(\.blurAmount, "Webcam Background Blur")
+        let softness = model.webcamBackgroundBinding(\.edgeSoftness, "Webcam Edge Softness")
+        undo.beginUndoGrouping()
+        model.editingChanged(true)
+        blur.wrappedValue = 0.6
+        blur.wrappedValue = 0.9
+        model.editingChanged(false)
+        undo.endUndoGrouping()
+        undo.beginUndoGrouping()
+        model.editingChanged(true)
+        softness.wrappedValue = 0.5
+        softness.wrappedValue = 0.8
+        model.editingChanged(false)
+        undo.endUndoGrouping()
+        undo.undo()
+        #expect(model.webcamBackground.blurAmount == 0.9)
+        #expect(model.webcamBackground.edgeSoftness == original.edgeSoftness)
+        undo.undo()
+        #expect(model.webcamBackground == original)
+        #expect(!undo.canUndo)
+        undo.redo()
+        #expect(model.webcamBackground.blurAmount == 0.9)
+        await model.close()
+    }
+
     @Test func cueWidthDragIsOneUndoStepAndCanBecomeTheDefault() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

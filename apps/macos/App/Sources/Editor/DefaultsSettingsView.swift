@@ -1,7 +1,7 @@
 import ProjectKit
 import SwiftUI
 
-/// Settings › Defaults: the zoom and subtitle settings new recordings start with.
+/// Settings › Defaults: the zoom, webcam background and subtitle settings new recordings start with.
 struct DefaultsSettingsView: View {
     @State private var store = ProjectDefaultsStore()
 
@@ -26,6 +26,16 @@ struct DefaultsSettingsView: View {
                 Text("Zoom")
             } footer: {
                 Text("Zooms created from clicks and zooms you add use this scale and timing.")
+                    .font(.caption)
+                    .foregroundStyle(Color.themeSecondaryText)
+            }
+
+            Section {
+                WebcamBackgroundControls(source: store)
+            } header: {
+                Text("Webcam background")
+            } footer: {
+                Text("A background image is chosen per recording, in the editor's Webcam panel.")
                     .font(.caption)
                     .foregroundStyle(Color.themeSecondaryText)
             }

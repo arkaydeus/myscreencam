@@ -6,6 +6,13 @@ import Testing
 struct AutoZoomTests {
     let defaults = ZoomTiming()  // 1.6, in 0.32, hold 0.85, out 0.48 → a keyframe lasts 1.65 s
 
+    @Test func addedAndSeededZoomsShareTimingDefaults() {
+        let keyframe = ZoomKeyframe(time: 0)
+        #expect(keyframe.easeIn == defaults.easeIn)
+        #expect(keyframe.hold == defaults.hold)
+        #expect(keyframe.easeOut == defaults.easeOut)
+    }
+
     func click(_ t: Double, x: Double = 0.5, y: Double = 0.5, button: Int = 0) -> InputEvent {
         InputEvent(t: t, kind: .down, x: x, y: y, button: button)
     }
@@ -36,7 +43,7 @@ struct AutoZoomTests {
     }
 
     @Test func skippedClickDoesNotExtendTheWindow() {
-        // Click 2 is skipped; click 3 is measured against click 1's end (2.53), not click 2's.
+        // Click 2 is skipped; click 3 is measured against click 1's end (2.53), not click 2's (3.03).
         let keyframes = AutoZoom.keyframes(from: [click(1), click(1.5), click(3)], defaults: defaults)
         #expect(keyframes.count == 2)
         #expect(abs(keyframes[1].time - 2.88) < 1e-9)

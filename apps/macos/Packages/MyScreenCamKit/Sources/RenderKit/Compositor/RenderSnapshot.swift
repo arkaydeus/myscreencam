@@ -32,6 +32,8 @@ final class ProjectResources: Sendable {
     let cursorImages: CursorImageCache
     /// Rasterised subtitle boxes, shared across snapshots so edits elsewhere don't re-render text.
     let subtitleRasters = SubtitleRasterCache()
+    /// Webcam person masks, shared across snapshots so editing doesn't re-run segmentation on a paused frame.
+    let personMasks = PersonMaskCache()
     private let tracks = LockedDictionary<CursorSmoothing, CursorTrack>()
     private let followTracks = LockedDictionary<CursorSmoothing, FollowCameraTrack>()
     private let fills = LockedDictionary<String, CIImage>()
@@ -116,10 +118,14 @@ final class RenderSnapshot: Sendable {
     struct WebcamOverlay: Sendable {
         let frame: CGRect
         let frameCI: CGRect
-        /// Rounded-rect alpha mask (analytic), or nil for square corners.
+        /// Rounded-rect alpha mask (analytic), or nil for square corners and for a cut-out.
         let mask: CIImage?
-        /// The drop shadow, rendered once into a texture.
+        /// The drop shadow, rendered once into a texture. Nil when the background is see-through, where the shadow
+        /// follows the person.
         let shadow: CIImage?
+        /// What's drawn behind the person when the background is removed in a frame (cropped to `frameCI`), or
+        /// nil to leave it see-through.
+        let fill: CIImage?
     }
 
     private struct CameraSizeKey: Hashable, Sendable {
@@ -140,11 +146,18 @@ final class RenderSnapshot: Sendable {
         let shape = CIHelpers.roundedRect(frameCI, radius: radius, color: CIColor(red: 1, green: 1, blue: 1))
         // CSS-like `0 4px 12px rgba(0,0,0,.3)` in 1080p units.
         let unit = layout.outputUnit
+        let cutout = settings.background.isCutout
         let shadow =
-            settings.shadow
+            settings.shadow && !settings.background.isSeeThrough
             ? RenderContext.rasterize(CIHelpers.shadow(of: shape, sigma: 6 * unit, offsetDown: 4 * unit, opacity: 0.3))
             : nil
-        let overlay = WebcamOverlay(frame: frame, frameCI: frameCI, mask: radius >= 0.5 ? shape : nil, shadow: shadow)
+        var fill: CIImage?
+        if settings.background.effect == .remove, !cutout, let backgroundFill = settings.background.fill {
+            fill = BackgroundRenderer.fill(backgroundFill, in: frameCI, resources: resources).cropped(to: frameCI)
+            if case .image = backgroundFill { fill = fill.map(RenderContext.rasterize) }
+        }
+        let overlay = WebcamOverlay(
+            frame: frame, frameCI: frameCI, mask: radius >= 0.5 && !cutout ? shape : nil, shadow: shadow, fill: fill)
         webcamOverlays[key] = overlay
         return overlay
     }

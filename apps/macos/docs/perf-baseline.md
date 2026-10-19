@@ -175,3 +175,18 @@ Notes:
 
 - **Visual check of exported frames:** the zoom, webcam overlay (rounded corners, shadow) and recorded-cursor overlay are all correct, and the recording HUD is not captured.
 - **Cursor de-duplication is correct:** two `resizeUpDown` entries in one recording turned out to be different system cursors (bidirectional vs "resize down only" with a greyed-out up arrow). Both classify to the same kind, which is what the stylised style needs.
+
+## Webcam background blur and removal, measured 2026-10-18
+
+**Setup:** `msc-tool` release build, M5 Max. A real 9.4 s recording: screen 6016×3384 HEVC @60, webcam 1280×720 @24, overlay width 35%. The effect runs Vision's "balanced" person segmentation once per webcam frame (`PersonMaskCache`); the composition re-uses the mask for the 2–3 output frames that show the same camera frame.
+
+| Webcam background | Editor playback (`msc-tool play`, 9 s) | Export H.264 4096×2304 @30 (wall / CPU) |
+|---|---:|---:|
+| None | 58.8 fps, **14%** of a core | 2.73 s / 0.82 s |
+| Blur | 59.1 fps, **31%** | 3.36 s / 2.42 s |
+| Remove, cut-out | 59.0 fps, **30%** | 3.08 s / 2.26 s |
+
+Notes:
+- Without the cache (segmenting every output frame) playback cost 44–49% of a core.
+- Segmentation alone, per 1280×720 frame including the blend: fast ≈ 3 ms (blocky mask), **balanced ≈ 8 ms**, accurate ≈ 27 ms.
+- Most of the added cost is CPU time around Vision's model, so slower Macs will feel it more than this M5 Max does.

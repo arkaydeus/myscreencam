@@ -2,6 +2,7 @@ import Foundation
 
 /// A named set of look-and-feel settings: webcam, audio, cursor, zoom defaults, background and subtitle style.
 /// Presets never carry per-recording content (segments, zoom keyframes, blur masks, subtitle cues, zoom on/off).
+/// Webcam image fills are dropped, leaving a see-through frame and retaining the other background settings.
 public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
     public var id: UUID
     public var name: String
@@ -23,6 +24,7 @@ public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
         self.id = id
         self.name = name
         self.webcam = webcam
+        self.webcam.background = webcam.background.withoutRecordingAssets
         self.audio = audio
         self.cursor = cursor
         self.zoomDefaults = zoomDefaults
@@ -43,6 +45,8 @@ public struct EditPreset: Codable, Sendable, Equatable, Identifiable {
     public func applied(to config: EditConfig) -> EditConfig {
         var config = config
         config.webcam = webcam
+        // Also sanitise presets saved by older versions or changed after initialisation.
+        config.webcam.background = webcam.background.withoutRecordingAssets
         config.audio = audio
         config.cursor = cursor
         config.zoom.defaults = zoomDefaults
@@ -99,6 +103,7 @@ public actor PresetStore {
     @discardableResult
     public func save(_ preset: EditPreset) throws -> EditPreset {
         var preset = preset
+        preset.webcam.background = preset.webcam.background.withoutRecordingAssets
         preset.name = preset.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !preset.name.isEmpty else { throw StoreError.emptyName }
         var presets = try load()

@@ -33,6 +33,11 @@ struct BackgroundPanel: View {
             })
     }
 
+    private func chooseImage() {
+        guard let path = model.chooseFillImage(message: "Choose a background image") else { return }
+        model.update("Background Image") { $0.background.fill = .image(path: path) }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -62,7 +67,9 @@ struct BackgroundPanel: View {
                         ForEach(FillKind.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    fillControls
+                    FillControls(
+                        fill: model.binding(\.background.fill, "Background Fill"), model: model,
+                        chooseImage: chooseImage)
                 }
             }
             .disabled(!model.edit.background.enabled)
@@ -70,30 +77,36 @@ struct BackgroundPanel: View {
     }
 
     private var percent: (Double) -> String { { String(format: "%.0f%%", $0 * 100) } }
+}
 
-    @ViewBuilder private var fillControls: some View {
-        switch model.edit.background.fill {
+/// Colour pickers and angle for a solid or gradient fill, or the chosen image. Shared by the Background panel, the
+/// fill behind the webcam and Settings › Defaults.
+struct FillControls: View {
+    @Binding var fill: BackgroundFill
+    /// The open recording (for an image fill's file and slider undo grouping); nil for the defaults.
+    var model: EditorModel?
+    var chooseImage: () -> Void = {}
+
+    var body: some View {
+        switch fill {
         case .solid(let color):
-            ColorPicker("Colour", selection: fillColor(color) { .solid($0) })
+            ColorPicker("Colour", selection: colorBinding(color) { .solid($0) })
         case .linearGradient(let from, let to, let angle):
-            ColorPicker("From", selection: fillColor(from) { .linearGradient(from: $0, to: to, angle: angle) })
-            ColorPicker("To", selection: fillColor(to) { .linearGradient(from: from, to: $0, angle: angle) })
+            ColorPicker("From", selection: colorBinding(from) { .linearGradient(from: $0, to: to, angle: angle) })
+            ColorPicker("To", selection: colorBinding(to) { .linearGradient(from: from, to: $0, angle: angle) })
             ValueSlider(
                 title: "Angle",
                 value: Binding(
                     get: { angle },
-                    set: { value in
-                        model.update("Gradient Angle", coalesce: "gradientAngle") {
-                            $0.background.fill = .linearGradient(from: from, to: to, angle: value)
-                        }
-                    }), range: 0...360, step: 1, format: { String(format: "%.0f°", $0) }, model: model)
+                    set: { fill = .linearGradient(from: from, to: to, angle: $0) }), range: 0...360, step: 1,
+                format: { String(format: "%.0f°", $0) }, onEditingChanged: { model?.editingChanged($0) })
         case .image(let path):
             LabeledContent("Image") {
                 Text(URL(fileURLWithPath: path).lastPathComponent)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            if !FileManager.default.fileExists(atPath: model.package.containedURL(path)?.path ?? "") {
+            if let model, !FileManager.default.fileExists(atPath: model.package.containedURL(path)?.path ?? "") {
                 Label("The image file is missing.", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             }
@@ -101,34 +114,39 @@ struct BackgroundPanel: View {
         }
     }
 
-    private func fillColor(_ current: RGBAColor, _ make: @escaping (RGBAColor) -> BackgroundFill) -> Binding<Color> {
+    private func colorBinding(_ current: RGBAColor, _ make: @escaping (RGBAColor) -> BackgroundFill) -> Binding<Color> {
         Binding(
             get: { current.color },
             set: { color in
                 let value = RGBAColor(color)
                 guard value.hex != current.hex else { return }
-                model.update("Background Colour", coalesce: "backgroundColour") { $0.background.fill = make(value) }
+                fill = make(value)
             })
     }
+}
 
-    private func chooseImage() {
+extension EditorModel {
+    /// Asks for an image and copies it into the recording's backgrounds folder. Returns its path in the package, or
+    /// nil if cancelled or the copy failed (which is reported).
+    func chooseFillImage(message: String) -> String? {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Choose a background image"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        panel.message = message
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         let relative = "\(PackageLayout.backgroundsDirectory)/\(UUID().uuidString).\(url.pathExtension)"
         do {
-            let destination = model.package.url(relative)
+            let destination = package.url(relative)
             let directory = destination.deletingLastPathComponent()
             if !FileManager.default.fileExists(atPath: directory.path) {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             }
             try FileManager.default.copyItem(at: url, to: destination)
-            model.update("Background Image") { $0.background.fill = .image(path: relative) }
+            return relative
         } catch {
-            model.flash("Couldn't copy the background image: \(error.localizedDescription)")
+            flash("Couldn't copy the background image: \(error.localizedDescription)")
+            return nil
         }
     }
 }

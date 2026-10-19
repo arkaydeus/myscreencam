@@ -31,6 +31,22 @@ struct ProjectDefaultsStoreTests {
         #expect(ProjectDefaultsStore(userDefaults: InMemoryDefaults()).defaults == ProjectDefaults())
     }
 
+    @Test func webcamDefaultsOfferOnlyPortableFills() {
+        let userDefaults = InMemoryDefaults()
+        let store = ProjectDefaultsStore(userDefaults: userDefaults)
+        let controls = WebcamBackgroundControls(source: store)
+        #expect(controls.fillKinds == [.clear, .solid, .gradient])
+        controls.fillKind.wrappedValue = .solid
+        #expect(controls.fillKind.wrappedValue == .solid)
+        controls.fillKind.wrappedValue = .gradient
+        #expect(ProjectDefaultsStore.load(from: userDefaults).webcamBackground.fill == BackgroundSettings().fill)
+        // Even an attempted image action cannot open a file picker or change the defaults.
+        controls.fillKind.wrappedValue = .image
+        #expect(controls.fillKind.wrappedValue == .gradient)
+        controls.fillKind.wrappedValue = .clear
+        #expect(ProjectDefaultsStore.load(from: userDefaults).webcamBackground.fill == nil)
+    }
+
     @Test func changesPersist() {
         let userDefaults = InMemoryDefaults()
         let store = ProjectDefaultsStore(userDefaults: userDefaults)

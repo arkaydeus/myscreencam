@@ -41,6 +41,10 @@ struct WebcamPanel: View {
                     Toggle("Shadow", isOn: model.binding(\.webcam.shadow, "Webcam Shadow"))
                 }
 
+                Section("Background") {
+                    WebcamBackgroundControls(source: model)
+                }
+
                 Section("Position") {
                     HStack {
                         ForEach(EditorModel.WebcamCorner.allCases) { corner in
@@ -70,13 +74,20 @@ struct WebcamPanel: View {
                     ValueSlider(
                         title: "Width", value: model.binding(\.webcam.width, "Resize Webcam"),
                         range: EditLimits.webcamWidth, format: percent, model: model)
-                    Picker("Shape", selection: shape) {
-                        ForEach(Shape.allCases) { Text($0.title).tag($0) }
+                    Group {
+                        Picker("Shape", selection: shape) {
+                            ForEach(Shape.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        ValueSlider(
+                            title: "Corner radius",
+                            value: model.binding(\.webcam.cornerRadius, "Webcam Corner Radius"),
+                            range: EditLimits.webcamCornerRadius, format: percent, model: model)
                     }
-                    .pickerStyle(.segmented)
-                    ValueSlider(
-                        title: "Corner radius", value: model.binding(\.webcam.cornerRadius, "Webcam Corner Radius"),
-                        range: EditLimits.webcamCornerRadius, format: percent, model: model)
+                    .disabled(model.edit.webcam.background.isCutout)
+                    .help(
+                        model.edit.webcam.background.isCutout
+                            ? "A cut-out has no frame, so its shape doesn't apply" : "")
                     Picker("Aspect", selection: model.binding(\.webcam.aspect, "Webcam Aspect")) {
                         Text("Wide").tag(WebcamSettings.Aspect.wide)
                         Text("Square").tag(WebcamSettings.Aspect.square)

@@ -80,3 +80,16 @@ extension ProjectDefaultsStore: SubtitleStyleSource {
 
     func editingChanged(_ editing: Bool) {}
 }
+
+extension ProjectDefaultsStore: WebcamBackgroundSource {
+    var webcamBackground: WebcamBackground { defaults.webcamBackground }
+    var recording: EditorModel? { nil }
+
+    func webcamBackgroundBinding<V: Equatable>(
+        _ keyPath: WritableKeyPath<WebcamBackground, V>, _ action: String
+    ) -> Binding<V> {
+        Binding(
+            get: { self.defaults.webcamBackground[keyPath: keyPath] },
+            set: { self.defaults.webcamBackground[keyPath: keyPath] = $0 })
+    }
+}

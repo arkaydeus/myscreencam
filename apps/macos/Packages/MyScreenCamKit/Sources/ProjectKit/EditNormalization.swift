@@ -11,6 +11,10 @@ public enum EditLimits {
     public static let webcamCornerRadius: ClosedRange<Double> = 0...0.5
     /// Webcam manual sync nudge in seconds.
     public static let webcamSyncOffset: ClosedRange<Double> = -5...5
+    /// Webcam background blur strength.
+    public static let webcamBackgroundBlur: ClosedRange<Double> = 0...1
+    /// Feathering of the person's edge when the webcam background is blurred or removed.
+    public static let webcamEdgeSoftness: ClosedRange<Double> = 0...1
     /// Blur radius in source pixels.
     public static let blurIntensity: ClosedRange<Double> = 1...50
     /// Per-track gain in dB.
@@ -38,7 +42,8 @@ extension EditConfig {
     /// - Zoom: defaults and keyframes clamped (scale ``EditLimits/zoomScale``, durations ≥ 0, time 0…duration,
     ///   targets 0…1); keyframes sorted by time.
     /// - Webcam: origin 0…1, width ``EditLimits/webcamWidth``, corner radius ``EditLimits/webcamCornerRadius``,
-    ///   sync offset ``EditLimits/webcamSyncOffset``.
+    ///   sync offset ``EditLimits/webcamSyncOffset``, background blur ``EditLimits/webcamBackgroundBlur`` and edge
+    ///   softness ``EditLimits/webcamEdgeSoftness``.
     /// - Cursor: idle delay ≥ 0, click highlight and drag trail within their ``EditLimits``, trail opacity 0…1.
     /// - Blur: times clamped to 0…duration and masks without `end > start` dropped; rect kept inside 0…1;
     ///   intensity ``EditLimits/blurIntensity``.
@@ -128,6 +133,10 @@ extension WebcamSettings {
         webcam.width = clamp(width, EditLimits.webcamWidth, fallback: fallback.width)
         webcam.cornerRadius = clamp(cornerRadius, EditLimits.webcamCornerRadius, fallback: fallback.cornerRadius)
         webcam.syncOffset = clamp(syncOffset, EditLimits.webcamSyncOffset, fallback: 0)
+        webcam.background.blurAmount = clamp(
+            background.blurAmount, EditLimits.webcamBackgroundBlur, fallback: fallback.background.blurAmount)
+        webcam.background.edgeSoftness = clamp(
+            background.edgeSoftness, EditLimits.webcamEdgeSoftness, fallback: fallback.background.edgeSoftness)
         return webcam
     }
 }

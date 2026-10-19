@@ -97,4 +97,57 @@ struct PresetStoreTests {
         let url = PresetStore.defaultDirectory(bundleIdentifier: "com.example.test")
         #expect(url.path.hasSuffix("Library/Application Support/com.example.test"))
     }
+
+    @Test(
+        arguments: [WebcamBackground.Effect.none, .blur, .remove],
+        [nil, BackgroundFill.solid(.black), BackgroundSettings().fill])
+    func webcamBackgroundLookSurvivesSavingAndApplying(effect: WebcamBackground.Effect, fill: BackgroundFill?)
+        async throws
+    {
+        let dir = try TempDirectory()
+        var source = styled()
+        source.webcam.background = WebcamBackground(
+            effect: effect, blurAmount: 0.7, edgeSoftness: 0.6, removalStyle: .framed, fill: fill)
+        let store = PresetStore(directory: dir.url)
+        let saved = try await store.save(EditPreset(name: "Webcam", from: source))
+        let loaded = try #require(try await PresetStore(directory: dir.url).list().first)
+        #expect(loaded == saved)
+        let applied = loaded.applied(to: EditConfig.initial(for: Fixtures.meta()))
+        #expect(applied.webcam == source.webcam)
+    }
+
+    @Test(arguments: [true, false])
+    func webcamImageDoesNotTravelBetweenRecordings(sourceAssetExists: Bool) async throws {
+        let dir = try TempDirectory()
+        let a = try Fixtures.package(in: dir.url, meta: Fixtures.meta())
+        let b = try Fixtures.package(in: dir.url, meta: Fixtures.meta())
+        let path = "backgrounds/webcam.png"
+        if sourceAssetExists {
+            try FileManager.default.createDirectory(at: a.url("backgrounds"), withIntermediateDirectories: true)
+            try Data("recording-local image".utf8).write(to: a.url(path))
+        }
+        var source = styled()
+        source.webcam.background = WebcamBackground(
+            effect: .remove, blurAmount: 0.7, edgeSoftness: 0.6, removalStyle: .framed, fill: .image(path: path))
+        try a.saveEdit(source)
+        let preset = EditPreset(name: "Image", from: try #require(try a.loadEdit()))
+        #expect(preset.webcam.background.fill == nil)
+        let store = PresetStore(directory: dir.url.appending(path: "presets"))
+        try await store.save(preset)
+        let loaded = try #require(try await store.list().first)
+        let applied = loaded.applied(to: EditConfig.initial(for: try b.loadMeta()))
+        try b.saveEdit(applied)
+        var expected = source.webcam
+        expected.background.fill = nil
+        #expect(try b.loadEdit()?.webcam == expected)
+        #expect(!FileManager.default.fileExists(atPath: b.url(path).path))
+
+        // Old JSON and callers mutating a preset must obey the same policy at apply/save time.
+        var legacy = preset
+        legacy.webcam = source.webcam
+        let decoded = try JSONDecoder().decode(EditPreset.self, from: JSONEncoder().encode(legacy))
+        #expect(decoded.applied(to: applied).webcam == expected)
+        #expect(try await store.save(legacy).webcam == expected)
+        #expect(source.webcam.background.fill == .image(path: path))
+    }
 }

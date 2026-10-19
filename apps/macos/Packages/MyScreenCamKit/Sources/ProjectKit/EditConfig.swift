@@ -179,11 +179,13 @@ public struct WebcamSettings: Codable, Sendable, Equatable {
     public var shadow: Bool
     /// Manual sync nudge in seconds on top of the recorded offset. Positive = webcam appears later.
     public var syncOffset: Double
+    /// Background blur or removal behind the person. Absent in files written before it existed.
+    public var background: WebcamBackground
 
     public init(
         enabled: Bool = true, origin: NormPoint = NormPoint(x: 0.78, y: 0.72), width: Double = 0.2,
         aspect: Aspect = .wide, cornerRadius: Double = 0.1, mirrored: Bool = false, shadow: Bool = true,
-        syncOffset: Double = 0
+        syncOffset: Double = 0, background: WebcamBackground = WebcamBackground()
     ) {
         self.enabled = enabled
         self.origin = origin
@@ -193,6 +195,90 @@ public struct WebcamSettings: Codable, Sendable, Equatable {
         self.mirrored = mirrored
         self.shadow = shadow
         self.syncOffset = syncOffset
+        self.background = background
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled, origin, width, aspect, cornerRadius, mirrored, shadow, syncOffset, background
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        origin = try c.decode(NormPoint.self, forKey: .origin)
+        width = try c.decode(Double.self, forKey: .width)
+        aspect = try c.decode(Aspect.self, forKey: .aspect)
+        cornerRadius = try c.decode(Double.self, forKey: .cornerRadius)
+        mirrored = try c.decode(Bool.self, forKey: .mirrored)
+        shadow = try c.decode(Bool.self, forKey: .shadow)
+        syncOffset = try c.decode(Double.self, forKey: .syncOffset)
+        background = try c.decodeIfPresent(WebcamBackground.self, forKey: .background) ?? WebcamBackground()
+    }
+}
+
+/// What happens to the webcam's background. The person is found on every frame by Apple's on-device person
+/// segmentation, so the effect follows them as they move.
+public struct WebcamBackground: Codable, Sendable, Equatable {
+    public enum Effect: String, Codable, Sendable, CaseIterable {
+        case none
+        case blur
+        case remove
+    }
+
+    /// How a removed background looks.
+    public enum RemovalStyle: String, Codable, Sendable, CaseIterable {
+        /// Only the person is drawn, with no frame; the shape is ignored and the shadow follows their outline.
+        case cutout
+        /// The overlay keeps its shape; `fill` is drawn behind the person.
+        case framed
+    }
+
+    public var effect: Effect
+    /// Blur strength 0…1 (``EditLimits/webcamBackgroundBlur``), relative to the overlay's size.
+    public var blurAmount: Double
+    /// Feathering of the person's edge 0…1 (``EditLimits/webcamEdgeSoftness``), relative to the overlay's size.
+    public var edgeSoftness: Double
+    public var removalStyle: RemovalStyle
+    /// Drawn behind the person when the background is removed in a frame; nil leaves it see-through.
+    public var fill: BackgroundFill?
+
+    public init(
+        effect: Effect = .none, blurAmount: Double = 0.5, edgeSoftness: Double = 0.3,
+        removalStyle: RemovalStyle = .cutout, fill: BackgroundFill? = nil
+    ) {
+        self.effect = effect
+        self.blurAmount = blurAmount
+        self.edgeSoftness = edgeSoftness
+        self.removalStyle = removalStyle
+        self.fill = fill
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case effect, blurAmount, edgeSoftness, removalStyle, fill
+    }
+
+    /// Missing keys take the built-in default.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let base = WebcamBackground()
+        effect = try c.decodeIfPresent(Effect.self, forKey: .effect) ?? base.effect
+        blurAmount = try c.decodeIfPresent(Double.self, forKey: .blurAmount) ?? base.blurAmount
+        edgeSoftness = try c.decodeIfPresent(Double.self, forKey: .edgeSoftness) ?? base.edgeSoftness
+        removalStyle = try c.decodeIfPresent(RemovalStyle.self, forKey: .removalStyle) ?? base.removalStyle
+        fill = try c.decodeIfPresent(BackgroundFill.self, forKey: .fill)
+    }
+
+    /// True when the person is drawn without the overlay's frame (no shape mask).
+    public var isCutout: Bool { effect == .remove && removalStyle == .cutout }
+    /// True when the screen shows through around the person (a cut-out, or a frame with no fill), so the shadow
+    /// follows the person instead of the frame.
+    public var isSeeThrough: Bool { effect == .remove && (removalStyle == .cutout || fill == nil) }
+
+    /// Reusable look settings. Image paths belong to one recording and cannot travel with defaults or presets.
+    public var withoutRecordingAssets: Self {
+        var background = self
+        if case .image = fill { background.fill = nil }
+        return background
     }
 }
 
@@ -368,7 +454,7 @@ public enum BackgroundFill: Codable, Sendable, Hashable {
     case solid(RGBAColor)
     /// Linear gradient; angle in degrees, 0 = left→right, 90 = top→bottom.
     case linearGradient(from: RGBAColor, to: RGBAColor, angle: Double)
-    /// An image file (absolute path), scaled to fill.
+    /// An image file relative to the recording package, scaled to fill.
     case image(path: String)
 }
 

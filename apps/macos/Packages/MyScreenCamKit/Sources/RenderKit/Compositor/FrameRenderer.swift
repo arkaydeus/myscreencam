@@ -1,4 +1,5 @@
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import Foundation
 import ProjectKit
 
@@ -6,7 +7,8 @@ import ProjectKit
 /// what makes preview and export identical.
 ///
 /// Effect order (docs/legacy-inventory.md §4): screen → blur masks → cursor (source space, so it zooms with the
-/// content) → zoom crop/scale → background canvas → webcam overlay (not zoomed) → subtitles (canvas space).
+/// content) → zoom crop/scale → background canvas → webcam overlay (not zoomed; background blurred or removed) →
+/// subtitles (canvas space).
 ///
 /// Work happens in a *working space*: the source scaled by `k = min(1, contentWidth·zoom / sourceWidth)`, so a 4K
 /// recording previewed in a small window is shrunk once up front instead of being blurred and composited at 4K.
@@ -208,19 +210,114 @@ enum FrameRenderer {
         let cropCI = CGRect(
             x: e.minX + crop.minX, y: e.minY + (cameraSize.height - crop.maxY), width: crop.width, height: crop.height)
 
-        var camera = webcam.cropped(to: cropCI)
-            .transformed(by: CGAffineTransform(translationX: -cropCI.minX, y: -cropCI.minY))
-        if settings.mirrored {
-            camera = camera.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -crop.width, y: 0))
+        // Crops, mirrors and scales a camera-space image into the overlay frame.
+        func place(_ image: CIImage) -> CIImage {
+            var placed = image.cropped(to: cropCI)
+                .transformed(by: CGAffineTransform(translationX: -cropCI.minX, y: -cropCI.minY))
+            if settings.mirrored {
+                placed = placed.transformed(
+                    by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -crop.width, y: 0))
+            }
+            return placed.transformed(
+                by: CGAffineTransform(scaleX: frame.width / crop.width, y: frame.height / crop.height)
+                    .concatenating(CGAffineTransform(translationX: frameCI.minX, y: frameCI.minY))
+            )
+            .cropped(to: frameCI)
         }
-        camera = camera.transformed(
-            by: CGAffineTransform(scaleX: frame.width / crop.width, y: frame.height / crop.height)
-                .concatenating(CGAffineTransform(translationX: frameCI.minX, y: frameCI.minY))
-        )
-        .cropped(to: frameCI)
+
+        var camera = place(webcam)
+        let background = settings.background
+        if background.effect != .none, let mask = personMask(for: webcam, cache: snapshot.resources.personMasks) {
+            camera = replacingBackground(
+                of: camera, personMask: place(mask.clampedToExtent()), settings: background, overlay: overlay)
+        }
 
         if let mask = overlay.mask { camera = CIHelpers.masked(camera, by: mask) }
-        let result = overlay.shadow.map { $0.composited(over: output) } ?? output
+        var result = output
+        if let shadow = overlay.shadow {
+            result = shadow.composited(over: result)
+        } else if background.isSeeThrough, settings.shadow {
+            // The same shadow as the framed overlay's, following the person's outline.
+            let unit = snapshot.layout.outputUnit
+            result = CIHelpers.shadow(of: camera, sigma: 6 * unit, offsetDown: 4 * unit, opacity: 0.3)
+                .composited(over: result)
+        }
         return camera.composited(over: result)
+    }
+
+    // MARK: webcam background
+
+    /// Vision's "balanced" person segmentation. Preview and export use the same level, so they match. On a 1280×720
+    /// webcam (M5 Max) a frame with the blur took ≈ 8 ms; "fast" (2) took ≈ 3 ms but its mask is blocky, and
+    /// "accurate" (0) ≈ 27 ms.
+    static let segmentationQuality = 1
+
+    /// Background blur strength 1 = a Gaussian sigma of this fraction of the overlay's shorter side.
+    static let maxBackgroundBlur = 0.06
+    /// Edge softness 1 = a mask feather sigma of this fraction of the overlay's shorter side.
+    static let maxEdgeFeather = 0.03
+    /// Mask values at or below this become background. The segmentation's soft edge (and the feather) reach past the
+    /// person, which left a rim of the room around them; remapping `choke…1` to `0…1` keeps the soft edge inside.
+    static let maskChoke = 0.5
+
+    /// Where the person is in a camera frame (red channel, 1 = person), scaled to the frame's extent, or nil if
+    /// segmentation produced nothing. Runs Apple's on-device person segmentation (Vision) inside Core Image on every
+    /// camera frame, so it follows the person; `cache` keeps each frame's mask for when it's composited again.
+    static func personMask(for camera: CIImage, cache: PersonMaskCache? = nil) -> CIImage? {
+        let segment = { (image: CIImage) -> CIImage? in
+            let filter = CIFilter.personSegmentation()
+            filter.inputImage = image
+            filter.qualityLevel = segmentationQuality
+            guard let mask = filter.outputImage, !mask.extent.isInfinite else { return nil }
+            return mask
+        }
+        guard let mask = cache.map({ $0.mask(for: camera, make: segment) }) ?? segment(camera) else { return nil }
+        let m = mask.extent
+        let e = camera.extent
+        guard m.width >= 1, m.height >= 1 else { return nil }
+        // The mask is smaller than the frame and needn't share its aspect: it covers the whole frame.
+        return mask.transformed(
+            by: CGAffineTransform(translationX: -m.minX, y: -m.minY)
+                .concatenating(CGAffineTransform(scaleX: e.width / m.width, y: e.height / m.height))
+                .concatenating(CGAffineTransform(translationX: e.minX, y: e.minY)))
+    }
+
+    /// `camera` (placed in the overlay frame) with everything outside `personMask` blurred, replaced by the fill, or
+    /// made transparent. Blur and feather scale with the overlay, so preview and export look the same.
+    private static func replacingBackground(
+        of camera: CIImage, personMask: CIImage, settings: WebcamBackground, overlay: RenderSnapshot.WebcamOverlay
+    ) -> CIImage {
+        let frameCI = overlay.frameCI
+        let side = min(frameCI.width, frameCI.height)
+        var mask = personMask
+        let feather = min(max(settings.edgeSoftness, 0), 1) * maxEdgeFeather * side
+        if feather > 0.01 {
+            mask = mask.clampedToExtent().applyingGaussianBlur(sigma: feather).cropped(to: frameCI)
+        }
+        let choke = CIFilter.colorMatrix()
+        choke.inputImage = mask
+        choke.rVector = CIVector(x: 1 / (1 - maskChoke), y: 0, z: 0, w: 0)
+        choke.biasVector = CIVector(x: -maskChoke / (1 - maskChoke), y: 0, z: 0, w: 0)
+        let clamp = CIFilter.colorClamp()
+        clamp.inputImage = choke.outputImage
+        clamp.minComponents = CIVector(x: 0, y: 0, z: 0, w: 0)
+        clamp.maxComponents = CIVector(x: 1, y: 1, z: 1, w: 1)
+        mask = clamp.outputImage ?? mask
+        let behind: CIImage
+        switch settings.effect {
+        case .none:
+            return camera
+        case .blur:
+            let sigma = min(max(settings.blurAmount, 0), 1) * maxBackgroundBlur * side
+            guard sigma > 0.01 else { return camera }
+            behind = camera.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: frameCI)
+        case .remove:
+            behind = overlay.fill ?? CIImage.empty()
+        }
+        let blend = CIFilter.blendWithRedMask()
+        blend.inputImage = camera
+        blend.backgroundImage = behind
+        blend.maskImage = mask
+        return (blend.outputImage ?? camera).cropped(to: frameCI)
     }
 }
