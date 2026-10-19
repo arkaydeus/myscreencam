@@ -31,7 +31,7 @@ enum CursorArtwork {
     static func hotspot(for kind: CursorKind) -> CGPoint {
         switch kind {
         case .arrow, .operationNotAllowed, .dragCopy, .contextualMenu, .other: CGPoint(x: 4, y: 4)
-        case .pointingHand: CGPoint(x: 15, y: 3)
+        case .pointingHand: CGPoint(x: 14.75, y: 2.5)
         case .iBeam, .crosshair, .openHand, .closedHand, .resizeLeftRight, .resizeUpDown, .resizeDiagonal:
             CGPoint(x: 16, y: 16)
         }
@@ -58,14 +58,17 @@ enum CursorArtwork {
     private static let doubleArrowPath =
         "M3 16 L9 10 L9 13.5 L23 13.5 L23 10 L29 16 L23 22 L23 18.5 L9 18.5 L9 22 Z"
 
-    /// Outline-then-fill so overlapping shapes read as one silhouette.
-    private static func silhouette(_ shapes: [String]) -> String {
+    /// Outline-then-fill so overlapping shapes read as one silhouette, then `creases` (path data) drawn on top.
+    private static func silhouette(_ shapes: [String], creases: String? = nil) -> String {
         let outlines = shapes.map {
             $0.replacingOccurrences(
                 of: "/>", with: " fill=\"black\" stroke=\"black\" stroke-width=\"3\" stroke-linejoin=\"round\"/>")
         }
         let fills = shapes.map { $0.replacingOccurrences(of: "/>", with: " fill=\"white\"/>") }
-        return (outlines + fills).joined()
+        let lines = creases.map {
+            "<path d=\"\($0)\" fill=\"none\" stroke=\"black\" stroke-width=\"1.1\" stroke-linecap=\"round\"/>"
+        }
+        return (outlines + fills).joined() + (lines ?? "")
     }
 
     private static func svg(_ body: String) -> String {
@@ -91,22 +94,30 @@ enum CursorArtwork {
         case .openHand:
             return svg(
                 silhouette([
-                    "<rect x=\"8\" y=\"14\" width=\"17\" height=\"14\" rx=\"6\"/>",
-                    "<rect x=\"8.5\" y=\"7\" width=\"3.5\" height=\"12\" rx=\"1.75\"/>",
-                    "<rect x=\"12.5\" y=\"4\" width=\"3.5\" height=\"14\" rx=\"1.75\"/>",
-                    "<rect x=\"16.5\" y=\"4.5\" width=\"3.5\" height=\"14\" rx=\"1.75\"/>",
-                    "<rect x=\"20.5\" y=\"7\" width=\"3.5\" height=\"12\" rx=\"1.75\"/>",
-                    "<rect x=\"3\" y=\"15\" width=\"9\" height=\"3.5\" rx=\"1.75\" transform=\"rotate(35 7 17)\"/>",
+                    "<rect x=\"9.5\" y=\"6\" width=\"3.2\" height=\"12\" rx=\"1.6\" "
+                        + "transform=\"rotate(-10 11.1 17)\"/>",
+                    "<rect x=\"13.2\" y=\"3.5\" width=\"3.2\" height=\"13.5\" rx=\"1.6\" "
+                        + "transform=\"rotate(-3 14.8 16)\"/>",
+                    "<rect x=\"16.9\" y=\"4\" width=\"3.2\" height=\"13.5\" rx=\"1.6\" "
+                        + "transform=\"rotate(3 18.5 16)\"/>",
+                    "<rect x=\"20.5\" y=\"7\" width=\"3\" height=\"11\" rx=\"1.5\" transform=\"rotate(11 22 17)\"/>",
+                    "<rect x=\"10\" y=\"14\" width=\"13.5\" height=\"13\" rx=\"5.5\"/>",
+                    "<rect x=\"10\" y=\"14\" width=\"13.5\" height=\"7\" rx=\"1.75\"/>",
+                    "<rect x=\"4\" y=\"16\" width=\"8.5\" height=\"3.4\" rx=\"1.7\" transform=\"rotate(42 9 17.7)\"/>",
                 ]))
         case .closedHand:
             return svg(
-                silhouette([
-                    "<rect x=\"8\" y=\"12\" width=\"17\" height=\"15\" rx=\"6\"/>",
-                    "<rect x=\"8.5\" y=\"10\" width=\"3.5\" height=\"6\" rx=\"1.75\"/>",
-                    "<rect x=\"12.5\" y=\"9\" width=\"3.5\" height=\"6\" rx=\"1.75\"/>",
-                    "<rect x=\"16.5\" y=\"9\" width=\"3.5\" height=\"6\" rx=\"1.75\"/>",
-                    "<rect x=\"20.5\" y=\"10\" width=\"3.5\" height=\"6\" rx=\"1.75\"/>",
-                ]))
+                silhouette(
+                    [
+                        "<rect x=\"9.5\" y=\"10\" width=\"3.5\" height=\"8\" rx=\"1.75\"/>",
+                        "<rect x=\"13\" y=\"9\" width=\"3.5\" height=\"8\" rx=\"1.75\"/>",
+                        "<rect x=\"16.5\" y=\"9\" width=\"3.5\" height=\"8\" rx=\"1.75\"/>",
+                        "<rect x=\"20\" y=\"10\" width=\"3.3\" height=\"8\" rx=\"1.65\"/>",
+                        "<rect x=\"9.5\" y=\"13\" width=\"13.8\" height=\"13\" rx=\"5.5\"/>",
+                        "<rect x=\"9.5\" y=\"13\" width=\"13.8\" height=\"7\" rx=\"1.75\"/>",
+                        "<rect x=\"5.5\" y=\"15\" width=\"8\" height=\"3.5\" rx=\"1.75\" "
+                            + "transform=\"rotate(30 9.5 16.75)\"/>",
+                    ], creases: "M13 12.5 V16 M16.5 11.5 V16 M20 12.5 V16"))
         case .operationNotAllowed:
             return svg(
                 arrowBody + "<circle cx=\"23\" cy=\"23\" r=\"6\" fill=\"white\" stroke=\"#D92D20\" stroke-width=\"2\"/>"

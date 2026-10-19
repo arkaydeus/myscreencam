@@ -1,5 +1,3 @@
-import { ChevronRight } from "lucide-react";
-
 import { DownloadButton, LogoMark } from "@/components/site/brand";
 import { site } from "@/lib/site";
 
@@ -33,7 +31,7 @@ const footerLinks = [
   { href: site.downloadUrl, label: "Download" },
 ];
 
-/** Apple-style fine print: numbered footnotes, a breadcrumb, then links and the copyright line. */
+/** Apple-style fine print: numbered footnotes, then links and the copyright line. */
 export function SiteFooter() {
   return (
     <footer className="bg-paper text-xs leading-[1.33] text-muted-foreground">
@@ -44,11 +42,6 @@ export function SiteFooter() {
             Mac, your display and what’s on screen.
           </li>
         </ol>
-        <div className="flex items-center gap-2 border-b border-rule py-4 text-ink">
-          <LogoMark size={16} className="size-4" />
-          <ChevronRight aria-hidden className="size-3 text-[#86868b]" strokeWidth={2} />
-          <span>{site.brand}</span>
-        </div>
         <div className="flex flex-col-reverse gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p>
             Copyright © {new Date().getFullYear()} {site.brand}. All rights reserved.
