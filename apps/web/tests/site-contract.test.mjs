@@ -5,15 +5,27 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DownloadButton } from "../src/components/site/brand";
-import { CanvasDemo } from "../src/components/site/canvas-demo";
 import { SiteFooter } from "../src/components/site/closing";
+import { EditorDemo } from "../src/components/site/editor-demo";
+import {
+  LOOP,
+  blurMask,
+  cameraAt,
+  clicks,
+  narration,
+  script,
+  zoomEnd,
+  zooms,
+} from "../src/components/site/editor-demo-script";
+import {
+  ANNOTATE_TIME,
+  ANNOTATE_WORD,
+  SubtitlesWindow,
+} from "../src/components/site/subtitles-window";
+import { recordingAt } from "../src/components/site/editor-demo-script";
 import { site } from "../src/lib/site";
 
 const css = readFileSync(resolve(import.meta.dir, "../src/app/globals.css"), "utf8");
-
-function keyframes(name) {
-  return css.match(new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\}`))?.[1];
-}
 
 test("Download for Mac points at the stable DMG asset while Releases opens the release page", () => {
   const download = renderToStaticMarkup(createElement(DownloadButton));
@@ -25,29 +37,70 @@ test("Download for Mac points at the stable DMG asset while Releases opens the r
   expect(footer).toContain(`href="${site.releasesUrl}"`);
 });
 
-test("hero timeline matches the camera and click keyframes over one 12 second loop", () => {
-  const demo = renderToStaticMarkup(createElement(CanvasDemo));
-  const camera = keyframes("msc-camera");
-  const publish = keyframes("msc-click-publish");
-  const check = keyframes("msc-click-check");
+test("hero zooms fit the loop and every click but the last lands inside a zoom", () => {
+  for (const [i, z] of zooms.entries()) {
+    expect(z.start).toBeGreaterThan(i === 0 ? 0 : zoomEnd(zooms[i - 1]));
+    expect(zoomEnd(z)).toBeLessThan(LOOP);
+    expect(cameraAt(z.start).scale).toBe(1);
+    expect(cameraAt(z.start + z.easeIn + z.hold / 2).scale).toBe(z.scale);
+    expect(cameraAt(zoomEnd(z) + 0.01).scale).toBe(1);
+  }
+  for (const c of clicks.slice(0, -1)) {
+    expect(zooms.some((z) => c >= z.start && c <= zoomEnd(z))).toBe(true);
+  }
+  expect(blurMask.end).toBeLessThan(LOOP);
+});
 
-  expect(demo).toContain("left:14%;width:42%");
-  expect(demo).toContain("left:73%;width:25%");
-  expect(demo).toContain("left:13.5%");
-  expect(demo).toContain("left:72.5%");
-  expect(camera).toMatch(/14%\s*\{\s*transform: scale\(1\)/);
-  expect(camera).toMatch(/56%,\s*64%\s*\{\s*transform: scale\(1\)/);
-  expect(camera).toMatch(/73%\s*\{\s*transform: scale\(1\)/);
-  expect(camera).toMatch(/98%,\s*100%\s*\{\s*transform: scale\(1\)/);
-  expect(publish).toMatch(/13\.5%\s*\{\s*opacity: 0\.95/);
-  expect(check).toMatch(/72\.5%\s*\{\s*opacity: 0\.95/);
-  for (const name of ["camera", "cursor", "click-publish", "click-check", "playhead"]) {
-    expect(css).toContain(`animation: msc-${name} 12s`);
+test("hero timeline draws a block per zoom and a marker per click", () => {
+  const demo = renderToStaticMarkup(createElement(EditorDemo));
+  const lane = 936 - 78 - 14;
+
+  for (const z of zooms) expect(demo).toContain(`d="M${(z.start / LOOP) * lane} `);
+  for (const c of clicks) expect(demo).toContain(`cx="${(c / LOOP) * lane}"`);
+  for (const tab of ["zoom", "webcam", "audio", "blur", "cursor", "background", "subtitles"]) {
+    expect(demo).toContain(`data-target="tab-${tab}"`);
   }
 });
 
-test("reduced motion disables smooth scrolling and the hero loop", () => {
+test("the pointer's script runs in order inside one loop, one action at a time", () => {
+  let busyUntil = 0;
+  for (const step of script) {
+    expect(step.at).toBeGreaterThanOrEqual(busyUntil);
+    expect(step.at).toBeLessThan(LOOP);
+    busyUntil = step.at + ("dur" in step ? step.dur : 0);
+  }
+  expect(busyUntil).toBeLessThanOrEqual(LOOP);
+});
+
+test("subtitle cues are in order, inside the loop and clear of each other", () => {
+  for (const [i, cue] of narration.entries()) {
+    expect(cue.end).toBeGreaterThan(cue.start);
+    expect(cue.start).toBeGreaterThan(i === 0 ? 0 : narration[i - 1].end);
+    expect(cue.end).toBeLessThan(LOOP);
+  }
+});
+
+test("reduced motion stops smooth scrolling", () => {
   const reducedMotion = css.split("@media (prefers-reduced-motion: reduce) {")[1];
   expect(reducedMotion).toMatch(/html\s*\{\s*scroll-behavior: auto;/);
-  expect(reducedMotion).toMatch(/\.demo-camera,[\s\S]*?animation: none;/);
+});
+
+test("Annotate uses the recording snapshot and highlighted narration at its playhead", () => {
+  const cue = narration.find((entry) => ANNOTATE_TIME >= entry.start && ANNOTATE_TIME < entry.end);
+  expect(cue).toBeDefined();
+  expect(cue.text.split(" ")).toContain(ANNOTATE_WORD);
+  const markup = renderToStaticMarkup(createElement(SubtitlesWindow));
+  const snapshot = recordingAt(ANNOTATE_TIME);
+  for (const name of ["published", "ticked", "progress", "progress-text", "progress-text-done"]) {
+    expect(snapshot.on[name]).toBe(true);
+    expect(markup).toContain(`data-el="${name}" data-on=""`);
+  }
+  expect(markup).toContain("4 of 5 done");
+  expect(markup).toContain(`left:${snapshot.cursor[0]}%;top:${snapshot.cursor[1]}%`);
+  expect(markup).toContain(`transform:scale(${snapshot.camera.scale})`);
+  expect(markup).toContain(
+    `transform-origin:${snapshot.camera.origin[0]}% ${snapshot.camera.origin[1]}%`,
+  );
+  expect(markup).toContain(`>${ANNOTATE_WORD}</span>`);
+  expect(markup).toContain("0:13.20");
 });
