@@ -6,38 +6,27 @@
     </filter>
   </defs>
   <g filter="url(#shadow)">
-    <!-- Hand shape -->
-    <path d="M13 4
-             C13 2.9 13.9 2 15 2
-             C16.1 2 17 2.9 17 4
-             L17 12
-             L18 12
-             C18 10.9 18.9 10 20 10
-             C21.1 10 22 10.9 22 12
-             L22 14
-             C22 12.9 22.9 12 24 12
-             C25.1 12 26 12.9 26 14
-             L26 16
-             C26 14.9 26.9 14 28 14
-             C29.1 14 30 14.9 30 16
-             L30 24
-             C30 27.3 27.3 30 24 30
-             L14 30
-             C10.7 30 8 27.3 8 24
-             L8 18
-             L6 18
-             C4.9 18 4 17.1 4 16
-             L4 14
-             C4 12.9 4.9 12 6 12
-             L13 12
-             Z"
-          fill="white"
-          stroke="black"
-          stroke-width="1.5"
-          stroke-linejoin="round"/>
-    <!-- Finger lines -->
-    <line x1="17" y1="14" x2="17" y2="20" stroke="black" stroke-width="1" opacity="0.3"/>
-    <line x1="22" y1="16" x2="22" y2="20" stroke="black" stroke-width="1" opacity="0.3"/>
-    <line x1="26" y1="18" x2="26" y2="20" stroke="black" stroke-width="1" opacity="0.3"/>
+    <!-- Black outline: index finger, folded fingers, palm (square-topped so the fingers meet it cleanly) and thumb, stroked so the overlaps merge -->
+    <g fill="black" stroke="black" stroke-width="3" stroke-linejoin="round">
+      <rect x="13" y="2" width="3.5" height="17" rx="1.75"/>
+      <rect x="16.5" y="11" width="3.5" height="8" rx="1.75"/>
+      <rect x="20" y="12" width="3.5" height="8" rx="1.75"/>
+      <rect x="23.5" y="13.5" width="3" height="7" rx="1.5"/>
+      <rect x="11" y="15" width="15.5" height="13" rx="5"/>
+      <rect x="11" y="15" width="15.5" height="7" rx="1.75"/>
+      <rect x="7" y="16" width="8" height="3.5" rx="1.75" transform="rotate(40 11 17.75)"/>
+    </g>
+    <!-- White fill: the same shapes -->
+    <g fill="white">
+      <rect x="13" y="2" width="3.5" height="17" rx="1.75"/>
+      <rect x="16.5" y="11" width="3.5" height="8" rx="1.75"/>
+      <rect x="20" y="12" width="3.5" height="8" rx="1.75"/>
+      <rect x="23.5" y="13.5" width="3" height="7" rx="1.5"/>
+      <rect x="11" y="15" width="15.5" height="13" rx="5"/>
+      <rect x="11" y="15" width="15.5" height="7" rx="1.75"/>
+      <rect x="7" y="16" width="8" height="3.5" rx="1.75" transform="rotate(40 11 17.75)"/>
+    </g>
+    <!-- Creases between the folded fingers -->
+    <path d="M16.5 13.5 V17 M20 14.5 V17.5 M23.5 15.5 V18" fill="none" stroke="black" stroke-width="1.1" stroke-linecap="round"/>
   </g>
 </svg>
