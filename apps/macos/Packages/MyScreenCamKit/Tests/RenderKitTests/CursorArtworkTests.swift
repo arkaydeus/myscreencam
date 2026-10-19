@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import Foundation
 import ImageIO
 import ProjectKit
@@ -61,5 +62,36 @@ struct CursorArtworkTests {
         let sprite = try #require(cache.sprite(for: .artwork(kind), pixelsPerPoint: 2))
         #expect(sprite.size == CGSize(width: CursorArtwork.pointSize * 2, height: CursorArtwork.pointSize * 2))
         #expect(sprite.hotspot.x > 0 && sprite.hotspot.y > 0)
+    }
+
+    @Test(arguments: [2.0, 4.0])
+    func pointingHandHotspotStaysOnIndexFingertip(pixelsPerPoint: Double) throws {
+        #expect(CursorArtwork.hotspot(for: .pointingHand) == CGPoint(x: 14.75, y: 2.5))
+        let (package, index) = try packageWithCursor()
+        let cache = CursorImageCache(package: package, index: index)
+        let sprite = try #require(cache.sprite(for: .artwork(.pointingHand), pixelsPerPoint: pixelsPerPoint))
+        let scale = sprite.size.width / 32
+        #expect(sprite.hotspot == CGPoint(x: 14.75 * scale, y: 2.5 * scale))
+
+        let image = try #require(CIContext().createCGImage(sprite.image, from: sprite.image.extent))
+        let bitmap = Bitmap(cgImage: image)
+        // The topmost white row is the rounded index-finger tip. Ignore the black outline and shadow.
+        let tipY = try #require(
+            (0..<bitmap.height).first { y in
+                (0..<bitmap.width).contains { x in
+                    let pixel = bitmap.pixel(x, y)
+                    return pixel.r > 200 && pixel.g > 200 && pixel.b > 200
+                }
+            })
+        let tipXs = (0..<bitmap.width).filter { x in
+            let pixel = bitmap.pixel(x, tipY)
+            return pixel.r > 200 && pixel.g > 200 && pixel.b > 200
+        }
+        let left = try #require(tipXs.first)
+        let right = try #require(tipXs.last)
+        let tipCenterX = Double(left + right + 1) / 2
+        // Allow subpixel rasterisation differences, while keeping the hotspot within one SVG unit of the tip.
+        #expect(abs(tipCenterX - sprite.hotspot.x) < scale / 2)
+        #expect(abs(Double(tipY) + 0.5 - sprite.hotspot.y) < scale)
     }
 }

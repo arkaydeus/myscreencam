@@ -27,14 +27,29 @@ import { site } from "../src/lib/site";
 
 const css = readFileSync(resolve(import.meta.dir, "../src/app/globals.css"), "utf8");
 
-test("Download for Mac points at the stable DMG asset while Releases opens the release page", () => {
+test("Download for Mac points at the stable DMG asset", () => {
   const download = renderToStaticMarkup(createElement(DownloadButton));
-  const footer = renderToStaticMarkup(createElement(SiteFooter));
 
   expect(site.downloadUrl).toMatch(/\/releases\/latest\/download\/MyScreenCam\.dmg$/);
   expect(download).toContain(`href="${site.downloadUrl}"`);
   expect(download).toContain("Download for Mac");
-  expect(footer).toContain(`href="${site.releasesUrl}"`);
+});
+
+test("footer preserves the performance footnote and Releases, FAQ and download links", () => {
+  const footer = renderToStaticMarkup(createElement(SiteFooter));
+  const links = Array.from(
+    footer.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g),
+    ([, href, label]) => [label, href],
+  );
+
+  expect(footer).toContain('<li id="footnote-1">');
+  for (const [label, href] of [
+    ["Releases", site.releasesUrl],
+    ["FAQ", "#faq"],
+    ["Download", site.downloadUrl],
+  ]) {
+    expect(links).toContainEqual([label, href]);
+  }
 });
 
 test("hero zooms fit the loop and every click but the last lands inside a zoom", () => {
