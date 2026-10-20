@@ -120,6 +120,210 @@ struct AppStateTests {
         }
     }
 
+    /// Deliver real AppKit mouse events through the preview's gesture routing.
+    private func cropDrag(
+        _ view: PreviewNSView, model: EditorModel, from: NormPoint, to: NormPoint, undo: UndoManager,
+        fullFrameState: Bool = false
+    ) throws {
+        func sync() {
+            var state = PreviewOverlayState(model: model)
+            if fullFrameState && model.edit.crop == nil { state.crop = .full }
+            view.state = state
+        }
+        func event(_ type: NSEvent.EventType, at source: NormPoint) throws -> NSEvent {
+            let layout = CanvasLayout.make(
+                sourceSize: model.renderer.layout.sourceSize, background: model.edit.background,
+                sizing: model.renderer.options.sizing)
+            let geometry = PreviewGeometry(layout: layout)
+            let point = geometry.viewPoint(
+                fromCanvas: geometry.canvasPoint(fromSource: source), viewSize: view.bounds.size)
+            return try #require(
+                NSEvent.mouseEvent(
+                    with: type, location: view.convert(point, to: nil), modifierFlags: [], timestamp: 0,
+                    windowNumber: view.window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1,
+                    pressure: 1))
+        }
+        sync()
+        let original = model.edit
+        let couldUndo = undo.canUndo
+        view.mouseDown(with: try event(.leftMouseDown, at: from))
+        // Multiple updates must all belong to one undo step. A click sends only down/up events.
+        if from != to {
+            view.mouseDragged(
+                with: try event(.leftMouseDragged, at: NormPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)))
+            sync()
+            view.mouseDragged(with: try event(.leftMouseDragged, at: to))
+            sync()
+        }
+        #expect(undo.canUndo == couldUndo)
+        // Empty explicit AppKit groups themselves count as actions, so group only a changed gesture.
+        let changed = model.edit != original
+        if changed { undo.beginUndoGrouping() }
+        view.mouseUp(with: try event(.leftMouseUp, at: to))
+        if changed { undo.endUndoGrouping() }
+    }
+
+    @Test func cropPreviewDrawMoveResetAndUndo() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.update("Seed") { $0.background.enabled = false }
+        model.isEditingCrop = true
+        let view = PreviewNSView(model: model)
+        view.frame = CGRect(x: 0, y: 0, width: 640, height: 360)
+        defer { view.teardown() }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let start = NormPoint(x: 0.2, y: 0.2)
+        let end = NormPoint(x: 0.7, y: 0.7)
+        // Clicking, including a sub-threshold drag, leaves nil and adds no undo action.
+        try cropDrag(view, model: model, from: start, to: start, undo: undo)
+        #expect(model.edit.crop == nil && !undo.canUndo)
+        try cropDrag(view, model: model, from: start, to: NormPoint(x: 0.201, y: 0.201), undo: undo)
+        #expect(model.edit.crop == nil && !undo.canUndo)
+        // Both nil and an explicitly full-frame overlay must route interior drags to drawing.
+        for full in [false, true] {
+            try cropDrag(view, model: model, from: start, to: end, undo: undo, fullFrameState: full)
+            let drawn = try #require(model.edit.crop)
+            #expect(abs(drawn.x - 0.2) < 1e-9 && abs(drawn.y - 0.2) < 1e-9)
+            #expect(abs(drawn.w - 0.5) < 1e-9 && abs(drawn.h - 0.5) < 1e-9)
+            undo.undo()
+            #expect(model.edit.crop == nil && !undo.canUndo)
+        }
+        try cropDrag(view, model: model, from: start, to: end, undo: undo)
+        let drawn = model.edit.crop
+        undo.removeAllActions()
+        try cropDrag(view, model: model, from: .center, to: .center, undo: undo)
+        #expect(model.edit.crop == drawn && !undo.canUndo)
+        try cropDrag(view, model: model, from: .center, to: NormPoint(x: 0.6, y: 0.6), undo: undo)
+        let moved = try #require(model.edit.crop)
+        #expect(abs(moved.x - 0.3) < 1e-9 && abs(moved.y - 0.3) < 1e-9)
+        #expect(moved.w == drawn?.w && moved.h == drawn?.h)
+        undo.undo()
+        #expect(model.edit.crop == drawn && !undo.canUndo)
+        try cropDrag(view, model: model, from: .center, to: NormPoint(x: 1.4, y: -0.3), undo: undo)
+        let bounded = try #require(model.edit.crop)
+        #expect(abs(bounded.x - (1 - bounded.w)) < 1e-9 && bounded.y == 0)
+        undo.undo()
+        #expect(model.edit.crop == drawn && !undo.canUndo)
+        undo.beginUndoGrouping()
+        model.setCrop(nil, "Reset Crop")
+        undo.endUndoGrouping()
+        #expect(model.edit.crop == nil)
+        undo.undo()
+        #expect(model.edit.crop == drawn)
+        undo.redo()
+        #expect(model.edit.crop == nil)
+        undo.removeAllActions()
+        try cropDrag(view, model: model, from: start, to: end, undo: undo)
+        #expect(model.edit.crop != nil)
+        undo.undo()
+        #expect(model.edit.crop == nil && !undo.canUndo)
+        await model.close()
+    }
+
+    @Test func cropPreviewResizesEveryHandleInOneUndoStep() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.update("Seed") { $0.background.enabled = false }
+        model.isEditingCrop = true
+        let view = PreviewNSView(model: model)
+        view.frame = CGRect(x: 0, y: 0, width: 640, height: 360)
+        defer { view.teardown() }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let original = NormRect(x: 0.25, y: 0.25, w: 0.5, h: 0.5)
+        for (x, y) in [
+            (0.25, 0.25), (0.5, 0.25), (0.75, 0.25), (0.75, 0.5),
+            (0.75, 0.75), (0.5, 0.75), (0.25, 0.75), (0.25, 0.5),
+        ] {
+            undo.beginUndoGrouping()
+            model.setCrop(original)
+            undo.endUndoGrouping()
+            undo.removeAllActions()
+            let dx = x == 0.5 ? 0 : (x < 0.5 ? -0.05 : 0.05)
+            let dy = y == 0.5 ? 0 : (y < 0.5 ? -0.05 : 0.05)
+            try cropDrag(
+                view, model: model, from: NormPoint(x: x, y: y), to: NormPoint(x: x + dx, y: y + dy), undo: undo)
+            let resized = try #require(model.edit.crop)
+            #expect(abs(resized.x - (x < 0.5 ? 0.2 : 0.25)) < 1e-9)
+            #expect(abs(resized.y - (y < 0.5 ? 0.2 : 0.25)) < 1e-9)
+            #expect(abs(resized.w - (0.5 + abs(dx))) < 1e-9)
+            #expect(abs(resized.h - (0.5 + abs(dy))) < 1e-9)
+            undo.undo()
+            #expect(model.edit.crop == original && !undo.canUndo)
+        }
+        await model.close()
+    }
+
+    @Test func cropModeShowsSourceAndExcludesTargetPicking() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.update("Seed") {
+            $0.crop = NormRect(x: 0.5, y: 0, w: 0.5, h: 1)
+            $0.zoom.enabled = true
+            $0.webcam.enabled = true
+            $0.subtitles.enabled = true
+        }
+        let original = model.edit
+        model.isPickingZoomTarget = true
+        model.toggleCropEditing()
+        #expect(model.isEditingCrop && !model.isPickingZoomTarget)
+        #expect(model.previewEdit.crop == nil)
+        #expect(
+            !model.previewEdit.zoom.enabled && !model.previewEdit.webcam.enabled && !model.previewEdit.subtitles.enabled
+        )
+        #expect(model.edit == original)
+        model.isPickingZoomTarget = true
+        #expect(!model.isEditingCrop && model.isPickingZoomTarget)
+        #expect(model.previewEdit == original)
+        model.toggleCropEditing()
+        model.inspectorTab = .background
+        #expect(!model.isEditingCrop && model.previewEdit == original)
+        await model.close()
+    }
+
+    @Test func cropRelativeZoomControlsMarkerAndPivotAgree() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let keyframe = ZoomKeyframe(time: 0, scale: 2, target: NormPoint(x: 0.2, y: 0.8), hold: 2, instant: true)
+        model.update("Seed") {
+            $0.crop = NormRect(x: 0.5, y: 0, w: 0.5, h: 1)
+            $0.zoom.keyframes = [keyframe]
+        }
+        model.selection = .keyframes([keyframe.id])
+        let x = model.zoomTargetBinding(\.x, keyframe: keyframe)
+        let y = model.zoomTargetBinding(\.y, keyframe: keyframe)
+        #expect(x.wrappedValue == 0 && y.wrappedValue == 0.8)
+        let layout = CanvasLayout.make(
+            sourceSize: model.renderer.layout.sourceSize, crop: model.edit.crop, background: model.edit.background,
+            sizing: .scale(1))
+        let geometry = PreviewGeometry(layout: layout)
+        let state = ZoomEvaluator(settings: model.edit.zoom, crop: layout.normalizedCrop).state(at: 1)
+        let pivot = NormPoint(x: x.wrappedValue, y: y.wrappedValue)
+        #expect(pivot == state.pivot)
+        let marker = geometry.canvasPoint(
+            fromSource: ZoomEvaluator.targetInSource(pivot, crop: layout.normalizedCrop), zoom: state)
+        #expect(abs(marker.x - layout.contentRect.minX) < 1e-9)
+        let view = PreviewNSView(model: model)
+        view.frame = CGRect(origin: .zero, size: layout.canvasSize)
+        view.state = PreviewOverlayState(model: model)
+        defer { view.teardown() }
+        let markerLayer = try #require(
+            view.layer?.sublayers?.flatMap { $0.sublayers ?? [] }.first { $0.name == "zoomTarget" } as? CAShapeLayer)
+        let markerBounds = try #require(markerLayer.path).boundingBoxOfPath
+        #expect(!markerLayer.isHidden)
+        #expect(abs(markerBounds.midX - marker.x) < 1e-9 && abs(markerBounds.midY - marker.y) < 1e-9)
+        x.wrappedValue = 0.4
+        #expect(abs(model.selectedKeyframe!.target.x - 0.7) < 1e-9)
+        #expect(y.wrappedValue == 0.8)
+        model.setZoomTarget(NormPoint(x: 0.1, y: 1.2))
+        #expect(model.selectedKeyframe?.target == NormPoint(x: 0.5, y: 1))
+        #expect(x.wrappedValue == 0 && y.wrappedValue == 1)
+        await model.close()
+    }
+
     private func timedRevision() -> TranscriptRevision {
         let entries: [(String, Double, Double)] = [("one", 0, 0.4), ("two", 0.5, 0.9), ("three", 1, 1.4)]
         var text = ""

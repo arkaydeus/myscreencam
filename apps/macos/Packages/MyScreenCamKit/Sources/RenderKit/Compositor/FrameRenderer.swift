@@ -7,10 +7,10 @@ import ProjectKit
 /// what makes preview and export identical.
 ///
 /// Effect order (docs/legacy-inventory.md §4): screen → blur masks → cursor (source space, so it zooms with the
-/// content) → zoom crop/scale → background canvas → webcam overlay (not zoomed; background blurred or removed) →
+/// content) → the edit's crop, then zoom crop/scale inside it → background canvas → webcam overlay (not zoomed; background blurred or removed) →
 /// subtitles (canvas space).
 ///
-/// Work happens in a *working space*: the source scaled by `k = min(1, contentWidth·zoom / sourceWidth)`, so a 4K
+/// Work happens in a *working space*: the source scaled by `k = min(1, contentWidth·zoom / cropWidth)`, so a 4K
 /// recording previewed in a small window is shrunk once up front instead of being blurred and composited at 4K.
 /// Every source-pixel quantity (blur radius, cursor size, highlight radius) is multiplied by `k`, so the result
 /// matches rendering at full resolution.
@@ -54,7 +54,8 @@ enum FrameRenderer {
 
         let zoom = snapshot.zoom.state(at: t)
         let z = max(zoom.scale, 1)
-        let k = min(1, max(content.width * z / sourceW, 1e-3))
+        let sourceCrop = layout.sourceCrop
+        let k = min(1, max(content.width * z / max(sourceCrop.width, 1), 1e-3))
         let work = CGSize(width: sourceW * k, height: sourceH * k)
         let workRect = CGRect(origin: .zero, size: work)
 
@@ -87,9 +88,11 @@ enum FrameRenderer {
         }
         image = image.cropped(to: workRect)
 
-        // 4. Zoom: crop the visible part and scale it into the content rect.
-        let crop = zoom.cropRect(in: work)
-        let cropCI = CIHelpers.flip(crop, height: work.height)
+        // 4. Crop and zoom: take the visible part of the crop and scale it into the content rect.
+        let shown = CGRect(
+            x: sourceCrop.minX * k, y: sourceCrop.minY * k, width: sourceCrop.width * k, height: sourceCrop.height * k)
+        let visible = zoom.cropRect(in: shown.size).offsetBy(dx: shown.minX, dy: shown.minY)
+        let cropCI = CIHelpers.flip(visible, height: work.height)
         let contentCI = CIHelpers.flip(content, height: layout.canvasSize.height)
         var placed = image.cropped(to: cropCI)
             .transformed(by: CGAffineTransform(translationX: -cropCI.minX, y: -cropCI.minY))

@@ -6,7 +6,7 @@ import SwiftUI
 
 /// The preview: an `AVPlayerLayer` (no controls) plus interactive overlays for dragging the webcam, moving and
 /// resizing the selected blur mask, dragging the subtitle under the playhead (or its left/right edge, to set its
-/// width), and picking a zoom target.
+/// width), picking a zoom target, and drawing the crop.
 struct PreviewContainer: View {
     let model: EditorModel
 
@@ -19,6 +19,22 @@ struct PreviewContainer: View {
                         Image(systemName: "scope")
                         Text("Click the preview to set the zoom target")
                         Button("Cancel") { model.isPickingZoomTarget = false }
+                            .buttonStyle(.link)
+                    }
+                    .font(.callout)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.top, 10)
+                } else if model.isEditingCrop {
+                    HStack(spacing: 8) {
+                        Image(systemName: "crop")
+                        Text("Drag to choose the area to keep")
+                        if model.edit.crop != nil {
+                            Button("Reset") { model.setCrop(nil, "Reset Crop") }
+                                .buttonStyle(.link)
+                        }
+                        Button("Done") { model.isEditingCrop = false }
                             .buttonStyle(.link)
                     }
                     .font(.callout)
@@ -43,6 +59,9 @@ struct PreviewOverlayState: Equatable {
     var isPlaying: Bool
     var subtitles: SubtitleSettings
     var selectedCues: Set<SubtitleCue.ID>
+    var crop: NormRect?
+    /// The crop tool is on; the preview then shows the whole recording, unzoomed.
+    var isCropping: Bool
 
     @MainActor
     init(model: EditorModel) {
@@ -56,6 +75,8 @@ struct PreviewOverlayState: Equatable {
         isPlaying = model.clock.isPlaying
         subtitles = model.edit.subtitles
         selectedCues = model.selectedCueIDs
+        crop = model.edit.crop
+        isCropping = model.isEditingCrop
     }
 }
 
@@ -100,6 +121,10 @@ final class PreviewNSView: NSView {
     private let handles: [CALayer] = (0..<8).map { _ in CALayer() }
     private let targetMarker = CAShapeLayer()
     private let subtitleOutline = CAShapeLayer()
+    /// Darkens what the crop leaves out (even-odd: the content minus the crop).
+    private let cropShade = CAShapeLayer()
+    private let cropOutline = CAShapeLayer()
+    private let cropHandles: [CALayer] = (0..<8).map { _ in CALayer() }
     private var trackingArea: NSTrackingArea?
     private var hoveringWebcam = false
     private var hoveringCue: SubtitleCue.ID?
@@ -120,6 +145,10 @@ final class PreviewNSView: NSView {
         case webcam(start: NormPoint, from: CGPoint)
         case maskMove(BlurMask.ID, start: NormRect, from: NormPoint)
         case maskResize(BlurMask.ID, Handle, start: NormRect)
+        case cropMove(start: NormRect, from: NormPoint)
+        case cropResize(Handle, start: NormRect)
+        /// Drawing a new crop from a corner (view point and source point).
+        case cropDraw(fromView: CGPoint, from: NormPoint)
     }
 
     private var drag: Drag?
@@ -156,6 +185,7 @@ final class PreviewNSView: NSView {
         maskOutline.fillColor = AppTheme.accent.withAlphaComponent(0.12).cgColor
         maskOutline.strokeColor = AppTheme.accent.cgColor
         maskOutline.lineWidth = 1.5
+        targetMarker.name = "zoomTarget"
         targetMarker.fillColor = nil
         targetMarker.strokeColor = NSColor.systemYellow.cgColor
         targetMarker.lineWidth = 2
@@ -163,8 +193,21 @@ final class PreviewNSView: NSView {
         subtitleOutline.strokeColor = AppTheme.accent.cgColor
         subtitleOutline.lineWidth = 1.5
         subtitleOutline.lineDashPattern = [5, 4]
-        for layer in [otherMasks, maskOutline, webcamOutline, targetMarker, subtitleOutline] {
+        cropShade.fillColor = NSColor.black.withAlphaComponent(0.55).cgColor
+        cropShade.fillRule = .evenOdd
+        cropOutline.fillColor = nil
+        cropOutline.strokeColor = NSColor.systemRed.cgColor
+        cropOutline.lineWidth = 2
+        cropOutline.lineDashPattern = [6, 4]
+        for layer in [otherMasks, maskOutline, webcamOutline, targetMarker, subtitleOutline, cropShade, cropOutline] {
             overlay.addSublayer(layer)
+        }
+        for handle in cropHandles {
+            handle.backgroundColor = NSColor.white.cgColor
+            handle.borderColor = NSColor.systemRed.cgColor
+            handle.borderWidth = 1.5
+            handle.bounds = CGRect(x: 0, y: 0, width: 9, height: 9)
+            overlay.addSublayer(handle)
         }
         for handle in handles {
             handle.backgroundColor = NSColor.white.cgColor
@@ -214,18 +257,33 @@ final class PreviewNSView: NSView {
 
     // MARK: Geometry
 
-    /// Geometry for the current edit (computed here so it never lags the renderer).
+    /// Geometry for the current edit (computed here so it never lags the renderer). Uncropped while cropping.
     private var geometry: PreviewGeometry? {
         guard let model, let state else { return nil }
         let layout = CanvasLayout.make(
-            sourceSize: model.renderer.layout.sourceSize, background: state.background,
-            sizing: model.renderer.options.sizing)
+            sourceSize: model.renderer.layout.sourceSize, crop: state.isCropping ? nil : state.crop,
+            background: state.background, sizing: model.renderer.options.sizing)
         return PreviewGeometry(layout: layout)
     }
 
     private var zoomState: ZoomState {
-        guard let model else { return .identity }
+        guard let model, state?.isCropping != true else { return .identity }
         return model.renderer.zoomState(atSource: model.currentSourceTime)
+    }
+
+    /// The crop box in view points (the whole content when there's no crop), while cropping.
+    private func cropViewRect(_ geometry: PreviewGeometry) -> CGRect? {
+        guard let state, state.isCropping else { return nil }
+        let canvas = geometry.canvasRect(fromSource: state.crop ?? .full)
+        return geometry.viewRect(fromCanvas: canvas, viewSize: bounds.size).standardized
+    }
+
+    private func hitCropHandle(_ p: CGPoint) -> Handle? {
+        guard let geometry, let r = cropViewRect(geometry) else { return nil }
+        return Handle.allCases.first { handle in
+            let c = handlePoint(handle, in: r)
+            return abs(c.x - p.x) <= 7 && abs(c.y - p.y) <= 7
+        }
     }
 
     private func webcamViewRect(_ geometry: PreviewGeometry) -> CGRect? {
@@ -310,6 +368,7 @@ final class PreviewNSView: NSView {
             return
         }
         overlay.isHidden = false
+        if refreshCrop(geometry) { return }
         let zoom = zoomState
 
         if let rect = webcamViewRect(geometry), hoveringWebcam || isDraggingWebcam {
@@ -371,7 +430,10 @@ final class PreviewNSView: NSView {
         }
 
         if paused, let keyframe = state.selectedKeyframe {
-            let canvas = geometry.canvasPoint(fromSource: keyframe.target, zoom: zoom)
+            let crop = geometry.layout.normalizedCrop
+            let pivot = ZoomEvaluator.targetInCrop(keyframe.target, crop: crop)
+            let target = ZoomEvaluator.targetInSource(pivot, crop: crop)
+            let canvas = geometry.canvasPoint(fromSource: target, zoom: zoom)
             let p = geometry.viewPoint(fromCanvas: canvas, viewSize: bounds.size)
             let path = CGMutablePath()
             path.addEllipse(in: CGRect(x: p.x - 9, y: p.y - 9, width: 18, height: 18))
@@ -388,6 +450,31 @@ final class PreviewNSView: NSView {
         } else {
             targetMarker.isHidden = true
         }
+    }
+
+    /// Draws the crop tool; returns true when it's on (the other overlays are hidden then).
+    private func refreshCrop(_ geometry: PreviewGeometry) -> Bool {
+        guard let r = cropViewRect(geometry) else {
+            cropShade.isHidden = true
+            cropOutline.isHidden = true
+            for handle in cropHandles { handle.isHidden = true }
+            return false
+        }
+        for layer in [webcamOutline, maskOutline, otherMasks, targetMarker, subtitleOutline] { layer.isHidden = true }
+        for handle in handles { handle.isHidden = true }
+        let content = geometry.viewRect(fromCanvas: geometry.layout.contentRect, viewSize: bounds.size)
+        let shade = CGMutablePath()
+        shade.addRect(content)
+        shade.addRect(r)
+        cropShade.path = shade
+        cropShade.isHidden = false
+        cropOutline.path = CGPath(rect: r, transform: nil)
+        cropOutline.isHidden = false
+        for handle in Handle.allCases {
+            cropHandles[handle.rawValue].position = handlePoint(handle, in: r)
+            cropHandles[handle.rawValue].isHidden = false
+        }
+        return true
     }
 
     // MARK: Mouse
@@ -453,6 +540,20 @@ final class PreviewNSView: NSView {
 
     private func cursor(for p: CGPoint) -> NSCursor {
         if state?.isPicking == true { return .crosshair }
+        if state?.isCropping == true {
+            switch hitCropHandle(p) {
+            case .left, .right: return .resizeLeftRight
+            case .top, .bottom: return .resizeUpDown
+            case .some: return .crosshair
+            case nil:
+                if state?.crop != nil, state?.crop != .full,
+                    let geometry, cropViewRect(geometry)?.contains(p) == true
+                {
+                    return .openHand
+                }
+                return .crosshair
+            }
+        }
         if let handle = hitHandle(p) {
             switch handle {
             case .left, .right: return .resizeLeftRight
@@ -474,6 +575,19 @@ final class PreviewNSView: NSView {
         if state.isPicking {
             let source = sourcePoint(p, geometry, zoom: zoomState)
             model.setZoomTarget(source.clamped)
+            return
+        }
+        if state.isCropping {
+            let crop = state.crop ?? .full
+            model.beginContinuousChange()
+            if let handle = hitCropHandle(p) {
+                drag = .cropResize(handle, start: crop)
+            } else if state.crop != nil, crop != .full, cropViewRect(geometry)?.contains(p) == true {
+                drag = .cropMove(start: crop, from: sourcePoint(p, geometry, zoom: .identity))
+                NSCursor.closedHand.set()
+            } else {
+                drag = .cropDraw(fromView: p, from: sourcePoint(p, geometry, zoom: .identity).clamped)
+            }
             return
         }
         // Subtitles are drawn on top of everything, so they win the hit test; their edges set their width.
@@ -575,6 +689,36 @@ final class PreviewNSView: NSView {
             let rect = NormRect(
                 x: min(x0, x1), y: min(y0, y1), w: max(abs(x1 - x0), minSize), h: max(abs(y1 - y0), minSize))
             model.updateBlur(id, "Resize Blur") { $0.rect = rect }
+        case .cropMove(let start, let from):
+            let s = sourcePoint(p, geometry, zoom: .identity)
+            let x = min(max(start.x + (s.x - from.x), 0), max(0, 1 - start.w))
+            let y = min(max(start.y + (s.y - from.y), 0), max(0, 1 - start.h))
+            model.setCrop(NormRect(x: x, y: y, w: start.w, h: start.h), "Move Crop")
+        case .cropResize(let handle, let start):
+            let s = sourcePoint(p, geometry, zoom: .identity).clamped
+            var x0 = start.x
+            var y0 = start.y
+            var x1 = start.x + start.w
+            var y1 = start.y + start.h
+            switch handle {
+            case .topLeft, .left, .bottomLeft: x0 = s.x
+            case .topRight, .right, .bottomRight: x1 = s.x
+            default: break
+            }
+            switch handle {
+            case .topLeft, .top, .topRight: y0 = s.y
+            case .bottomLeft, .bottom, .bottomRight: y1 = s.y
+            default: break
+            }
+            model.setCrop(
+                NormRect(x: min(x0, x1), y: min(y0, y1), w: abs(x1 - x0), h: abs(y1 - y0)), "Resize Crop")
+        case .cropDraw(let fromView, let from):
+            // A click without a drag keeps the current crop.
+            guard hypot(p.x - fromView.x, p.y - fromView.y) >= 4 else { return }
+            let s = sourcePoint(p, geometry, zoom: .identity).clamped
+            model.setCrop(
+                NormRect(x: min(from.x, s.x), y: min(from.y, s.y), w: abs(s.x - from.x), h: abs(s.y - from.y)),
+                "Crop")
         }
         refreshOverlay()
     }

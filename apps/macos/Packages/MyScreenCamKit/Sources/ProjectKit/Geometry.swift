@@ -30,6 +30,9 @@ public struct NormRect: Codable, Sendable, Hashable {
         self.h = h
     }
 
+    /// The whole frame.
+    public static let full = NormRect(x: 0, y: 0, w: 1, h: 1)
+
     /// Converts to a rect in a y-down pixel space of the given size.
     public func denormalized(in size: CGSize) -> CGRect {
         CGRect(x: x * size.width, y: y * size.height, width: w * size.width, height: h * size.height)

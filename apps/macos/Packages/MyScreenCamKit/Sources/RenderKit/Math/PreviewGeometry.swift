@@ -7,9 +7,10 @@ import ProjectKit
 /// Three spaces are involved, all with the origin top-left and y down:
 /// - **view** points: the preview view (the canvas is aspect-fitted in it, like `AVLayerVideoGravity.resizeAspect`);
 /// - **canvas** pixels: the rendered frame (`CanvasLayout.canvasSize`);
-/// - **normalised source**: 0…1 over the recording, the space of zoom targets, blur rects and cursor events.
+/// - **normalised source**: 0…1 over the recording, the space of zoom targets, blur rects, the crop and cursor events.
 ///
-/// The zoom state is needed to map through the zoomed content; pass `.identity` for the unzoomed frame.
+/// The content shows the layout's crop of the source. The zoom state (relative to the crop) is needed to map through
+/// the zoomed content; pass `.identity` for the unzoomed frame.
 public struct PreviewGeometry: Sendable, Equatable {
     public let layout: CanvasLayout
 
@@ -50,18 +51,23 @@ public struct PreviewGeometry: Sendable, Equatable {
         return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
     }
 
-    /// Canvas pixel → normalised source point through the zoom (not clamped; outside 0…1 when off the content).
-    /// Use it for click-to-set zoom targets (pass `.identity` to pick on the unzoomed frame) and blur dragging.
+    /// Canvas pixel → normalised source point through the zoom and crop (not clamped; outside 0…1 when off the
+    /// content). Use it for click-to-set zoom targets (pass `.identity` to pick on the unzoomed frame) and blur
+    /// dragging. `zoom` is relative to the crop, as `ZoomEvaluator` gives it.
     public func sourcePoint(fromCanvas point: CGPoint, zoom: ZoomState = .identity) -> NormPoint {
         let content = layout.contentRect
         let visible = NormPoint(
             x: (point.x - content.minX) / max(content.width, 1), y: (point.y - content.minY) / max(content.height, 1))
-        return zoom.sourcePoint(fromVisible: visible)
+        let local = zoom.sourcePoint(fromVisible: visible)
+        let crop = layout.normalizedCrop
+        return NormPoint(x: crop.x + local.x * crop.w, y: crop.y + local.y * crop.h)
     }
 
-    /// Normalised source point → canvas pixel through the zoom.
+    /// Normalised source point → canvas pixel through the crop and zoom.
     public func canvasPoint(fromSource point: NormPoint, zoom: ZoomState = .identity) -> CGPoint {
-        let visible = zoom.visiblePoint(fromSource: point)
+        let crop = layout.normalizedCrop
+        let local = NormPoint(x: (point.x - crop.x) / max(crop.w, 1e-9), y: (point.y - crop.y) / max(crop.h, 1e-9))
+        let visible = zoom.visiblePoint(fromSource: local)
         let content = layout.contentRect
         return CGPoint(x: content.minX + visible.x * content.width, y: content.minY + visible.y * content.height)
     }

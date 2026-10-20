@@ -94,6 +94,17 @@ struct ZoomTests {
             ZoomEvaluator(settings: ZoomSettings(enabled: false, keyframes: [keyframe])).state(at: 1.5) == .identity)
     }
 
+    @Test func targetsAreRelativeToTheCrop() {
+        // Target 0.2, 0.8 in the source is 0.2, 0.6 of the crop's right half (x 0…1 → 0.5…1 is off to the left).
+        let crop = NormRect(x: 0.5, y: 0.5, w: 0.5, h: 0.5)
+        let evaluator = ZoomEvaluator(settings: ZoomSettings(keyframes: [keyframe]), crop: crop)
+        let outside = evaluator.state(at: 1.5).pivot
+        #expect(outside.x == 0 && abs(outside.y - 0.6) < 1e-12)
+        let inside = ZoomKeyframe(time: 1, scale: 2, target: NormPoint(x: 0.75, y: 0.625), hold: 1)
+        let pivot = ZoomEvaluator(settings: ZoomSettings(keyframes: [inside]), crop: crop).state(at: 1.5).pivot
+        #expect(pivot == NormPoint(x: 0.5, y: 0.25))
+    }
+
     @Test func pivotCenteredOnClamps() {
         #expect(ZoomState.pivot(centeredOn: .center, scale: 2) == NormPoint(x: 0.5, y: 0.5))
         #expect(ZoomState.pivot(centeredOn: NormPoint(x: 0, y: 1), scale: 2) == NormPoint(x: 0, y: 1))
@@ -117,6 +128,58 @@ struct ZoomTests {
         let crop = state.cropRect(in: CGSize(width: 1, height: 1))
         #expect(crop.maxX <= 1 + 1e-9 && crop.minY >= -1e-9)
         #expect(state.pivot.x > 0.99 && state.pivot.y < 0.01)
+    }
+
+    @Test(arguments: [
+        NormRect(x: 0.4, y: 0.4, w: 0.2, h: 0.2),
+        NormRect(x: 0.4, y: 0.3, w: 0.2, h: 0.4),
+        NormRect(x: 0.3, y: 0.4, w: 0.4, h: 0.2),
+    ])
+    func croppedFollowKeepsSmallSourceMovementsVisible(crop: NormRect) async throws {
+        let events = [
+            InputEvent(t: 0, kind: .move, x: 0.5, y: 0.5),
+            InputEvent(t: 0.5, kind: .move, x: 0.5, y: 0.5),
+            InputEvent(t: 0.6, kind: .move, x: 0.59, y: 0.59),
+            InputEvent(t: 6, kind: .move, x: 0.59, y: 0.59),
+        ]
+        let keyframe = ZoomKeyframe(time: 0, scale: 2, mode: .followMouse, hold: 10, instant: true)
+        var edit = try await TestMedia.plainEdit()
+        edit.zoom.keyframes = [keyframe]
+        let project = try await TestMedia.project(edit: edit, events: events)
+        let resources = ProjectResources(project: project)
+        func snapshot(_ crop: NormRect?) -> RenderSnapshot {
+            var edit = edit
+            edit.crop = crop
+            let layout = CanvasLayout.make(
+                sourceSize: CGSize(width: 640, height: 360), crop: crop, background: edit.background, sizing: .scale(1))
+            return RenderSnapshot(
+                edit: edit, timeline: EditTimeline(segments: edit.segments), layout: layout,
+                trackIDs: CompositionTrackIDs(screen: 1), resources: resources)
+        }
+        // Populate the shared cache with a full-frame track before changing crop dimensions.
+        let full = snapshot(nil)
+        let fullCenter = try #require(full.zoom.follow?.center(at: 5))
+        #expect(abs(fullCenter.x - 0.5) < 1e-6 && abs(fullCenter.y - 0.5) < 1e-6)
+        let cropped = snapshot(crop)
+        let geometry = PreviewGeometry(layout: cropped.layout)
+        let state = cropped.zoom.state(at: 5)
+        let cursor = geometry.canvasPoint(fromSource: NormPoint(x: 0.59, y: 0.59), zoom: state)
+        #expect(cropped.layout.contentRect.contains(cursor))
+        let visible = state.cropRect(in: CGSize(width: 1, height: 1))
+        let source = cropped.layout.normalizedCrop
+        #expect(source.x + visible.minX * source.w >= source.x - 1e-9)
+        #expect(source.y + visible.minY * source.h >= source.y - 1e-9)
+        #expect(source.x + visible.maxX * source.w <= source.x + source.w + 1e-9)
+        #expect(source.y + visible.maxY * source.h <= source.y + source.h + 1e-9)
+        let center = try #require(cropped.zoom.follow?.center(at: 5))
+        #expect(abs(center.x - (0.59 - 0.1 * source.w)) < 1e-3)
+        #expect(abs(center.y - (0.59 - 0.1 * source.h)) < 1e-3)
+        // A second shape in the same cache must use its own horizontal and vertical dead zones.
+        let swapped = NormRect(x: crop.y, y: crop.x, w: crop.h, h: crop.w)
+        let other = snapshot(swapped)
+        let otherCenter = try #require(other.zoom.follow?.center(at: 5))
+        #expect(abs(otherCenter.x - (0.59 - 0.1 * swapped.w)) < 1e-3)
+        #expect(abs(otherCenter.y - (0.59 - 0.1 * swapped.h)) < 1e-3)
     }
 
     @Test func followCameraIgnoresJitterInsideDeadZone() {
@@ -263,6 +326,23 @@ struct LayoutTests {
         #expect(layout.contentRect == CGRect(x: 449, y: 60, width: 880, height: 880))
     }
 
+    @Test func cropSizesTheCanvas() {
+        let crop = NormRect(x: 0.25, y: 0.1, w: 0.5, h: 0.5)
+        let layout = CanvasLayout.make(
+            sourceSize: CGSize(width: 1920, height: 1080), crop: crop, background: BackgroundSettings(),
+            sizing: .scale(1))
+        #expect(layout.sourceCrop == CGRect(x: 480, y: 108, width: 960, height: 540))
+        #expect(layout.canvasSize == CGSize(width: 960, height: 540))
+        #expect(layout.contentScale == 1)
+        #expect(layout.normalizedCrop == crop)
+        let framed = CanvasLayout.make(
+            sourceSize: CGSize(width: 1920, height: 1080), crop: NormRect(x: 0, y: 0, w: 0.25, h: 1),
+            background: BackgroundSettings(enabled: true, aspect: .square, padding: 0), sizing: .scale(1))
+        // A 480×1080 crop on a square canvas: fitted to the full height, centred.
+        #expect(framed.canvasSize == CGSize(width: 1080, height: 1080))
+        #expect(framed.contentRect == CGRect(x: 300, y: 0, width: 480, height: 1080))
+    }
+
     @Test func fitSizing() {
         let layout = CanvasLayout.make(
             sourceSize: CGSize(width: 1920, height: 1080), background: BackgroundSettings(),
@@ -325,6 +405,20 @@ struct PreviewGeometryTests {
         #expect(abs(canvasRect.width - 768) < 1e-9 && abs(canvasRect.height - 216) < 1e-9)
         let back = geometry.sourceRect(fromCanvas: canvasRect, zoom: zoom)
         #expect(abs(back.x - 0.1) < 1e-12 && abs(back.w - 0.2) < 1e-12 && abs(back.h - 0.1) < 1e-12)
+    }
+
+    @Test func sourceMappingThroughCropAndZoom() {
+        let cropped = PreviewGeometry(
+            layout: CanvasLayout.make(
+                sourceSize: CGSize(width: 1920, height: 1080), crop: NormRect(x: 0.5, y: 0.5, w: 0.5, h: 0.5),
+                background: BackgroundSettings(), sizing: .scale(1)))
+        #expect(cropped.sourcePoint(fromCanvas: .zero) == NormPoint(x: 0.5, y: 0.5))
+        #expect(cropped.sourcePoint(fromCanvas: CGPoint(x: 960, y: 540)) == NormPoint(x: 1, y: 1))
+        let zoom = ZoomState(scale: 2, pivot: NormPoint(x: 0, y: 0))
+        let p = cropped.sourcePoint(fromCanvas: CGPoint(x: 960, y: 540), zoom: zoom)
+        #expect(p == NormPoint(x: 0.75, y: 0.75))
+        let back = cropped.canvasPoint(fromSource: p, zoom: zoom)
+        #expect(abs(back.x - 960) < 1e-9 && abs(back.y - 540) < 1e-9)
     }
 
     @Test func withPaddingOffContentIsOutsideZeroToOne() {

@@ -6,4 +6,4 @@ Open cases are recorded here when a test fails in the normal suite and its ownin
 | --- | --- | --- | --- |
 | 0001 | open | Aggregate app test host `XCTWaiter` crashes | [0001-transcription-center-crashed-worker.md](0001-transcription-center-crashed-worker.md) |
 
-Latest recurrence: 2026-10-20 during merge validation; the transcription suite passed in isolation (see case 0001).
+Latest recurrence: 2026-10-20 during repeated main-merge validation; the transcription suite passed in isolation (see case 0001).
