@@ -21,17 +21,19 @@ nonisolated struct ExportSizing: Equatable, Sendable {
 
     /// Plans the render size for `settings`.
     ///
-    /// RenderKit sizes its canvas from the *natural* canvas (the source, widened to the background's aspect ratio
-    /// when one is set) times a factor, rounding each side to even pixels. The unrounded natural canvas is fed to
+    /// RenderKit sizes its canvas from the *natural* canvas (the cropped source, widened to the background's aspect
+    /// ratio when one is set) times a factor, rounding each side to even pixels. The unrounded natural canvas is fed to
     /// `outputSize(forSource:)` (the user's scale, the preset's long/short edge caps — e.g. GIF's 720 px — and the
     /// codec's maximum), then a RenderKit sizing that reproduces that size exactly is picked by checking candidates
     /// with the pure `CanvasLayout.make`.
-    static func plan(sourceSize: CGSize, background: BackgroundSettings, settings: ExportSettings) -> ExportSizing {
-        let natural = naturalCanvas(sourceSize: sourceSize, background: background)
+    static func plan(
+        sourceSize: CGSize, crop: NormRect? = nil, background: BackgroundSettings, settings: ExportSettings
+    ) -> ExportSizing {
+        let natural = naturalCanvas(sourceSize: sourceSize, crop: crop, background: background)
         let target = settings.outputSize(forSource: natural)
 
         func canvas(_ sizing: RenderSizing) -> CGSize {
-            CanvasLayout.make(sourceSize: sourceSize, background: background, sizing: sizing).canvasSize
+            CanvasLayout.make(sourceSize: sourceSize, crop: crop, background: background, sizing: sizing).canvasSize
         }
         let widthScale = target.width / max(natural.width, 1)
         let heightScale = target.height / max(natural.height, 1)
@@ -70,11 +72,12 @@ nonisolated struct ExportSizing: Equatable, Sendable {
         return scale * min(1, longLimit / max(longEdge, 1), shortLimit / max(shortEdge, 1))
     }
 
-    /// The canvas at 100 % before even-rounding, as `CanvasLayout.make` computes it: the source, widened or
+    /// The canvas at 100 % before even-rounding, as `CanvasLayout.make` computes it: the cropped source, widened or
     /// heightened to the background's aspect ratio when a background with a fixed aspect is on.
-    static func naturalCanvas(sourceSize: CGSize, background: BackgroundSettings) -> CGSize {
-        let width = max(sourceSize.width, 1)
-        let height = max(sourceSize.height, 1)
+    static func naturalCanvas(sourceSize: CGSize, crop: NormRect? = nil, background: BackgroundSettings) -> CGSize {
+        let shown = CanvasLayout.sourceCrop(crop, sourceSize: sourceSize)
+        let width = max(shown.width, 1)
+        let height = max(shown.height, 1)
         guard background.enabled, let ratio = background.aspect.ratio else {
             return CGSize(width: width, height: height)
         }
@@ -137,7 +140,8 @@ nonisolated enum ExportPipeline {
         try Task.checkCancellation()
 
         let source = await sourceSize(of: package, meta: project.meta)
-        let sizing = ExportSizing.plan(sourceSize: source, background: edit.background, settings: settings)
+        let sizing = ExportSizing.plan(
+            sourceSize: source, crop: edit.crop, background: edit.background, settings: settings)
         let options = RenderOptions(
             purpose: .export, frameRate: settings.effectiveFrameRate.framesPerSecond, sizing: sizing.renderSizing)
         let built = try await CompositionBuilder.build(project: project, options: options)

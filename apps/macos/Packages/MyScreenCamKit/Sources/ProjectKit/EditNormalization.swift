@@ -29,6 +29,8 @@ public enum EditLimits {
     public static let backgroundPadding: ClosedRange<Double> = 0...0.3
     /// Background content corner radius as a fraction of the content's shorter side.
     public static let backgroundCornerRadius: ClosedRange<Double> = 0...0.2
+    /// Smallest crop width and height as a fraction of the recording.
+    public static let cropMinimumSize = 0.05
     /// Shortest segment the segment-editing operations will produce, and the edge tolerance for cuts (seconds).
     public static let minimumSegmentLength = 0.1
 }
@@ -49,6 +51,8 @@ extension EditConfig {
     ///   intensity ``EditLimits/blurIntensity``.
     /// - Audio: gains ``EditLimits/gainDB``.
     /// - Background: padding, corner radius and shadow within their ranges.
+    /// - Crop: kept inside 0…1, at least ``EditLimits/cropMinimumSize`` on each side; nil when it covers the whole
+    ///   frame or isn't finite.
     /// - Subtitles: style within its ``EditLimits``; cue times clamped to 0…duration, cues without `end > start`
     ///   dropped, positions inside 0…1, cues sorted by start.
     ///
@@ -64,6 +68,7 @@ extension EditConfig {
         config.audio.system.gainDB = clamp(audio.system.gainDB, EditLimits.gainDB, fallback: 0)
         config.audio.microphone.gainDB = clamp(audio.microphone.gainDB, EditLimits.gainDB, fallback: 0)
         config.background = background.normalized()
+        config.crop = crop?.normalizedCrop()
         config.subtitles = subtitles.normalized(duration: duration)
         return config
     }
@@ -182,6 +187,18 @@ extension BackgroundSettings {
             cornerRadius, EditLimits.backgroundCornerRadius, fallback: fallback.cornerRadius)
         background.shadow = clamp(shadow, 0...1, fallback: fallback.shadow)
         return background
+    }
+}
+
+extension NormRect {
+    /// A crop inside the frame and no smaller than ``EditLimits/cropMinimumSize``, or nil for the whole frame.
+    func normalizedCrop() -> NormRect? {
+        guard x.isFinite, y.isFinite, w.isFinite, h.isFinite else { return nil }
+        let sizes = EditLimits.cropMinimumSize...1
+        let w = clamp(w, sizes, fallback: 1)
+        let h = clamp(h, sizes, fallback: 1)
+        guard w < 1 - 1e-6 || h < 1 - 1e-6 else { return nil }
+        return NormRect(x: clamp(x, 0...(1 - w), fallback: 0), y: clamp(y, 0...(1 - h), fallback: 0), w: w, h: h)
     }
 }
 

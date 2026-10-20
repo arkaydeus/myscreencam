@@ -59,7 +59,7 @@ enum InspectorTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .zoom: "Zoom"
+        case .zoom: "Zoom and Crop"
         case .webcam: "Webcam"
         case .audio: "Audio"
         case .blur: "Blur"
@@ -108,13 +108,25 @@ final class EditorModel {
     var selection: EditorSelection? {
         didSet { if selection != oldValue { isPickingZoomTarget = false } }
     }
-    var inspectorTab: InspectorTab = .zoom
+    var inspectorTab: InspectorTab = .zoom {
+        didSet { if inspectorTab != .zoom { isEditingCrop = false } }
+    }
     /// Timeline zoom, 0.5…4 (1 = the whole edited duration fits).
     var timelineZoom: Double = 1
     /// The zoom last picked by a plain or ⌘-click: ⇧-click selects from here, and the inspector shows its values.
     @ObservationIgnored var keyframeAnchor: ZoomKeyframe.ID?
     /// The next click on the preview sets the selected keyframes' target.
-    var isPickingZoomTarget = false
+    var isPickingZoomTarget = false {
+        didSet { if isPickingZoomTarget { isEditingCrop = false } }
+    }
+    /// The crop tool is on: the preview shows the whole recording, with the crop drawn on it to drag.
+    var isEditingCrop = false {
+        didSet {
+            guard isEditingCrop != oldValue else { return }
+            if isEditingCrop { isPickingZoomTarget = false }
+            scheduleRender()
+        }
+    }
     /// A short message shown in the transport bar ("Too close to edge").
     private(set) var transientMessage: String?
     var showExport = false
@@ -352,7 +364,7 @@ final class EditorModel {
         renderTask = Task { [weak self] in
             while let self, self.renderNeeded, !self.isClosed {
                 self.renderNeeded = false
-                let target = self.edit
+                let target = self.previewEdit
                 do {
                     let kind = try await self.renderer.update(edit: target)
                     guard !self.isClosed else { break }
@@ -367,6 +379,18 @@ final class EditorModel {
             }
             self?.renderTask = nil
         }
+    }
+
+    /// What the preview renders: the edit, or while the crop tool is on, the whole recording unzoomed and without the
+    /// webcam or subtitles, so the crop can be drawn over all of it.
+    var previewEdit: EditConfig {
+        guard isEditingCrop else { return edit }
+        var preview = edit
+        preview.crop = nil
+        preview.zoom.enabled = false
+        preview.webcam.enabled = false
+        preview.subtitles.enabled = false
+        return preview
     }
 
     /// The preview view's backing size changed; re-render at that size once resizing settles.

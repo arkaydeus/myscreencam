@@ -67,15 +67,37 @@ public enum ZoomPhase: Sendable, Equatable {
 /// Only enabled keyframes render, and only when zoom is enabled. Where keyframes overlap, the one that starts
 /// earliest wins. Timing: `inEnd = t + in`, `holdEnd = inEnd + hold`, `end = holdEnd + out`; instant keyframes
 /// have `in = out = 0`. Scale is `lerp(1, s, easeInOutCubic(p))`.
+///
+/// Zooms happen inside `crop`: targets and the follow camera (normalised source points) are mapped into the crop, so
+/// the states are relative to it.
 public struct ZoomEvaluator: Sendable {
     public let keyframes: [ZoomKeyframe]
     public let follow: FollowCameraTrack?
+    /// The part of the source the zoom works in (normalised).
+    public let crop: NormRect
 
-    public init(settings: ZoomSettings, follow: FollowCameraTrack? = nil) {
+    public init(settings: ZoomSettings, crop: NormRect = .full, follow: FollowCameraTrack? = nil) {
         keyframes =
             settings.enabled
             ? settings.keyframes.filter { $0.enabled && $0.end > $0.time }.sorted { $0.time < $1.time } : []
         self.follow = follow
+        self.crop = crop
+    }
+
+    /// A normalised source point in the crop's normalised coordinates.
+    private func cropPoint(_ p: NormPoint) -> NormPoint {
+        NormPoint(x: (p.x - crop.x) / max(crop.w, 1e-9), y: (p.y - crop.y) / max(crop.h, 1e-9))
+    }
+
+    /// The effective manual/click pivot, relative to the crop and clamped to its edges.
+    public static func targetInCrop(_ point: NormPoint, crop: NormRect) -> NormPoint {
+        NormPoint(x: (point.x - crop.x) / max(crop.w, 1e-9), y: (point.y - crop.y) / max(crop.h, 1e-9)).clamped
+    }
+
+    /// Converts a crop-relative pivot back to the source coordinates stored by keyframes.
+    public static func targetInSource(_ pivot: NormPoint, crop: NormRect) -> NormPoint {
+        let p = pivot.clamped
+        return NormPoint(x: crop.x + p.x * crop.w, y: crop.y + p.y * crop.h)
     }
 
     /// Whether any keyframe uses follow-mouse (so a `FollowCameraTrack` is needed).
@@ -115,15 +137,15 @@ public struct ZoomEvaluator: Sendable {
         }
     }
 
-    /// The zoom at source time `t`.
+    /// The zoom at source time `t`, relative to `crop`.
     public func state(at t: Double) -> ZoomState {
         guard let keyframe = activeKeyframe(at: t) else { return .identity }
         let scale = Self.scale(of: keyframe, at: t)
         switch keyframe.mode {
         case .manual, .click:
-            return ZoomState(scale: scale, pivot: keyframe.target.clamped)
+            return ZoomState(scale: scale, pivot: Self.targetInCrop(keyframe.target, crop: crop))
         case .followMouse:
-            let center = follow?.center(at: t) ?? keyframe.target
+            let center = cropPoint(follow?.center(at: t) ?? keyframe.target)
             return ZoomState(scale: scale, pivot: ZoomState.pivot(centeredOn: center, scale: scale))
         }
     }
@@ -134,6 +156,7 @@ public struct ZoomEvaluator: Sendable {
 /// The camera only moves once the cursor leaves a dead zone around it, then eases after it with a critically
 /// damped spring, so small cursor jitter never moves the view. Precomputed at `sampleRate` Hz.
 public struct FollowCameraTrack: Sendable {
+    /// Dead-zone radius as a fraction of each crop dimension. Centres remain in source coordinates.
     public let deadZone: Double
     public let omega: Double
     public let sampleRate: Double
@@ -141,7 +164,10 @@ public struct FollowCameraTrack: Sendable {
     private let xs: [Float]
     private let ys: [Float]
 
-    public init(cursor: CursorTrack, deadZone: Double = 0.1, omega: Double = 5, sampleRate: Double = 60) {
+    public init(
+        cursor: CursorTrack, crop: NormRect = .full, deadZone: Double = 0.1, omega: Double = 5,
+        sampleRate: Double = 60
+    ) {
         self.deadZone = deadZone
         self.omega = omega
         self.sampleRate = sampleRate
@@ -153,6 +179,8 @@ public struct FollowCameraTrack: Sendable {
         }
         let end = (cursor.lastActivity(atOrBefore: .infinity) ?? first) + CursorTrack.settleTime + 2
         let count = Int(((end - first) * sampleRate).rounded(.up)) + 1
+        let deadZoneX = deadZone * crop.w
+        let deadZoneY = deadZone * crop.h
         let spring = CriticallyDampedSpring(omega: omega)
         let dt = 1 / sampleRate
         var cx = min(max(p0.x, 0), 1)
@@ -167,8 +195,8 @@ public struct FollowCameraTrack: Sendable {
                 let px = min(max(p.x, 0), 1)
                 let py = min(max(p.y, 0), 1)
                 // Desired centre: the nearest point to the camera that keeps the cursor inside the dead zone.
-                let dx = min(max(cx, px - deadZone), px + deadZone)
-                let dy = min(max(cy, py - deadZone), py + deadZone)
+                let dx = min(max(cx, px - deadZoneX), px + deadZoneX)
+                let dy = min(max(cy, py - deadZoneY), py + deadZoneY)
                 spring.step(position: &cx, velocity: &vx, target: dx, dt: dt)
                 spring.step(position: &cy, velocity: &vy, target: dy, dt: dt)
             }

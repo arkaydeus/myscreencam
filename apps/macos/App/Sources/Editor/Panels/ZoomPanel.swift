@@ -1,5 +1,6 @@
 import AppKit
 import ProjectKit
+import RenderKit
 import SwiftUI
 
 struct ZoomPanel: View {
@@ -7,6 +8,8 @@ struct ZoomPanel: View {
 
     var body: some View {
         Form {
+            CropSection(model: model)
+
             Section {
                 Toggle("Zoom", isOn: model.binding(\.zoom.enabled, "Toggle Zoom"))
             }
@@ -53,6 +56,42 @@ struct ZoomPanel: View {
 
             if let keyframe = model.selectedKeyframe {
                 SelectedKeyframeSection(model: model, keyframe: keyframe, selected: model.selectedKeyframes)
+            }
+        }
+    }
+}
+
+/// The crop tool: choose the part of the screen recording kept in the output.
+private struct CropSection: View {
+    let model: EditorModel
+
+    /// The kept area in recording pixels.
+    private var size: String {
+        guard model.edit.crop != nil else { return "Full frame" }
+        let rect = CanvasLayout.sourceCrop(model.edit.crop, sourceSize: model.renderer.layout.sourceSize)
+        return "\(Int(rect.width)) × \(Int(rect.height))"
+    }
+
+    var body: some View {
+        Section("Crop") {
+            HStack {
+                Button {
+                    model.toggleCropEditing()
+                } label: {
+                    Label(model.isEditingCrop ? "Done" : "Crop on Preview", systemImage: "crop")
+                }
+                Spacer()
+                Text(size)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            if model.isEditingCrop {
+                Text("Drag on the preview to choose the area to keep, or drag the red box and its handles.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if model.edit.crop != nil {
+                Button("Reset to Full Frame") { model.setCrop(nil, "Reset Crop") }
             }
         }
     }
@@ -131,11 +170,16 @@ private struct SelectedKeyframeSection: View {
             title: "Scale", value: binding(\.scale, "Zoom Scale"), range: EditLimits.zoomScale, step: 0.05,
             format: { String(format: "%.2f×", $0) }, model: model)
         if selected.contains(where: { $0.mode != .followMouse }) {
+            if model.edit.crop != nil {
+                Text("Target coordinates are relative to the crop.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ValueSlider(
-                title: "Target X", value: binding(\.target.x, "Zoom Target"), range: 0...1,
+                title: "Target X", value: model.zoomTargetBinding(\.x, keyframe: keyframe), range: 0...1,
                 format: { String(format: "%.0f%%", $0 * 100) }, model: model)
             ValueSlider(
-                title: "Target Y", value: binding(\.target.y, "Zoom Target"), range: 0...1,
+                title: "Target Y", value: model.zoomTargetBinding(\.y, keyframe: keyframe), range: 0...1,
                 format: { String(format: "%.0f%%", $0 * 100) }, model: model)
             Button {
                 model.pause()

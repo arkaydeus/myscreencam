@@ -17,6 +17,9 @@ public struct EditConfig: Codable, Sendable, Equatable {
     public var background: BackgroundSettings
     /// Absent in files written before subtitles existed (decoded as the default).
     public var subtitles: SubtitleSettings
+    /// The part of the screen recording kept in the output, in normalised source coordinates; nil keeps the whole
+    /// frame. Zooms happen inside it. Absent in files written before cropping existed.
+    public var crop: NormRect?
 
     public init(
         version: Int = EditConfig.currentVersion,
@@ -27,7 +30,8 @@ public struct EditConfig: Codable, Sendable, Equatable {
         blur: [BlurMask] = [],
         audio: AudioSettings = AudioSettings(),
         background: BackgroundSettings = BackgroundSettings(),
-        subtitles: SubtitleSettings = SubtitleSettings()
+        subtitles: SubtitleSettings = SubtitleSettings(),
+        crop: NormRect? = nil
     ) {
         self.version = version
         self.segments = segments
@@ -38,10 +42,11 @@ public struct EditConfig: Codable, Sendable, Equatable {
         self.audio = audio
         self.background = background
         self.subtitles = subtitles
+        self.crop = crop
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, segments, zoom, webcam, cursor, blur, audio, background, subtitles
+        case version, segments, zoom, webcam, cursor, blur, audio, background, subtitles, crop
     }
 
     public init(from decoder: any Decoder) throws {
@@ -55,6 +60,7 @@ public struct EditConfig: Codable, Sendable, Equatable {
         audio = try c.decode(AudioSettings.self, forKey: .audio)
         background = try c.decode(BackgroundSettings.self, forKey: .background)
         subtitles = try c.decodeIfPresent(SubtitleSettings.self, forKey: .subtitles) ?? SubtitleSettings()
+        crop = try c.decodeIfPresent(NormRect.self, forKey: .crop)
     }
 
     /// A fresh config for a recording: one segment covering everything, cursor overlay on if the system cursor
