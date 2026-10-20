@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Builds a Developer ID signed, notarised My Screen Cam.app, wraps it in a signed + notarised DMG, refreshes the
-# Sparkle appcast and (with --publish) uploads both to the public releases repo. Runs entirely on this Mac.
-# See docs/release.md.
+# Sparkle appcast and (with --publish) uploads both as a GitHub Release of the public source repo. Runs entirely on
+# this Mac; see docs/release.md.
 #
 #   scripts/release/release.sh [--publish] [--notes FILE] [--no-notarize] [--no-appcast] [--no-dmg] [--output DIR]
-#   MSC_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and source tag
+#   MSC_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and release tag
 #
 # Environment:
 #   NOTARY_PROFILE        notarytool keychain profile (default: myscreencam-notary)
 #   MSC_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
 #   MSC_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
-#   MSC_RELEASES_REPO     public GitHub repo that hosts DMGs + appcast (default: arkaydeustech/myscreencam-releases)
+#   MSC_RELEASES_REPO     public source repo containing HEAD, tags + assets (default: arkaydeus/myscreencam)
 #   MSC_SPARKLE_ACCOUNT   Keychain account of the Sparkle private key (default: Sparkle's default, "ed25519")
 #   MSC_PREVIOUS_APPCAST  path or URL of the current appcast.xml, merged so older versions stay listed
 #                         (default: the latest release's appcast.xml in MSC_RELEASES_REPO)
@@ -25,7 +25,7 @@ notes=""
 # The macOS app root (apps/macos in the monorepo), not the git top level.
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="$root/build/release"
-releases_repo="${MSC_RELEASES_REPO:-arkaydeustech/myscreencam-releases}"
+releases_repo="${MSC_RELEASES_REPO:-arkaydeus/myscreencam}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,7 +43,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # The script builds from $root; make custom output paths absolute for the cleanup trap and LaunchServices paths.
-out="$(python3 -c 'import os, sys; print(os.path.realpath(os.path.join(sys.argv[1], sys.argv[2])))' "$root" "$out")"
+# The system Python, so a mise python3 shim can't intercept it.
+out="$(/usr/bin/python3 -c 'import os, sys; print(os.path.realpath(os.path.join(sys.argv[1], sys.argv[2])))' "$root" "$out")"
 
 team="QWD87G9T3P"
 identity="Developer ID Application"
@@ -54,12 +55,12 @@ export_dir="$out/export"
 app="$export_dir/My Screen Cam.app"
 stable_dmg="$out/MyScreenCam.dmg"
 
-source_tag_for_version() { printf 'macos/v%s' "$1"; }
+release_tag_for_version() { printf 'v%s' "$1"; }
 
 if [[ $print_config -eq 1 ]]; then
   [[ -n "${MSC_VERSION:-}" ]] || { echo "--print-config needs MSC_VERSION" >&2; exit 2; }
-  printf 'Root: %s\nDerivedData: %s\nArchive: %s\nApp: %s\nDMG asset: %s\nSource tag: %s\n' \
-    "$root" "$derived" "$archive" "$app" "$stable_dmg" "$(source_tag_for_version "$MSC_VERSION")"
+  printf 'Root: %s\nDerivedData: %s\nArchive: %s\nApp: %s\nDMG asset: %s\nRelease tag: %s\n' \
+    "$root" "$derived" "$archive" "$app" "$stable_dmg" "$(release_tag_for_version "$MSC_VERSION")"
   exit 0
 fi
 
@@ -75,6 +76,10 @@ if [[ $publish -eq 1 ]]; then
   gh repo view "$releases_repo" --json visibility --jq .visibility | grep -qx PUBLIC \
     || { echo "$releases_repo must exist and be public (Sparkle downloads from it)" >&2; exit 2; }
   [[ -z "$(git status --porcelain)" ]] || { echo "Commit or stash your changes before publishing" >&2; exit 2; }
+  # The release tag is created on the commit being built, so GitHub must already have that commit.
+  head_sha="$(git rev-parse HEAD)"
+  gh api "repos/$releases_repo/commits/$head_sha" --silent 2>/dev/null \
+    || { echo "Push $head_sha to $releases_repo before publishing; MSC_RELEASES_REPO must contain the source commit (hosting-only repositories are unsupported)" >&2; exit 2; }
 fi
 
 notarize_file() {
@@ -154,7 +159,7 @@ fi
 if [[ $appcast -eq 1 ]]; then
   generate_appcast="$(find "$derived/SourcePackages/artifacts" -path '*/Sparkle/bin/generate_appcast' -type f | head -1)"
   [[ -x "$generate_appcast" ]] || { echo "generate_appcast not found under $derived/SourcePackages/artifacts" >&2; exit 1; }
-  prefix="https://github.com/$releases_repo/releases/download/v$version/"
+  prefix="https://github.com/$releases_repo/releases/download/$(release_tag_for_version "$version")/"
   previous="${MSC_PREVIOUS_APPCAST:-https://github.com/$releases_repo/releases/latest/download/appcast.xml}"
   updates="$out/updates"
   rm -rf "$updates"
@@ -177,9 +182,9 @@ else
 fi
 
 if [[ $publish -eq 1 ]]; then
-  tag="v$version"
-  if gh release view "$tag" --repo "$releases_repo" >/dev/null 2>&1; then
-    echo "$releases_repo already has a $tag release; bump MARKETING_VERSION (or MSC_VERSION) first" >&2
+  tag="$(release_tag_for_version "$version")"
+  if gh api "repos/$releases_repo/git/ref/tags/$tag" --silent 2>/dev/null; then
+    echo "$releases_repo already has a $tag tag; bump MARKETING_VERSION (or MSC_VERSION) first" >&2
     exit 1
   fi
   step "Publishing $tag to $releases_repo"
@@ -187,13 +192,11 @@ if [[ $publish -eq 1 ]]; then
   [[ -n "$notes" ]] && notes_args=(--notes-file "$notes")
   # The site links to this stable asset name; retain the versioned DMG for Sparkle's appcast.
   cp "$dmg" "$stable_dmg"
-  gh release create "$tag" --repo "$releases_repo" --title "My Screen Cam $version" "${notes_args[@]}" \
-    "$dmg" "$stable_dmg" "$out/appcast.xml"
-  # The source repo is a monorepo, so the app's source tag is namespaced.
-  source_tag="$(source_tag_for_version "$version")"
-  git tag -a "$source_tag" -m "My Screen Cam $version (build $build)" 2>/dev/null || echo "Local tag $source_tag already exists"
+  # GitHub creates the tag on the commit that was built.
+  gh release create "$tag" --repo "$releases_repo" --target "$head_sha" --title "My Screen Cam $version" \
+    "${notes_args[@]}" "$dmg" "$stable_dmg" "$out/appcast.xml"
   echo "Published: https://github.com/$releases_repo/releases/tag/$tag"
-  echo "Push the source tag when ready: git push origin $source_tag"
+  echo "Fetch the tag locally with: git fetch origin tag $tag"
 fi
 
 step "Done: My Screen Cam $version ($build)"
