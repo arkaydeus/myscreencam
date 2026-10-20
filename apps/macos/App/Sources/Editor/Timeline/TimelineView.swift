@@ -46,6 +46,13 @@ enum CueDragTime {
     }
 }
 
+enum CueHitTest {
+    /// Selected bars take priority; shared edges and overlaps keep the cue order within each group.
+    static func ordered(_ cues: [SubtitleCue], selected: Set<SubtitleCue.ID>) -> [SubtitleCue] {
+        cues.filter { selected.contains($0.id) } + cues.filter { !selected.contains($0.id) }
+    }
+}
+
 /// A plain click on a selected zoom keeps the group until the gesture's outcome is known.
 enum KeyframeClick {
     @MainActor
@@ -717,7 +724,7 @@ final class TimelineNSView: NSView {
         guard let model, let data else { return nil }
         let cx = vx - TimelineMetrics.gutter
         let selected = model.selectedCueIDs
-        let ordered = data.cues.sorted { a, _ in selected.contains(a.id) }
+        let ordered = CueHitTest.ordered(data.cues, selected: selected)
         for cue in ordered {
             let e0 = model.timeline.editedTimeSnapping(forSource: cue.start)
             let e1 = model.timeline.editedTimeSnapping(forSource: cue.end)

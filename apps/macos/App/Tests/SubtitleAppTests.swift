@@ -93,6 +93,16 @@ struct SubtitleAppTests {
         #expect(CueDragTime.sourceTime(editedStart: editedStart, editedDelta: -0.5, timeline: timeline) == 1)
     }
 
+    @Test func cueHitTestOrderIsAStableSelectedFirstPartition() {
+        let cues = (0..<5).map { SubtitleCue(start: Double($0), end: Double($0 + 1), text: "\($0)") }
+        let ids = cues.map(\.id)
+        #expect(
+            CueHitTest.ordered(cues, selected: [ids[1], ids[3]]).map(\.id) == [ids[1], ids[3], ids[0], ids[2], ids[4]])
+        #expect(CueHitTest.ordered(cues, selected: Set(ids)).map(\.id) == ids)
+        #expect(CueHitTest.ordered(cues, selected: []).map(\.id) == ids)
+        #expect(CueHitTest.ordered([], selected: Set(ids)).isEmpty)
+    }
+
     @Test func timeFieldParsing() {
         #expect(TimeFormat.parse("1:02.50") == 62.5)
         #expect(TimeFormat.parse("1:00:01") == 3601)

@@ -339,6 +339,18 @@ private struct CuePositionNotes: View {
 
 // MARK: - Cue rows
 
+/// Modifier taps change selection; a plain tap focuses a cue unless its editor is already open.
+enum CueRowClick {
+    static func handle(_ id: SubtitleCue.ID, flags: NSEvent.ModifierFlags, isEditing: Bool, model: EditorModel) {
+        let modifier = SelectionModifier(flags)
+        if modifier != .replace {
+            model.selectCue(id, modifier)
+        } else if !isEditing {
+            model.focusCue(id)
+        }
+    }
+}
+
 private struct CueRow: View {
     let model: EditorModel
     let cue: SubtitleCue
@@ -391,12 +403,7 @@ private struct CueRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            let modifier = SelectionModifier(NSEvent.modifierFlags)
-            if modifier != .replace {
-                model.selectCue(cue.id, modifier)
-            } else if !isEditing {
-                model.focusCue(cue.id)
-            }
+            CueRowClick.handle(cue.id, flags: NSEvent.modifierFlags, isEditing: isEditing, model: model)
         }
         .accessibilityElement(children: isEditing ? .contain : .combine)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [.isButton])
