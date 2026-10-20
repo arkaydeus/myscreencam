@@ -7,6 +7,8 @@
 #   mise run web                   # the site's dev server
 #   mise run start                 # both of the above
 #   mise run check                 # every project's local gate
+#   mise run release:version -- v1.2.3  # set, commit and push the Mac app version
+#   mise run release:publish       # build, notarise and publish that version as a GitHub Release
 # build, test, lint, format and clean at the root run that task in both projects.
 # Inside a project directory, `mise run <task>` resolves to that project's tasks.
 monorepo_root = true
@@ -67,3 +69,11 @@ depends = ["//apps/macos:clean", "//apps/web:clean"]
 description = "Local gate before pushing (there is no GitHub CI): every project's check"
 depends = ["//apps/macos:check", "//apps/web:check"]
 run = "echo 'All projects passed.'"
+
+[tasks."release:version"]
+description = "Set the Mac app version, commit and push it: `mise run release:version -- v1.2.3` (same as //apps/macos:release:version)"
+run = "mise run //apps/macos:release:version"
+
+[tasks."release:publish"]
+description = "Build, notarise and publish the Mac app locally as a GitHub Release (same as //apps/macos:release:publish)"
+run = "mise run //apps/macos:release:publish"
