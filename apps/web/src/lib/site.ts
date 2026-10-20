@@ -10,5 +10,7 @@ export const site = {
   /** Stable DMG asset uploaded by apps/macos/scripts/release/release.sh. */
   downloadUrl: "https://github.com/arkaydeus/myscreencam/releases/latest/download/MyScreenCam.dmg",
   releasesUrl: "https://github.com/arkaydeus/myscreencam/releases/latest",
+  /** Source repository link; this does not imply an open-source license grant. */
+  sourceUrl: "https://github.com/arkaydeus/myscreencam",
   requirements: "macOS 15 Sequoia or later, Apple silicon",
 } as const;
