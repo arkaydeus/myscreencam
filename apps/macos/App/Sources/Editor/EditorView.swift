@@ -129,6 +129,8 @@ struct EditorWindowHooks: NSViewRepresentable {
             case 53:  // Esc
                 if model.isPickingZoomTarget {
                     model.isPickingZoomTarget = false
+                } else if model.isEditingCrop {
+                    model.isEditingCrop = false
                 } else {
                     model.selection = nil
                 }

@@ -27,27 +27,57 @@ public struct CanvasLayout: Sendable, Equatable {
     public let canvasSize: CGSize
     /// Where the (zoomed) screen content is drawn. Equal to the whole canvas when the background is off.
     public let contentRect: CGRect
+    /// The part of the source shown at 1× zoom (the edit's crop), in source pixels (y down). The whole frame when
+    /// there's no crop.
+    public let sourceCrop: CGRect
 
-    public init(sourceSize: CGSize, canvasSize: CGSize, contentRect: CGRect) {
+    /// `sourceCrop` nil means the whole source.
+    public init(sourceSize: CGSize, canvasSize: CGSize, contentRect: CGRect, sourceCrop: CGRect? = nil) {
         self.sourceSize = sourceSize
         self.canvasSize = canvasSize
         self.contentRect = contentRect
+        self.sourceCrop = sourceCrop ?? CGRect(origin: .zero, size: sourceSize)
     }
 
     /// Canvas pixels per source pixel at 1× zoom.
-    public var contentScale: Double { contentRect.width / max(sourceSize.width, 1) }
+    public var contentScale: Double { contentRect.width / max(sourceCrop.width, 1) }
+
+    /// `sourceCrop` in normalised source coordinates (the space zooms are evaluated in).
+    public var normalizedCrop: NormRect {
+        let w = max(sourceSize.width, 1)
+        let h = max(sourceSize.height, 1)
+        return NormRect(
+            x: sourceCrop.minX / w, y: sourceCrop.minY / h, w: sourceCrop.width / w, h: sourceCrop.height / h)
+    }
+
+    /// The crop in source pixels (y down), snapped to whole pixels and kept inside the frame; the whole frame for nil.
+    public static func sourceCrop(_ crop: NormRect?, sourceSize: CGSize) -> CGRect {
+        let full = CGRect(origin: .zero, size: sourceSize)
+        guard let crop else { return full }
+        let r = crop.denormalized(in: sourceSize)
+        let x0 = r.minX.rounded()
+        let y0 = r.minY.rounded()
+        let snapped = CGRect(
+            x: x0, y: y0, width: max(r.maxX.rounded() - x0, 1), height: max(r.maxY.rounded() - y0, 1)
+        ).intersection(full)
+        return snapped.isNull || snapped.width < 1 || snapped.height < 1 ? full : snapped
+    }
 
     /// A resolution-independent unit for output-space effects (shadows): 1 at a 1080-pixel shorter side.
     public var outputUnit: Double { min(canvasSize.width, canvasSize.height) / 1080 }
 
-    /// Lays out a `sourceSize` recording.
+    /// Lays out a `sourceSize` recording, of which `crop` (normalised; nil = all of it) is shown. Below, "the
+    /// source" means the cropped part.
     ///
     /// - Background off: the canvas is the source scaled by the sizing.
     /// - Background on: the canvas takes the requested aspect ratio around the source (keeping the source's
     ///   pixel density), then `padding × shorter side` is inset and the source is aspect-fitted and centred.
-    public static func make(sourceSize: CGSize, background: BackgroundSettings, sizing: RenderSizing) -> CanvasLayout {
-        let sw = max(sourceSize.width, 1)
-        let sh = max(sourceSize.height, 1)
+    public static func make(
+        sourceSize: CGSize, crop: NormRect? = nil, background: BackgroundSettings, sizing: RenderSizing
+    ) -> CanvasLayout {
+        let shown = sourceCrop(crop, sourceSize: sourceSize)
+        let sw = max(shown.width, 1)
+        let sh = max(shown.height, 1)
         var natural = CGSize(width: sw, height: sh)
         if background.enabled, let ratio = background.aspect.ratio {
             if ratio >= sw / sh {
@@ -69,7 +99,8 @@ public struct CanvasLayout: Sendable, Equatable {
 
         guard background.enabled else {
             return CanvasLayout(
-                sourceSize: sourceSize, canvasSize: canvas, contentRect: CGRect(origin: .zero, size: canvas))
+                sourceSize: sourceSize, canvasSize: canvas, contentRect: CGRect(origin: .zero, size: canvas),
+                sourceCrop: shown)
         }
         let padding = min(max(background.padding, 0), 0.45) * min(canvas.width, canvas.height)
         let inner = CGRect(origin: .zero, size: canvas).insetBy(dx: padding, dy: padding)
@@ -78,7 +109,7 @@ public struct CanvasLayout: Sendable, Equatable {
         let h = (sh * fit).rounded()
         let content = CGRect(
             x: ((canvas.width - w) / 2).rounded(), y: ((canvas.height - h) / 2).rounded(), width: w, height: h)
-        return CanvasLayout(sourceSize: sourceSize, canvasSize: canvas, contentRect: content)
+        return CanvasLayout(sourceSize: sourceSize, canvasSize: canvas, contentRect: content, sourceCrop: shown)
     }
 
     /// Content corner radius in canvas pixels for `background.cornerRadius` (a fraction of the shorter side).

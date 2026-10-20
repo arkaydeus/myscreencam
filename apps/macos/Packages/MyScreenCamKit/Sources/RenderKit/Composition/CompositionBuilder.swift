@@ -183,7 +183,7 @@ public enum CompositionBuilder {
         assembled: Assembled, edit: EditConfig, options: RenderOptions, resources: ProjectResources
     ) -> RenderSnapshot {
         let layout = CanvasLayout.make(
-            sourceSize: assembled.sourceSize, background: edit.background, sizing: options.sizing)
+            sourceSize: assembled.sourceSize, crop: edit.crop, background: edit.background, sizing: options.sizing)
         return RenderSnapshot(
             edit: edit, timeline: assembled.timeline, layout: layout, trackIDs: assembled.trackIDs,
             resources: resources)

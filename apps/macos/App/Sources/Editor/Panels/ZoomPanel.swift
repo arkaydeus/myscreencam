@@ -1,5 +1,6 @@
 import AppKit
 import ProjectKit
+import RenderKit
 import SwiftUI
 
 struct ZoomPanel: View {
@@ -7,6 +8,8 @@ struct ZoomPanel: View {
 
     var body: some View {
         Form {
+            CropSection(model: model)
+
             Section {
                 Toggle("Zoom", isOn: model.binding(\.zoom.enabled, "Toggle Zoom"))
             }
@@ -53,6 +56,42 @@ struct ZoomPanel: View {
 
             if let keyframe = model.selectedKeyframe {
                 SelectedKeyframeSection(model: model, keyframe: keyframe, selected: model.selectedKeyframes)
+            }
+        }
+    }
+}
+
+/// The crop tool: choose the part of the screen recording kept in the output.
+private struct CropSection: View {
+    let model: EditorModel
+
+    /// The kept area in recording pixels.
+    private var size: String {
+        guard model.edit.crop != nil else { return "Full frame" }
+        let rect = CanvasLayout.sourceCrop(model.edit.crop, sourceSize: model.renderer.layout.sourceSize)
+        return "\(Int(rect.width)) × \(Int(rect.height))"
+    }
+
+    var body: some View {
+        Section("Crop") {
+            HStack {
+                Button {
+                    model.toggleCropEditing()
+                } label: {
+                    Label(model.isEditingCrop ? "Done" : "Crop on Preview", systemImage: "crop")
+                }
+                Spacer()
+                Text(size)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            if model.isEditingCrop {
+                Text("Drag on the preview to choose the area to keep, or drag the red box and its handles.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if model.edit.crop != nil {
+                Button("Reset to Full Frame") { model.setCrop(nil, "Reset Crop") }
             }
         }
     }

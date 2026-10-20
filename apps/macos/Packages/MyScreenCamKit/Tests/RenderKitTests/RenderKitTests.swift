@@ -94,6 +94,17 @@ struct ZoomTests {
             ZoomEvaluator(settings: ZoomSettings(enabled: false, keyframes: [keyframe])).state(at: 1.5) == .identity)
     }
 
+    @Test func targetsAreRelativeToTheCrop() {
+        // Target 0.2, 0.8 in the source is 0.2, 0.6 of the crop's right half (x 0…1 → 0.5…1 is off to the left).
+        let crop = NormRect(x: 0.5, y: 0.5, w: 0.5, h: 0.5)
+        let evaluator = ZoomEvaluator(settings: ZoomSettings(keyframes: [keyframe]), crop: crop)
+        let outside = evaluator.state(at: 1.5).pivot
+        #expect(outside.x == 0 && abs(outside.y - 0.6) < 1e-12)
+        let inside = ZoomKeyframe(time: 1, scale: 2, target: NormPoint(x: 0.75, y: 0.625), hold: 1)
+        let pivot = ZoomEvaluator(settings: ZoomSettings(keyframes: [inside]), crop: crop).state(at: 1.5).pivot
+        #expect(pivot == NormPoint(x: 0.5, y: 0.25))
+    }
+
     @Test func pivotCenteredOnClamps() {
         #expect(ZoomState.pivot(centeredOn: .center, scale: 2) == NormPoint(x: 0.5, y: 0.5))
         #expect(ZoomState.pivot(centeredOn: NormPoint(x: 0, y: 1), scale: 2) == NormPoint(x: 0, y: 1))
@@ -263,6 +274,23 @@ struct LayoutTests {
         #expect(layout.contentRect == CGRect(x: 449, y: 60, width: 880, height: 880))
     }
 
+    @Test func cropSizesTheCanvas() {
+        let crop = NormRect(x: 0.25, y: 0.1, w: 0.5, h: 0.5)
+        let layout = CanvasLayout.make(
+            sourceSize: CGSize(width: 1920, height: 1080), crop: crop, background: BackgroundSettings(),
+            sizing: .scale(1))
+        #expect(layout.sourceCrop == CGRect(x: 480, y: 108, width: 960, height: 540))
+        #expect(layout.canvasSize == CGSize(width: 960, height: 540))
+        #expect(layout.contentScale == 1)
+        #expect(layout.normalizedCrop == crop)
+        let framed = CanvasLayout.make(
+            sourceSize: CGSize(width: 1920, height: 1080), crop: NormRect(x: 0, y: 0, w: 0.25, h: 1),
+            background: BackgroundSettings(enabled: true, aspect: .square, padding: 0), sizing: .scale(1))
+        // A 480×1080 crop on a square canvas: fitted to the full height, centred.
+        #expect(framed.canvasSize == CGSize(width: 1080, height: 1080))
+        #expect(framed.contentRect == CGRect(x: 300, y: 0, width: 480, height: 1080))
+    }
+
     @Test func fitSizing() {
         let layout = CanvasLayout.make(
             sourceSize: CGSize(width: 1920, height: 1080), background: BackgroundSettings(),
@@ -325,6 +353,20 @@ struct PreviewGeometryTests {
         #expect(abs(canvasRect.width - 768) < 1e-9 && abs(canvasRect.height - 216) < 1e-9)
         let back = geometry.sourceRect(fromCanvas: canvasRect, zoom: zoom)
         #expect(abs(back.x - 0.1) < 1e-12 && abs(back.w - 0.2) < 1e-12 && abs(back.h - 0.1) < 1e-12)
+    }
+
+    @Test func sourceMappingThroughCropAndZoom() {
+        let cropped = PreviewGeometry(
+            layout: CanvasLayout.make(
+                sourceSize: CGSize(width: 1920, height: 1080), crop: NormRect(x: 0.5, y: 0.5, w: 0.5, h: 0.5),
+                background: BackgroundSettings(), sizing: .scale(1)))
+        #expect(cropped.sourcePoint(fromCanvas: .zero) == NormPoint(x: 0.5, y: 0.5))
+        #expect(cropped.sourcePoint(fromCanvas: CGPoint(x: 960, y: 540)) == NormPoint(x: 1, y: 1))
+        let zoom = ZoomState(scale: 2, pivot: NormPoint(x: 0, y: 0))
+        let p = cropped.sourcePoint(fromCanvas: CGPoint(x: 960, y: 540), zoom: zoom)
+        #expect(p == NormPoint(x: 0.75, y: 0.75))
+        let back = cropped.canvasPoint(fromSource: p, zoom: zoom)
+        #expect(abs(back.x - 960) < 1e-9 && abs(back.y - 540) < 1e-9)
     }
 
     @Test func withPaddingOffContentIsOutsideZeroToOne() {

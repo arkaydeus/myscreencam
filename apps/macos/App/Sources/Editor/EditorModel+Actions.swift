@@ -151,6 +151,19 @@ extension EditorModel {
         isPickingZoomTarget = false
     }
 
+    // MARK: Crop
+
+    /// Turns the crop tool on or off (pausing, so the frame being cropped stays put).
+    func toggleCropEditing() {
+        if !isEditingCrop { pause() }
+        isEditingCrop.toggle()
+    }
+
+    /// Sets the crop (normalised source coordinates; nil = the whole frame).
+    func setCrop(_ crop: NormRect?, _ action: String = "Crop") {
+        update(action) { $0.crop = crop }
+    }
+
     // MARK: Blur masks
 
     var selectedBlur: BlurMask? {

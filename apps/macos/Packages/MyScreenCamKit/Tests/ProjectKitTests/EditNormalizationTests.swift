@@ -120,6 +120,28 @@ struct EditNormalizationTests {
         #expect(EditConfig(segments: []).normalized(duration: .nan).segments.count == 1)
     }
 
+    @Test func cropIsKeptInsideTheFrame() {
+        var config = EditConfig(segments: [Segment(start: 0, end: 10)])
+        config.crop = NormRect(x: 0.9, y: -0.2, w: 0.5, h: 0.01)
+        let crop = config.normalized(duration: 10).crop
+        #expect(crop == NormRect(x: 0.5, y: 0, w: 0.5, h: EditLimits.cropMinimumSize))
+        config.crop = NormRect(x: 0, y: 0, w: 1.2, h: 1)
+        #expect(config.normalized(duration: 10).crop == nil)  // the whole frame
+        config.crop = NormRect(x: .nan, y: 0, w: 0.5, h: 0.5)
+        #expect(config.normalized(duration: 10).crop == nil)
+        config.crop = NormRect(x: 0.1, y: 0.2, w: 0.5, h: 0.6)
+        #expect(config.normalized(duration: 10).crop == config.crop)
+    }
+
+    @Test func editWrittenBeforeCroppingDecodesUncropped() throws {
+        var config = EditConfig.initial(for: Fixtures.meta(duration: 10))
+        let data = try JSONEncoder().encode(config)
+        #expect(!String(decoding: data, as: UTF8.self).contains(#""crop""#))
+        #expect(try JSONDecoder().decode(EditConfig.self, from: data).crop == nil)
+        config.crop = NormRect(x: 0.1, y: 0.2, w: 0.3, h: 0.4)
+        #expect(try JSONDecoder().decode(EditConfig.self, from: JSONEncoder().encode(config)) == config)
+    }
+
     @Test func validConfigIsUnchanged() {
         var config = EditConfig.initial(for: Fixtures.meta(duration: 10))
         config.zoom.keyframes = [ZoomKeyframe(time: 1), ZoomKeyframe(time: 5, scale: 2)]

@@ -178,7 +178,7 @@ public final class ProjectRenderer {
     /// Source (session) seconds for an edited-timeline time.
     public func sourceTime(forEdited t: Double) -> Double { built.timeline.sourceTime(forEdited: t) }
 
-    /// The zoom applied at a source time (for mapping preview clicks through the zoom).
+    /// The zoom applied at a source time, relative to the layout's crop (for mapping preview clicks through it).
     public func zoomState(atSource t: Double) -> ZoomState { built.snapshot.zoom.state(at: t) }
 
     /// The displayed cursor position at a source time (normalised), if the cursor overlay is on.

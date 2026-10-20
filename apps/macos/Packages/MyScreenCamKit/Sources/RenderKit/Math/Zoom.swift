@@ -67,15 +67,26 @@ public enum ZoomPhase: Sendable, Equatable {
 /// Only enabled keyframes render, and only when zoom is enabled. Where keyframes overlap, the one that starts
 /// earliest wins. Timing: `inEnd = t + in`, `holdEnd = inEnd + hold`, `end = holdEnd + out`; instant keyframes
 /// have `in = out = 0`. Scale is `lerp(1, s, easeInOutCubic(p))`.
+///
+/// Zooms happen inside `crop`: targets and the follow camera (normalised source points) are mapped into the crop, so
+/// the states are relative to it.
 public struct ZoomEvaluator: Sendable {
     public let keyframes: [ZoomKeyframe]
     public let follow: FollowCameraTrack?
+    /// The part of the source the zoom works in (normalised).
+    public let crop: NormRect
 
-    public init(settings: ZoomSettings, follow: FollowCameraTrack? = nil) {
+    public init(settings: ZoomSettings, crop: NormRect = .full, follow: FollowCameraTrack? = nil) {
         keyframes =
             settings.enabled
             ? settings.keyframes.filter { $0.enabled && $0.end > $0.time }.sorted { $0.time < $1.time } : []
         self.follow = follow
+        self.crop = crop
+    }
+
+    /// A normalised source point in the crop's normalised coordinates.
+    private func cropPoint(_ p: NormPoint) -> NormPoint {
+        NormPoint(x: (p.x - crop.x) / max(crop.w, 1e-9), y: (p.y - crop.y) / max(crop.h, 1e-9))
     }
 
     /// Whether any keyframe uses follow-mouse (so a `FollowCameraTrack` is needed).
@@ -115,15 +126,15 @@ public struct ZoomEvaluator: Sendable {
         }
     }
 
-    /// The zoom at source time `t`.
+    /// The zoom at source time `t`, relative to `crop`.
     public func state(at t: Double) -> ZoomState {
         guard let keyframe = activeKeyframe(at: t) else { return .identity }
         let scale = Self.scale(of: keyframe, at: t)
         switch keyframe.mode {
         case .manual, .click:
-            return ZoomState(scale: scale, pivot: keyframe.target.clamped)
+            return ZoomState(scale: scale, pivot: cropPoint(keyframe.target).clamped)
         case .followMouse:
-            let center = follow?.center(at: t) ?? keyframe.target
+            let center = cropPoint(follow?.center(at: t) ?? keyframe.target)
             return ZoomState(scale: scale, pivot: ZoomState.pivot(centeredOn: center, scale: scale))
         }
     }

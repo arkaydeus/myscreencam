@@ -109,7 +109,7 @@ final class RenderSnapshot: Sendable {
         let follow =
             ZoomEvaluator.needsFollowTrack(edit.zoom) && !resources.events.isEmpty
             ? resources.followTrack(smoothing: edit.cursor.smoothing) : nil
-        zoom = ZoomEvaluator(settings: edit.zoom, follow: follow)
+        zoom = ZoomEvaluator(settings: edit.zoom, crop: layout.normalizedCrop, follow: follow)
         backgroundRenderer = BackgroundRenderer(layout: layout, settings: edit.background, resources: resources)
         contentMask = backgroundRenderer.contentMask()
     }

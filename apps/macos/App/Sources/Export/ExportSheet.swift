@@ -327,7 +327,8 @@ struct ExportSheet: View {
 
     private var sizing: ExportSizing? {
         guard let info else { return nil }
-        return ExportSizing.plan(sourceSize: info.sourceSize, background: edit.background, settings: effectiveSettings)
+        return ExportSizing.plan(
+            sourceSize: info.sourceSize, crop: edit.crop, background: edit.background, settings: effectiveSettings)
     }
 
     private var editedDuration: Double { EditTimeline(segments: edit.segments).duration }
