@@ -383,7 +383,7 @@ final class EditorModel {
 
     /// What the preview renders: the edit, or while the crop tool is on, the whole recording unzoomed and without the
     /// webcam or subtitles, so the crop can be drawn over all of it.
-    private var previewEdit: EditConfig {
+    var previewEdit: EditConfig {
         guard isEditingCrop else { return edit }
         var preview = edit
         preview.crop = nil

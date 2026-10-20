@@ -185,6 +185,7 @@ final class PreviewNSView: NSView {
         maskOutline.fillColor = AppTheme.accent.withAlphaComponent(0.12).cgColor
         maskOutline.strokeColor = AppTheme.accent.cgColor
         maskOutline.lineWidth = 1.5
+        targetMarker.name = "zoomTarget"
         targetMarker.fillColor = nil
         targetMarker.strokeColor = NSColor.systemYellow.cgColor
         targetMarker.lineWidth = 2
@@ -429,7 +430,10 @@ final class PreviewNSView: NSView {
         }
 
         if paused, let keyframe = state.selectedKeyframe {
-            let canvas = geometry.canvasPoint(fromSource: keyframe.target, zoom: zoom)
+            let crop = geometry.layout.normalizedCrop
+            let pivot = ZoomEvaluator.targetInCrop(keyframe.target, crop: crop)
+            let target = ZoomEvaluator.targetInSource(pivot, crop: crop)
+            let canvas = geometry.canvasPoint(fromSource: target, zoom: zoom)
             let p = geometry.viewPoint(fromCanvas: canvas, viewSize: bounds.size)
             let path = CGMutablePath()
             path.addEllipse(in: CGRect(x: p.x - 9, y: p.y - 9, width: 18, height: 18))
@@ -542,7 +546,11 @@ final class PreviewNSView: NSView {
             case .top, .bottom: return .resizeUpDown
             case .some: return .crosshair
             case nil:
-                if let geometry, cropViewRect(geometry)?.contains(p) == true { return .openHand }
+                if state?.crop != nil, state?.crop != .full,
+                    let geometry, cropViewRect(geometry)?.contains(p) == true
+                {
+                    return .openHand
+                }
                 return .crosshair
             }
         }
@@ -574,7 +582,7 @@ final class PreviewNSView: NSView {
             model.beginContinuousChange()
             if let handle = hitCropHandle(p) {
                 drag = .cropResize(handle, start: crop)
-            } else if cropViewRect(geometry)?.contains(p) == true {
+            } else if state.crop != nil, crop != .full, cropViewRect(geometry)?.contains(p) == true {
                 drag = .cropMove(start: crop, from: sourcePoint(p, geometry, zoom: .identity))
                 NSCursor.closedHand.set()
             } else {
@@ -683,8 +691,8 @@ final class PreviewNSView: NSView {
             model.updateBlur(id, "Resize Blur") { $0.rect = rect }
         case .cropMove(let start, let from):
             let s = sourcePoint(p, geometry, zoom: .identity)
-            let x = min(max(start.x + s.x - from.x, 0), max(0, 1 - start.w))
-            let y = min(max(start.y + s.y - from.y, 0), max(0, 1 - start.h))
+            let x = min(max(start.x + (s.x - from.x), 0), max(0, 1 - start.w))
+            let y = min(max(start.y + (s.y - from.y), 0), max(0, 1 - start.h))
             model.setCrop(NormRect(x: x, y: y, w: start.w, h: start.h), "Move Crop")
         case .cropResize(let handle, let start):
             let s = sourcePoint(p, geometry, zoom: .identity).clamped

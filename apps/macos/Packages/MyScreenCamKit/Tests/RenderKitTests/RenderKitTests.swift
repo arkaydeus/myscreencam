@@ -130,6 +130,58 @@ struct ZoomTests {
         #expect(state.pivot.x > 0.99 && state.pivot.y < 0.01)
     }
 
+    @Test(arguments: [
+        NormRect(x: 0.4, y: 0.4, w: 0.2, h: 0.2),
+        NormRect(x: 0.4, y: 0.3, w: 0.2, h: 0.4),
+        NormRect(x: 0.3, y: 0.4, w: 0.4, h: 0.2),
+    ])
+    func croppedFollowKeepsSmallSourceMovementsVisible(crop: NormRect) async throws {
+        let events = [
+            InputEvent(t: 0, kind: .move, x: 0.5, y: 0.5),
+            InputEvent(t: 0.5, kind: .move, x: 0.5, y: 0.5),
+            InputEvent(t: 0.6, kind: .move, x: 0.59, y: 0.59),
+            InputEvent(t: 6, kind: .move, x: 0.59, y: 0.59),
+        ]
+        let keyframe = ZoomKeyframe(time: 0, scale: 2, mode: .followMouse, hold: 10, instant: true)
+        var edit = try await TestMedia.plainEdit()
+        edit.zoom.keyframes = [keyframe]
+        let project = try await TestMedia.project(edit: edit, events: events)
+        let resources = ProjectResources(project: project)
+        func snapshot(_ crop: NormRect?) -> RenderSnapshot {
+            var edit = edit
+            edit.crop = crop
+            let layout = CanvasLayout.make(
+                sourceSize: CGSize(width: 640, height: 360), crop: crop, background: edit.background, sizing: .scale(1))
+            return RenderSnapshot(
+                edit: edit, timeline: EditTimeline(segments: edit.segments), layout: layout,
+                trackIDs: CompositionTrackIDs(screen: 1), resources: resources)
+        }
+        // Populate the shared cache with a full-frame track before changing crop dimensions.
+        let full = snapshot(nil)
+        let fullCenter = try #require(full.zoom.follow?.center(at: 5))
+        #expect(abs(fullCenter.x - 0.5) < 1e-6 && abs(fullCenter.y - 0.5) < 1e-6)
+        let cropped = snapshot(crop)
+        let geometry = PreviewGeometry(layout: cropped.layout)
+        let state = cropped.zoom.state(at: 5)
+        let cursor = geometry.canvasPoint(fromSource: NormPoint(x: 0.59, y: 0.59), zoom: state)
+        #expect(cropped.layout.contentRect.contains(cursor))
+        let visible = state.cropRect(in: CGSize(width: 1, height: 1))
+        let source = cropped.layout.normalizedCrop
+        #expect(source.x + visible.minX * source.w >= source.x - 1e-9)
+        #expect(source.y + visible.minY * source.h >= source.y - 1e-9)
+        #expect(source.x + visible.maxX * source.w <= source.x + source.w + 1e-9)
+        #expect(source.y + visible.maxY * source.h <= source.y + source.h + 1e-9)
+        let center = try #require(cropped.zoom.follow?.center(at: 5))
+        #expect(abs(center.x - (0.59 - 0.1 * source.w)) < 1e-3)
+        #expect(abs(center.y - (0.59 - 0.1 * source.h)) < 1e-3)
+        // A second shape in the same cache must use its own horizontal and vertical dead zones.
+        let swapped = NormRect(x: crop.y, y: crop.x, w: crop.h, h: crop.w)
+        let other = snapshot(swapped)
+        let otherCenter = try #require(other.zoom.follow?.center(at: 5))
+        #expect(abs(otherCenter.x - (0.59 - 0.1 * swapped.w)) < 1e-3)
+        #expect(abs(otherCenter.y - (0.59 - 0.1 * swapped.h)) < 1e-3)
+    }
+
     @Test func followCameraIgnoresJitterInsideDeadZone() {
         var events: [InputEvent] = []
         for i in 0..<200 {

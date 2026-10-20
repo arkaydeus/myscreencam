@@ -10,9 +10,12 @@ import UniformTypeIdentifiers
 
 /// Preview and export share one renderer: a preview-sized frame must equal the export frame scaled down.
 struct PreviewMatchesExportTests {
-    @Test(arguments: [nil, WebcamBackground.Effect.blur, .remove])
-    func previewEqualsDownscaledExport(webcamEffect: WebcamBackground.Effect?) async throws {
+    @Test(
+        arguments: [nil, WebcamBackground.Effect.blur, .remove],
+        [nil, NormRect(x: 0.5, y: 0, w: 0.5, h: 1)])
+    func previewEqualsDownscaledExport(webcamEffect: WebcamBackground.Effect?, crop: NormRect?) async throws {
         var edit = try await TestMedia.plainEdit()
+        edit.crop = crop
         if let webcamEffect {
             edit.webcam.enabled = true
             edit.webcam.background = WebcamBackground(effect: webcamEffect)
@@ -155,6 +158,33 @@ struct FrameRendererTests {
         let zoomed = try await render(edit, webcam: nil, screen: screen)
         #expect(close(zoomed.pixel(10, 10), (255, 255, 255)))
         #expect(close(zoomed.pixel(310, 350), (255, 255, 255)))
+    }
+
+    @Test(arguments: [OutputAspect.square, .landscape16x9, .portrait9x16])
+    func croppedContentFitsBackgroundWithPadding(aspect: OutputAspect) async throws {
+        let red = CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(
+            to: CGRect(x: 0, y: 0, width: 640, height: 360))
+        let green = CIImage(color: CIColor(red: 0, green: 1, blue: 0)).cropped(
+            to: CGRect(x: 320, y: 0, width: 320, height: 360))
+        var edit = try await TestMedia.plainEdit()
+        edit.crop = NormRect(x: 0.5, y: 0, w: 0.5, h: 1)
+        edit.background = BackgroundSettings(
+            enabled: true, aspect: aspect, padding: 0.1, cornerRadius: 0, shadow: 0,
+            fill: .solid(RGBAColor(r: 0, g: 0, b: 1)))
+        let layout = CanvasLayout.make(
+            sourceSize: CGSize(width: 640, height: 360), crop: edit.crop, background: edit.background, sizing: .scale(1)
+        )
+        let image = try await render(edit, webcam: nil, screen: green.composited(over: red))
+        #expect(image.width == Int(layout.canvasSize.width) && image.height == Int(layout.canvasSize.height))
+        #expect(
+            layout.contentRect.width < layout.canvasSize.width && layout.contentRect.height < layout.canvasSize.height)
+        #expect(abs(layout.contentRect.width / layout.contentRect.height - 320.0 / 360) < 0.01)
+        #expect(close(image.pixel(2, 2), (0, 0, 255)))
+        for x in [layout.contentRect.minX + 3, layout.contentRect.midX, layout.contentRect.maxX - 3] {
+            for y in [layout.contentRect.minY + 3, layout.contentRect.midY, layout.contentRect.maxY - 3] {
+                #expect(close(image.pixel(Int(x), Int(y)), (0, 255, 0)))
+            }
+        }
     }
 
     @Test func framedGradientAndRasterizedImageFillStayAtTheOverlayOrigin() async throws {

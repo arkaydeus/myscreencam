@@ -24,7 +24,7 @@ public struct CompositionTrackIDs: Sendable, Equatable {
     public var videoTrackIDs: [CMPersistentTrackID] { [screen] + (webcam.map { [$0] } ?? []) }
 }
 
-/// Derived data that depends only on the recording and the cursor smoothing, reused across snapshots.
+/// Recording resources and derived tracks, reused across snapshots with matching smoothing and crop dimensions.
 final class ProjectResources: Sendable {
     let package: RecordingPackage
     let meta: RecordingMeta
@@ -35,7 +35,12 @@ final class ProjectResources: Sendable {
     /// Webcam person masks, shared across snapshots so editing doesn't re-run segmentation on a paused frame.
     let personMasks = PersonMaskCache()
     private let tracks = LockedDictionary<CursorSmoothing, CursorTrack>()
-    private let followTracks = LockedDictionary<CursorSmoothing, FollowCameraTrack>()
+    private struct FollowKey: Hashable, Sendable {
+        let smoothing: CursorSmoothing
+        let width: Double
+        let height: Double
+    }
+    private let followTracks = LockedDictionary<FollowKey, FollowCameraTrack>()
     private let fills = LockedDictionary<String, CIImage>()
 
     init(project: RenderProject) {
@@ -53,11 +58,12 @@ final class ProjectResources: Sendable {
     }
 
     /// The follow-mouse camera tracks the smoothed cursor (at least `.medium` smoothing so it's calm).
-    func followTrack(smoothing: CursorSmoothing) -> FollowCameraTrack {
+    func followTrack(smoothing: CursorSmoothing, crop: NormRect) -> FollowCameraTrack {
         let s: CursorSmoothing = smoothing == .none || smoothing == .rapid ? .medium : smoothing
-        if let track = followTracks[s] { return track }
-        let track = FollowCameraTrack(cursor: cursorTrack(smoothing: s))
-        followTracks[s] = track
+        let key = FollowKey(smoothing: s, width: crop.w, height: crop.h)
+        if let track = followTracks[key] { return track }
+        let track = FollowCameraTrack(cursor: cursorTrack(smoothing: s), crop: crop)
+        followTracks[key] = track
         return track
     }
 
@@ -108,7 +114,7 @@ final class RenderSnapshot: Sendable {
         cursorTrack = track
         let follow =
             ZoomEvaluator.needsFollowTrack(edit.zoom) && !resources.events.isEmpty
-            ? resources.followTrack(smoothing: edit.cursor.smoothing) : nil
+            ? resources.followTrack(smoothing: edit.cursor.smoothing, crop: layout.normalizedCrop) : nil
         zoom = ZoomEvaluator(settings: edit.zoom, crop: layout.normalizedCrop, follow: follow)
         backgroundRenderer = BackgroundRenderer(layout: layout, settings: edit.background, resources: resources)
         contentMask = backgroundRenderer.contentMask()

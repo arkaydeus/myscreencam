@@ -1,6 +1,7 @@
 import Foundation
 import ProjectKit
 import RenderKit
+import SwiftUI
 
 /// Editing commands used by the transport, keyboard, timeline, preview and inspector.
 extension EditorModel {
@@ -144,11 +145,40 @@ extension EditorModel {
     func setZoomTarget(_ point: NormPoint) {
         let ids = selectedKeyframeIDs
         guard !ids.isEmpty else { return }
+        let crop = zoomTargetCrop
+        let target = ZoomEvaluator.targetInSource(ZoomEvaluator.targetInCrop(point, crop: crop), crop: crop)
         updateKeyframes(ids, "Set Zoom Target") {
-            $0.target = point.clamped
+            $0.target = target
             if $0.mode == .click { $0.mode = .manual }
         }
         isPickingZoomTarget = false
+    }
+
+    /// Use the same pixel-snapped crop as the renderer, even while a render update is pending.
+    var zoomTargetCrop: NormRect {
+        CanvasLayout.make(
+            sourceSize: renderer.layout.sourceSize, crop: edit.crop, background: edit.background, sizing: .scale(1)
+        ).normalizedCrop
+    }
+
+    /// Target sliders show the effective pivot within the crop; the project keeps source coordinates.
+    func zoomTargetBinding(_ axis: WritableKeyPath<NormPoint, Double>, keyframe: ZoomKeyframe) -> Binding<Double> {
+        Binding(
+            get: {
+                let target = self.edit.zoom.keyframes.first { $0.id == keyframe.id }?.target ?? keyframe.target
+                return ZoomEvaluator.targetInCrop(target, crop: self.zoomTargetCrop)[keyPath: axis]
+            },
+            set: { value in
+                let crop = self.zoomTargetCrop
+                let ids = self.selectedKeyframeIDs
+                self.updateKeyframes(
+                    ids, "Zoom Target", coalesce: AnyHashable([AnyHashable(ids), AnyHashable(axis)])
+                ) {
+                    var pivot = ZoomEvaluator.targetInCrop($0.target, crop: crop)
+                    pivot[keyPath: axis] = value
+                    $0.target = ZoomEvaluator.targetInSource(pivot, crop: crop)
+                }
+            })
     }
 
     // MARK: Crop

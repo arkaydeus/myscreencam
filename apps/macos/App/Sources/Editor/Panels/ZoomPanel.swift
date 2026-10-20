@@ -170,11 +170,16 @@ private struct SelectedKeyframeSection: View {
             title: "Scale", value: binding(\.scale, "Zoom Scale"), range: EditLimits.zoomScale, step: 0.05,
             format: { String(format: "%.2f×", $0) }, model: model)
         if selected.contains(where: { $0.mode != .followMouse }) {
+            if model.edit.crop != nil {
+                Text("Target coordinates are relative to the crop.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ValueSlider(
-                title: "Target X", value: binding(\.target.x, "Zoom Target"), range: 0...1,
+                title: "Target X", value: model.zoomTargetBinding(\.x, keyframe: keyframe), range: 0...1,
                 format: { String(format: "%.0f%%", $0 * 100) }, model: model)
             ValueSlider(
-                title: "Target Y", value: binding(\.target.y, "Zoom Target"), range: 0...1,
+                title: "Target Y", value: model.zoomTargetBinding(\.y, keyframe: keyframe), range: 0...1,
                 format: { String(format: "%.0f%%", $0 * 100) }, model: model)
             Button {
                 model.pause()
