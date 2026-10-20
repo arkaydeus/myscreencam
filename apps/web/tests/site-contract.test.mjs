@@ -30,6 +30,34 @@ const releaseRepo = "arkaydeus/myscreencam";
 const releasesUrl = `https://github.com/${releaseRepo}/releases/latest`;
 const readRepoFile = (path) => readFileSync(resolve(import.meta.dir, "../../..", path), "utf8");
 
+const srgbToLinear = (channel) =>
+  channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+
+test("source link points at the intended GitHub repository", () => {
+  expect(site.sourceUrl).toBe("https://github.com/arkaydeus/myscreencam");
+});
+
+test("hero text gradient meets 4.5:1 against white at stops and between them", () => {
+  const paint = css.match(/@utility text-paint \{([^}]+)\}/)?.[1];
+  expect(paint).toContain("in srgb");
+  const stops = Array.from(paint.matchAll(/#([0-9a-f]{6})\b/gi), ([, hex]) =>
+    [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255),
+  );
+  expect(stops).toHaveLength(4);
+  for (let stop = 1; stop < stops.length; stop++) {
+    for (let sample = 0; sample <= 100; sample++) {
+      const rgb = stops[stop - 1].map(
+        (channel, i) => channel + (stops[stop][i] - channel) * (sample / 100),
+      );
+      const luminance = rgb.reduce(
+        (sum, channel, i) => sum + srgbToLinear(channel) * [0.2126, 0.7152, 0.0722][i],
+        0,
+      );
+      expect(1.05 / (luminance + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
+
 test("Download for Mac points at the stable DMG asset", () => {
   const download = renderToStaticMarkup(createElement(DownloadButton));
 
@@ -71,7 +99,7 @@ test("website, Sparkle, release defaults and documentation use the same public s
   }
 });
 
-test("footer preserves the performance footnote and Releases, FAQ and download links", () => {
+test("footer preserves the performance footnote and Releases, GitHub, FAQ and download links", () => {
   const footer = renderToStaticMarkup(createElement(SiteFooter));
   const links = Array.from(
     footer.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g),
@@ -81,6 +109,7 @@ test("footer preserves the performance footnote and Releases, FAQ and download l
   expect(footer).toContain('<li id="footnote-1">');
   for (const [label, href] of [
     ["Releases", site.releasesUrl],
+    ["GitHub", site.sourceUrl],
     ["FAQ", "#faq"],
     ["Download", site.downloadUrl],
   ]) {

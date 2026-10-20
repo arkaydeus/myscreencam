@@ -27,6 +27,7 @@ export function Closing() {
 
 const footerLinks = [
   { href: site.releasesUrl, label: "Releases" },
+  { href: site.sourceUrl, label: "GitHub" },
   { href: "#faq", label: "FAQ" },
   { href: site.downloadUrl, label: "Download" },
 ];
