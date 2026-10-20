@@ -72,6 +72,54 @@ struct AppStateTests {
         return (root, EditorModel(project: project, renderer: renderer))
     }
 
+    /// Sends real AppKit mouse events through the timeline, with its current model snapshot.
+    private struct CueTimeline {
+        let model: EditorModel
+        let window: NSWindow
+        let view: TimelineNSView
+
+        init(model: EditorModel) {
+            self.model = model
+            window = NSWindow(
+                contentRect: CGRect(x: 0, y: 0, width: 1092, height: 300), styleMask: [.titled],
+                backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            view = TimelineNSView(model: model)
+            window.contentView = view
+        }
+
+        func send(
+            _ type: NSEvent.EventType, at time: Double = 0, flags: NSEvent.ModifierFlags = [],
+            gutter: Bool = false, offset: CGFloat = 0
+        ) throws {
+            view.update(data: TimelineData(model: model), zoom: 1, isPlaying: false, waveformCount: 0)
+            let rows = TimelineMetrics.rows(for: model.recordedStreams, subtitles: true)
+            let y =
+                TimelineMetrics.rulerHeight
+                + rows.prefix(while: { $0 != .subtitles }).reduce(CGFloat.zero) {
+                    $0 + $1.height + TimelineMetrics.rowGap
+                } + TimelineMetrics.Row.subtitles.height / 2
+            let pps =
+                (view.bounds.width - TimelineMetrics.gutter - TimelineMetrics.trailingPad) / model.timeline.duration
+            let point = CGPoint(x: gutter ? 10 : TimelineMetrics.gutter + time * pps + offset, y: y)
+            let event = try #require(
+                NSEvent.mouseEvent(
+                    with: type, location: view.convert(point, to: nil), modifierFlags: flags, timestamp: 0,
+                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            switch type {
+            case .leftMouseDown: view.mouseDown(with: event)
+            case .leftMouseDragged: view.mouseDragged(with: event)
+            case .leftMouseUp: view.mouseUp(with: event)
+            default: Issue.record("Unsupported timeline test event")
+            }
+        }
+
+        func close() {
+            view.teardown()
+            window.close()
+        }
+    }
+
     /// Deliver real AppKit mouse events through the preview's gesture routing.
     private func cropDrag(
         _ view: PreviewNSView, model: EditorModel, from: NormPoint, to: NormPoint, undo: UndoManager,
@@ -526,6 +574,223 @@ struct AppStateTests {
         #expect(model.selectedKeyframe?.id == first.id)
         model.deleteKeyframes([first.id])
         #expect(model.selection == nil)
+        await model.close()
+    }
+
+    @Test func cueSelectionRangesTogglesSelectsAllAndDeletesTogether() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = (0..<4).map { SubtitleCue(start: Double($0) * 0.5, end: Double($0) * 0.5 + 0.4, text: "\($0)") }
+        model.update("Seed") { $0.subtitles.cues = cues }
+        let ids = cues.map(\.id)
+
+        model.selectCue(ids[1])
+        #expect(model.selectedCue?.id == ids[1])
+        model.selectCue(ids[3], .range)
+        #expect(model.selectedCueIDs == Set(ids[1...3]))
+        #expect(model.selectedCue == nil)
+        model.selectCue(ids[2], .toggle)
+        #expect(model.selectedCueIDs == [ids[1], ids[3]])
+        model.selectCue(ids[0], .toggle)
+        #expect(model.selectedCueIDs == [ids[0], ids[1], ids[3]])
+
+        let undo = UndoManager()
+        model.undoManager = undo
+        model.deleteSelection()
+        #expect(model.edit.subtitles.cues.map(\.id) == [ids[2]])
+        #expect(model.selection == nil)
+        undo.undo()
+        #expect(model.edit.subtitles.cues.map(\.id) == ids)
+
+        model.selectAllCues()
+        #expect(model.selectedCueIDs == Set(ids))
+        model.deleteSelection()
+        #expect(model.edit.subtitles.cues.isEmpty)
+        await model.close()
+    }
+
+    @Test func deletingSomeCuesPreservesTheSurvivingSelection() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = (0..<3).map { SubtitleCue(start: Double($0) * 0.5, end: Double($0) * 0.5 + 0.4, text: "\($0)") }
+        model.update("Seed") { $0.subtitles.cues = cues }
+        model.selectCue(cues[0].id)
+        model.selectCue(cues[1].id, .toggle)
+
+        model.deleteCues([cues[0].id])
+        #expect(model.selection == .cues([cues[1].id]))
+        #expect(model.selectedCue?.id == cues[1].id)
+        #expect(model.edit.subtitles.cues.map(\.id) == [cues[1].id, cues[2].id])
+        // The same pruning must run for edits from sources other than the delete action.
+        model.selectCue(cues[2].id, .toggle)
+        model.update("Remove Cue") { $0.subtitles.cues.removeAll { $0.id == cues[1].id } }
+        #expect(model.selection == .cues([cues[2].id]))
+        model.deleteCues([cues[2].id])
+        #expect(model.selection == nil)
+        await model.close()
+    }
+
+    @Test func cueReselectionPreservesWordsAndChangingSelectionClearsThem() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = SubtitleCue(start: 0.2, end: 0.6, text: "First")
+        let second = SubtitleCue(start: 0.8, end: 1.2, text: "Second")
+        model.update("Seed") { $0.subtitles.cues = [first, second] }
+        model.selectCue(first.id)
+        model.selectedWordIDs = ["word-0", "word-1"]
+        model.selectCue(first.id)
+        #expect(model.selectedWordIDs == ["word-0", "word-1"])
+        model.selectCue(second.id)
+        #expect(model.selectedWordIDs.isEmpty)
+        model.selectedWordIDs = ["word-2"]
+        model.selectCue(first.id, .toggle)
+        #expect(model.selectedCueIDs == [first.id, second.id])
+        #expect(model.selectedWordIDs.isEmpty)
+        model.selectCue(first.id)
+        model.selectedWordIDs = ["word-0"]
+        model.selectCue(second.id, .range)
+        #expect(model.selectedWordIDs.isEmpty)
+        model.selectCue(first.id)
+        model.selectedWordIDs = ["word-0"]
+        model.selectAllCues()
+        #expect(model.selectedWordIDs.isEmpty)
+        await model.close()
+    }
+
+    @Test func timelineCueModifierClicksAndGutterSelectAll() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = (0..<4).map {
+            SubtitleCue(start: Double($0) * 0.4 + 0.1, end: Double($0) * 0.4 + 0.4, text: "\($0)")
+        }
+        model.update("Seed") { $0.subtitles.cues = cues }
+        let timeline = CueTimeline(model: model)
+        defer { timeline.close() }
+        func click(_ time: Double, _ flags: NSEvent.ModifierFlags = []) throws {
+            try timeline.send(.leftMouseDown, at: time, flags: flags)
+            // Modifier gestures must never start a move or resize.
+            if !flags.isEmpty { try timeline.send(.leftMouseDragged, at: time + 0.05, flags: flags) }
+            try timeline.send(.leftMouseUp, at: time, flags: flags)
+        }
+        try click(0.65)
+        #expect(model.selectedCueIDs == [cues[1].id])
+        try click(1.45, .command)
+        #expect(model.selectedCueIDs == [cues[1].id, cues[3].id])
+        try click(0.65, .command)
+        #expect(model.selectedCueIDs == [cues[3].id])
+        try click(0.65, .shift)
+        #expect(model.selectedCueIDs == Set(cues[1...3].map(\.id)))
+        try click(0.25, [.command, .shift])
+        #expect(model.selectedCueIDs == Set(cues.map(\.id)))
+        #expect(model.edit.subtitles.cues == cues)
+
+        model.selectCue(cues[2].id)
+        model.selectedWordIDs = ["word"]
+        model.inspectorTab = .zoom
+        try timeline.send(.leftMouseDown, gutter: true)
+        try timeline.send(.leftMouseUp, gutter: true)
+        #expect(model.selectedCueIDs == Set(cues.map(\.id)))
+        #expect(model.inspectorTab == .subtitles)
+        #expect(model.selectedWordIDs.isEmpty)
+        await model.close()
+    }
+
+    @Test func timelinePlainCueClickCollapsesBeforeDraggingOnlyThatCue() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = [
+            SubtitleCue(start: 0.2, end: 0.6, text: "First"), SubtitleCue(start: 0.8, end: 1.2, text: "Second"),
+        ]
+        model.update("Seed") { $0.subtitles.cues = cues }
+        model.selectAllCues()
+        let undo = UndoManager()
+        model.undoManager = undo
+        let timeline = CueTimeline(model: model)
+        defer { timeline.close() }
+        try timeline.send(.leftMouseDown, at: 1)
+        #expect(model.selectedCueIDs == [cues[1].id])
+        try timeline.send(.leftMouseDragged, at: 1.1)
+        try timeline.send(.leftMouseDragged, at: 1.2)
+        try timeline.send(.leftMouseUp, at: 1.2)
+        #expect(model.edit.subtitles.cues[0] == cues[0])
+        #expect(abs(model.edit.subtitles.cues[1].start - 1) < 1e-9)
+        #expect(abs(model.edit.subtitles.cues[1].end - 1.4) < 1e-9)
+        undo.undo()
+        #expect(model.edit.subtitles.cues == cues)
+        #expect(!undo.canUndo)
+        await model.close()
+    }
+
+    @Test func timelineCueHitTestingKeepsStablePriorityAtSharedEdgesAndOverlaps() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = [
+            SubtitleCue(start: 0.2, end: 0.8, text: "First"),
+            SubtitleCue(start: 0.8, end: 1.4, text: "Second"),
+            SubtitleCue(start: 0.9, end: 1.6, text: "Third"),
+        ]
+        model.update("Seed") { $0.subtitles.cues = cues }
+        let timeline = CueTimeline(model: model)
+        defer { timeline.close() }
+        // Both sides of the junction are within its four-point edge slop.
+        for offset in [CGFloat(-3), 0, 3] {
+            model.selectAllCues()
+            try timeline.send(.leftMouseDown, at: 0.8, offset: offset)
+            #expect(model.selectedCueIDs == [cues[0].id])
+            try timeline.send(.leftMouseUp, at: 0.8, offset: offset)
+            model.selectCue(cues[1].id)
+            model.selectCue(cues[2].id, .toggle)
+            try timeline.send(.leftMouseDown, at: 0.8, offset: offset)
+            #expect(model.selectedCueIDs == [cues[1].id])
+            try timeline.send(.leftMouseUp, at: 0.8, offset: offset)
+        }
+        model.selectAllCues()
+        try timeline.send(.leftMouseDown, at: 1.1)
+        #expect(model.selectedCueIDs == [cues[1].id])
+        try timeline.send(.leftMouseUp, at: 1.1)
+        model.selectCue(cues[0].id)
+        model.selectCue(cues[2].id, .toggle)
+        try timeline.send(.leftMouseDown, at: 1.1)
+        #expect(model.selectedCueIDs == [cues[2].id])
+        try timeline.send(.leftMouseUp, at: 1.1)
+        await model.close()
+    }
+
+    @Test func cueRowClicksUseModifiersAndOnlyPlainClicksFocus() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = (0..<4).map {
+            SubtitleCue(start: Double($0) * 0.4 + 0.1, end: Double($0) * 0.4 + 0.4, text: "\($0)")
+        }
+        model.update("Seed") { $0.subtitles.cues = cues }
+        CueRowClick.handle(cues[1].id, flags: [], isEditing: false, model: model)
+        #expect(model.selectedCueIDs == [cues[1].id])
+        #expect(abs(model.currentTime - 0.55) < 1e-9)
+        model.player.play()
+        CueRowClick.handle(cues[3].id, flags: .command, isEditing: false, model: model)
+        #expect(model.selectedCueIDs == [cues[1].id, cues[3].id])
+        CueRowClick.handle(cues[3].id, flags: .command, isEditing: false, model: model)
+        #expect(model.selectedCueIDs == [cues[1].id])
+        // Removing the anchor leaves no range origin until the next click establishes one.
+        CueRowClick.handle(cues[3].id, flags: .shift, isEditing: false, model: model)
+        #expect(model.selectedCueIDs == [cues[3].id])
+        CueRowClick.handle(cues[1].id, flags: .shift, isEditing: false, model: model)
+        #expect(model.selectedCueIDs == Set(cues[1...3].map(\.id)))
+        #expect(model.player.rate != 0)
+        #expect(abs(model.currentTime - 0.55) < 1e-9)
+        CueRowClick.handle(cues[2].id, flags: [], isEditing: false, model: model)
+        #expect(model.selectedCueIDs == [cues[2].id])
+        #expect(model.player.rate == 0)
+        #expect(abs(model.currentTime - 0.95) < 1e-9)
+        model.seek(to: 1.5)
+        model.selectedWordIDs = ["word"]
+        CueRowClick.handle(cues[2].id, flags: [], isEditing: true, model: model)
+        #expect(model.currentTime == 1.5)
+        #expect(model.selectedWordIDs == ["word"])
+        // Modifiers still work on the row that currently contains the cue editor.
+        CueRowClick.handle(cues[2].id, flags: .command, isEditing: true, model: model)
+        #expect(model.selection == nil)
+        #expect(model.selectedWordIDs.isEmpty)
         await model.close()
     }
 

@@ -46,6 +46,13 @@ enum CueDragTime {
     }
 }
 
+enum CueHitTest {
+    /// Selected bars take priority; shared edges and overlaps keep the cue order within each group.
+    static func ordered(_ cues: [SubtitleCue], selected: Set<SubtitleCue.ID>) -> [SubtitleCue] {
+        cues.filter { selected.contains($0.id) } + cues.filter { !selected.contains($0.id) }
+    }
+}
+
 /// A plain click on a selected zoom keeps the group until the gesture's outcome is known.
 enum KeyframeClick {
     @MainActor
@@ -593,6 +600,8 @@ final class TimelineNSView: NSView {
             for layer in cueLayers { layer.isHidden = true }
             return
         }
+        let selectedIDs: Set<SubtitleCue.ID>
+        if case .cues(let ids) = data.selection { selectedIDs = ids } else { selectedIDs = [] }
         pool(&cueLayers, count: data.cues.count) {
             let layer = CATextLayer()
             layer.cornerRadius = 4
@@ -612,7 +621,7 @@ final class TimelineNSView: NSView {
                 layer.isHidden = true
                 continue
             }
-            let selected = data.selection == .cue(cue.id)
+            let selected = selectedIDs.contains(cue.id)
             layer.frame = CGRect(x: x(e0), y: frame.minY + 3, width: max(2, x(e1) - x(e0)), height: frame.height - 6)
             layer.backgroundColor = AppTheme.subtitleTrack.withAlphaComponent(selected ? 0.7 : 0.3).cgColor
             layer.borderColor = selected ? NSColor.white.cgColor : AppTheme.subtitleTrack.cgColor
@@ -714,7 +723,8 @@ final class TimelineNSView: NSView {
     private func cue(atViewX vx: CGFloat) -> (SubtitleCue, BlurHit)? {
         guard let model, let data else { return nil }
         let cx = vx - TimelineMetrics.gutter
-        let ordered = data.cues.sorted { a, _ in data.selection == .cue(a.id) }
+        let selected = model.selectedCueIDs
+        let ordered = CueHitTest.ordered(data.cues, selected: selected)
         for cue in ordered {
             let e0 = model.timeline.editedTimeSnapping(forSource: cue.start)
             let e1 = model.timeline.editedTimeSnapping(forSource: cue.end)
@@ -747,6 +757,7 @@ final class TimelineNSView: NSView {
     }
 
     private func cursor(at p: CGPoint) -> NSCursor {
+        if p.x < TimelineMetrics.gutter, row(at: p.y) == .subtitles { return .pointingHand }
         guard p.x >= TimelineMetrics.gutter, let model else { return .arrow }
         let cx = p.x - TimelineMetrics.gutter
         switch row(at: p.y) {
@@ -771,7 +782,11 @@ final class TimelineNSView: NSView {
         guard let model else { return }
         window?.makeFirstResponder(self)
         let p = convert(event.locationInWindow, from: nil)
-        guard p.x >= TimelineMetrics.gutter else { return }
+        guard p.x >= TimelineMetrics.gutter else {
+            // The Subtitles label selects every subtitle.
+            if p.y >= TimelineMetrics.rulerHeight, row(at: p.y) == .subtitles { model.selectAllCues() }
+            return
+        }
         let cx = p.x - TimelineMetrics.gutter
         let t = time(atViewX: p.x)
         drag = nil
@@ -823,8 +838,11 @@ final class TimelineNSView: NSView {
             }
         case .subtitles:
             if let (cue, hit) = cue(atViewX: p.x) {
-                model.selection = .cue(cue.id)
                 model.inspectorTab = .subtitles
+                let modifier = SelectionModifier(event.modifierFlags)
+                // ⌘ and ⇧ only change the selection; a plain click selects the cue and can move or resize it.
+                model.selectCue(cue.id, modifier)
+                guard modifier == .replace else { return }
                 switch hit {
                 case .body:
                     beginEdit(.cueMove(cue.id, start: model.timeline.editedTimeSnapping(forSource: cue.start), x: p.x))

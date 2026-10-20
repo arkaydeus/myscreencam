@@ -58,7 +58,7 @@ struct PreviewOverlayState: Equatable {
     var isPicking: Bool
     var isPlaying: Bool
     var subtitles: SubtitleSettings
-    var selectedCue: SubtitleCue.ID?
+    var selectedCues: Set<SubtitleCue.ID>
     var crop: NormRect?
     /// The crop tool is on; the preview then shows the whole recording, unzoomed.
     var isCropping: Bool
@@ -74,7 +74,7 @@ struct PreviewOverlayState: Equatable {
         isPicking = model.isPickingZoomTarget
         isPlaying = model.clock.isPlaying
         subtitles = model.edit.subtitles
-        if case .cue(let id) = model.selection { selectedCue = id } else { selectedCue = nil }
+        selectedCues = model.selectedCueIDs
         crop = model.edit.crop
         isCropping = model.isEditingCrop
     }
@@ -408,7 +408,7 @@ final class PreviewNSView: NSView {
 
         let cueRects = activeCueRects(geometry)
         let highlighted = cueRects.filter {
-            $0.cue.id == state.selectedCue || $0.cue.id == hoveringCue || isDraggingCue($0.cue.id)
+            state.selectedCues.contains($0.cue.id) || $0.cue.id == hoveringCue || isDraggingCue($0.cue.id)
         }
         if !highlighted.isEmpty {
             let path = CGMutablePath()
@@ -592,7 +592,7 @@ final class PreviewNSView: NSView {
         }
         // Subtitles are drawn on top of everything, so they win the hit test; their edges set their width.
         if let hit = hitCueEdge(p) {
-            model.selection = .cue(hit.cue.id)
+            model.selectCue(hit.cue.id)
             model.inspectorTab = .subtitles
             model.beginContinuousChange()
             let width = state.subtitles.style(for: hit.cue).maxWidth
@@ -604,7 +604,7 @@ final class PreviewNSView: NSView {
             return
         }
         if let hit = hitCue(p) {
-            model.selection = .cue(hit.cue.id)
+            model.selectCue(hit.cue.id)
             model.inspectorTab = .subtitles
             let frame = SubtitleLayout.frame(
                 for: hit.cue, settings: state.subtitles, canvasSize: geometry.layout.canvasSize)
