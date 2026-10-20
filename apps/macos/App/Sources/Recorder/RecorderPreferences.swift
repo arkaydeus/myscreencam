@@ -30,6 +30,9 @@ final class RecorderPreferences {
     var customCursor: Bool { didSet { defaults.set(customCursor, forKey: Key.customCursor) } }
     var frameRate: Int { didSet { defaults.set(frameRate, forKey: Key.frameRate) } }
     var codec: VideoCodec { didSet { defaults.set(codec.rawValue, forKey: Key.codec) } }
+    /// Record this app's own windows (for demos of My Screen Cam). Not saved: every launch starts with it off,
+    /// so a forgotten demo setting can't leak the editor into later recordings.
+    var demoMode = false
 
     @ObservationIgnored private let defaults: UserDefaults
 

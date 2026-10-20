@@ -413,6 +413,12 @@ private struct OptionsSection: View {
                 .font(.caption)
                 .foregroundStyle(Color.themeSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+                Toggle("Demo Mode", isOn: $preferences.demoMode)
+                    .onChange(of: preferences.demoMode) { model.demoModeChanged() }
+                Text("Records My Screen Cam's own windows and lists them under Window. Off at every launch.")
+                    .font(.caption)
+                    .foregroundStyle(Color.themeSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 DisclosureGroup(isExpanded: $showsAdvanced) {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Frame rate", selection: $preferences.frameRate) {

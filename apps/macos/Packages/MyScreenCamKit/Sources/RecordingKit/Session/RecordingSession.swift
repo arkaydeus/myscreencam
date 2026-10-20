@@ -171,7 +171,8 @@ public final class RecordingSession: @unchecked Sendable {
             configuration: ScreenCaptureConfiguration(
                 source: options.source, frameRate: options.frameRate, showsCursor: !hidesCursor,
                 capturesSystemAudio: options.captureSystemAudio,
-                microphoneDeviceID: options.microphoneBackend == .screenCaptureKit ? options.microphoneDeviceID : nil))
+                microphoneDeviceID: options.microphoneBackend == .screenCaptureKit ? options.microphoneDeviceID : nil,
+                excludesOwnApplication: options.excludesOwnApplication))
         lock.withLock { self.screen = screen }
         let geometry: ScreenCaptureGeometry
         do { geometry = try await screen.prepare() } catch {
@@ -298,7 +299,7 @@ public final class RecordingSession: @unchecked Sendable {
                 displayID: id, x: Double(region.minX), y: Double(region.minY), width: Double(region.width),
                 height: Double(region.height))
         case .window(let id):
-            let window = (try? await CaptureSources.windows())?.first { $0.id == id }
+            let window = (try? await CaptureSources.windows(includingOwnApplication: true))?.first { $0.id == id }
             return .window(windowID: id, title: window?.title, appName: window?.appName, bundleID: window?.bundleID)
         }
     }

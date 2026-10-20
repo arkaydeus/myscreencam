@@ -35,13 +35,16 @@ public struct RecordingOptions: Sendable, Hashable {
     public var name: String?
     /// Record pointer events and cursor images (needs Input Monitoring; skipped silently without it).
     public var recordsInputEvents: Bool
+    /// Hide this app's windows from display and region capture. Off for demos of the app itself (the HUD and
+    /// countdown stay hidden either way: their panels opt out of capture).
+    public var excludesOwnApplication: Bool
 
     public init(
         source: ScreenSource, recordingsRoot: URL, frameRate: Int = 60, hideSystemCursor: Bool = false,
         captureSystemAudio: Bool = true, microphoneDeviceID: String? = nil,
         microphoneBackend: MicrophoneBackend = .screenCaptureKit, cameraDeviceID: String? = nil,
         cameraWidth: Int = 1280, cameraHeight: Int = 720, cameraFrameRate: Int = 30, videoCodec: VideoCodec = .hevc,
-        name: String? = nil, recordsInputEvents: Bool = true
+        name: String? = nil, recordsInputEvents: Bool = true, excludesOwnApplication: Bool = true
     ) {
         self.source = source
         self.recordingsRoot = recordingsRoot
@@ -57,6 +60,7 @@ public struct RecordingOptions: Sendable, Hashable {
         self.videoCodec = videoCodec
         self.name = name
         self.recordsInputEvents = recordsInputEvents
+        self.excludesOwnApplication = excludesOwnApplication
     }
 
     /// "Recording 25 Sep 2026 at 14:03" in the user's locale.

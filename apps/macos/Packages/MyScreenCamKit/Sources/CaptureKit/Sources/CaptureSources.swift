@@ -16,13 +16,14 @@ public enum CaptureSources {
             }
     }
 
-    /// On-screen, titled, normal-level (layer 0) windows of other applications, front to back.
-    public static func windows() async throws -> [WindowInfo] {
+    /// On-screen, titled, normal-level (layer 0) windows of other applications (and this one's, if
+    /// `includingOwnApplication`), front to back.
+    public static func windows(includingOwnApplication: Bool = false) async throws -> [WindowInfo] {
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         let ownPID = ProcessInfo.processInfo.processIdentifier
         return content.windows.compactMap { window -> WindowInfo? in
             guard window.windowLayer == 0, window.isOnScreen, let title = window.title, !title.isEmpty,
-                let app = window.owningApplication, app.processID != ownPID,
+                let app = window.owningApplication, includingOwnApplication || app.processID != ownPID,
                 window.frame.width >= 1, window.frame.height >= 1
             else { return nil }
             return WindowInfo(

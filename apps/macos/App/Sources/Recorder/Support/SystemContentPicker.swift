@@ -16,7 +16,8 @@ final class SystemContentPicker: NSObject {
 
     private var completion: ((ScreenSource?) -> Void)?
 
-    func present(completion: @escaping (ScreenSource?) -> Void) {
+    /// - Parameter includingOwnApplication: offer this app's windows too (Demo Mode).
+    func present(includingOwnApplication: Bool = false, completion: @escaping (ScreenSource?) -> Void) {
         guard Self.isSupported else {
             completion(nil)
             return
@@ -25,7 +26,9 @@ final class SystemContentPicker: NSObject {
         let picker = SCContentSharingPicker.shared
         var configuration = SCContentSharingPickerConfiguration()
         configuration.allowedPickerModes = [.singleDisplay, .singleWindow]
-        if let bundleID = Bundle.main.bundleIdentifier { configuration.excludedBundleIDs = [bundleID] }
+        if !includingOwnApplication, let bundleID = Bundle.main.bundleIdentifier {
+            configuration.excludedBundleIDs = [bundleID]
+        }
         configuration.allowsChangingSelectedContent = false
         picker.defaultConfiguration = configuration
         picker.add(self)

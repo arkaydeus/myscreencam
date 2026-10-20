@@ -217,7 +217,8 @@ final class RecorderWindowModel {
         pendingThumbnails = []
         windowsTask = Task { [weak self] in
             do {
-                let windows = try await CaptureSources.windows()
+                let windows = try await CaptureSources.windows(
+                    includingOwnApplication: self?.preferences.demoMode ?? false)
                 guard let self, !Task.isCancelled else { return }
                 self.windows = windows
                 self.windowsError = nil
@@ -229,6 +230,12 @@ final class RecorderWindowModel {
                 Log.app.error("Window list failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+    }
+
+    /// Demo Mode lists this app's windows too: reload the list now if it's showing, otherwise on the next visit.
+    func demoModeChanged() {
+        windowsLoaded = false
+        if preferences.sourceKind == .window { refreshWindows() }
     }
 
     /// Queues a small thumbnail for a window row (loaded one at a time, off the main thread).
@@ -280,7 +287,7 @@ final class RecorderWindowModel {
     }
 
     func chooseWithSystemPicker() {
-        systemPicker.present { [weak self] source in
+        systemPicker.present(includingOwnApplication: preferences.demoMode) { [weak self] source in
             guard let self, let source else { return }
             switch source {
             case .display(let id):

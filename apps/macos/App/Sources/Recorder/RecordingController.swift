@@ -134,7 +134,7 @@ final class RecordingController {
             source: source, recordingsRoot: root, frameRate: preferences.frameRate,
             hideSystemCursor: preferences.customCursor, captureSystemAudio: preferences.captureSystemAudio,
             microphoneDeviceID: microphoneID, cameraDeviceID: cameraID, videoCodec: preferences.codec,
-            recordsInputEvents: true)
+            recordsInputEvents: true, excludesOwnApplication: !preferences.demoMode)
     }
 
     private func begin(_ options: RecordingOptions) async {
