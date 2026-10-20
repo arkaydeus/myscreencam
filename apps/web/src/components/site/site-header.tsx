@@ -1,5 +1,7 @@
-import { DownloadButton, LogoMark } from "@/components/site/brand";
+import { DownloadButton, GitHubMark, LogoMark } from "@/components/site/brand";
+import { wordmark } from "@/lib/fonts";
 import { site } from "@/lib/site";
+import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "#how", label: "How it works" },
@@ -15,7 +17,7 @@ export function SiteHeader() {
       <div className="page-width flex h-12 items-center justify-between gap-6 sm:h-13">
         <a href="#top" className="flex items-center gap-2.5 rounded-md">
           <LogoMark size={26} className="size-[22px] sm:size-[26px]" />
-          <span className="text-[17px] font-semibold tracking-[-0.01em] sm:text-[21px]">
+          <span className={cn(wordmark.className, "text-[17px] tracking-[-0.01em] sm:text-[21px]")}>
             {site.brand}
           </span>
         </a>
@@ -31,6 +33,13 @@ export function SiteHeader() {
               </a>
             ))}
           </nav>
+          <a
+            href={site.sourceUrl}
+            aria-label="My Screen Cam on GitHub"
+            className="-mx-1 rounded-sm p-1 text-ink/80 transition-colors hover:text-ink"
+          >
+            <GitHubMark className="size-[18px]" />
+          </a>
           <DownloadButton size="sm" />
         </div>
       </div>

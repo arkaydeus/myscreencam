@@ -35,7 +35,7 @@ test("Download for Mac points at the stable DMG asset", () => {
   expect(download).toContain("Download for Mac");
 });
 
-test("footer preserves the performance footnote and Releases, FAQ and download links", () => {
+test("footer preserves the performance footnote and Releases, GitHub, FAQ and download links", () => {
   const footer = renderToStaticMarkup(createElement(SiteFooter));
   const links = Array.from(
     footer.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g),
@@ -45,6 +45,7 @@ test("footer preserves the performance footnote and Releases, FAQ and download l
   expect(footer).toContain('<li id="footnote-1">');
   for (const [label, href] of [
     ["Releases", site.releasesUrl],
+    ["GitHub", site.sourceUrl],
     ["FAQ", "#faq"],
     ["Download", site.downloadUrl],
   ]) {

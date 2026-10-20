@@ -149,6 +149,19 @@
     );
 }
 
+/* The canvas paint as a text fill, for the hero's "free and open source" line. */
+@utility text-paint {
+  background: linear-gradient(
+    90deg,
+    #ff8a5c 0%,
+    var(--color-rose) 35%,
+    #7b3fd6 68%,
+    var(--color-ultramarine) 100%
+  );
+  background-clip: text;
+  color: transparent;
+}
+
 /*
  * App mocks (`app-ui.tsx`): the hero editor and the window illustrations are drawn in the app's own points.
  * Inside `ui-units`, Tailwind's spacing step is one point of a window `--ui-width` points wide, measured

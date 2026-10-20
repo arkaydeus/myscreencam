@@ -11,5 +11,7 @@ export const site = {
   downloadUrl:
     "https://github.com/arkaydeustech/myscreencam-releases/releases/latest/download/MyScreenCam.dmg",
   releasesUrl: "https://github.com/arkaydeustech/myscreencam-releases/releases/latest",
+  /** The public source repository. */
+  sourceUrl: "https://github.com/arkaydeus/myscreencam",
   requirements: "macOS 15 Sequoia or later, Apple silicon",
 } as const;
