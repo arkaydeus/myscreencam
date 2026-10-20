@@ -67,4 +67,12 @@ public struct RecordingOptions: Sendable, Hashable {
     public static func defaultName(for date: Date) -> String {
         "Recording \(date.formatted(date: .abbreviated, time: .shortened))"
     }
+
+    func screenConfiguration(hasInputMonitoring: Bool) -> ScreenCaptureConfiguration {
+        ScreenCaptureConfiguration(
+            source: source, frameRate: frameRate, showsCursor: !(hideSystemCursor && hasInputMonitoring),
+            capturesSystemAudio: captureSystemAudio,
+            microphoneDeviceID: microphoneBackend == .screenCaptureKit ? microphoneDeviceID : nil,
+            excludesOwnApplication: excludesOwnApplication)
+    }
 }

@@ -24,16 +24,22 @@ final class SystemContentPicker: NSObject {
         }
         self.completion = completion
         let picker = SCContentSharingPicker.shared
+        let configuration = Self.configuration(includingOwnApplication: includingOwnApplication)
+        picker.defaultConfiguration = configuration
+        picker.add(self)
+        picker.isActive = true
+        picker.present()
+    }
+
+    static func configuration(includingOwnApplication: Bool) -> SCContentSharingPickerConfiguration {
         var configuration = SCContentSharingPickerConfiguration()
         configuration.allowedPickerModes = [.singleDisplay, .singleWindow]
         if !includingOwnApplication, let bundleID = Bundle.main.bundleIdentifier {
             configuration.excludedBundleIDs = [bundleID]
         }
         configuration.allowsChangingSelectedContent = false
-        picker.defaultConfiguration = configuration
-        picker.add(self)
-        picker.isActive = true
-        picker.present()
+        configuration.excludedWindowIDs = CaptureSources.excludedWindowIDs.map(Int.init)
+        return configuration
     }
 
     private func finish(_ source: ScreenSource?) {

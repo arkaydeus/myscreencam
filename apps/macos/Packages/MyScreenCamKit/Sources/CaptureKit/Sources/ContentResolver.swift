@@ -20,10 +20,13 @@ struct ResolvedContent {
 enum ContentResolver {
     static func resolve(_ source: ScreenSource, excludingOwnApplication: Bool) async throws -> ResolvedContent {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let excluded = await CaptureSources.excludedWindowIDs
         switch source {
         case .display(let id):
             let display = try display(id, in: content)
-            let filter = displayFilter(display, content: content, excludingOwnApplication: excludingOwnApplication)
+            let filter = displayFilter(
+                display, content: content, excludingOwnApplication: excludingOwnApplication, excludedWindowIDs: excluded
+            )
             return ResolvedContent(
                 filter: filter, sourceRect: nil, contentRect: CGDisplayBounds(id),
                 scale: scale(of: filter, display: id), displayID: id, windowOwnerPID: nil)
@@ -33,14 +36,20 @@ enum ContentResolver {
             let bounds = CGDisplayBounds(id)
             let region = CaptureGeometry.clampedRegion(rect, displaySize: bounds.size)
             guard region.width >= 1, region.height >= 1 else { throw CaptureError.emptyRegion }
-            let filter = displayFilter(display, content: content, excludingOwnApplication: excludingOwnApplication)
+            let filter = displayFilter(
+                display, content: content, excludingOwnApplication: excludingOwnApplication, excludedWindowIDs: excluded
+            )
             let global = region.offsetBy(dx: bounds.minX, dy: bounds.minY)
             return ResolvedContent(
                 filter: filter, sourceRect: region, contentRect: global, scale: scale(of: filter, display: id),
                 displayID: id, windowOwnerPID: nil)
 
         case .window(let id):
-            guard let window = content.windows.first(where: { $0.windowID == id }) else {
+            guard let window = content.windows.first(where: { $0.windowID == id }),
+                CaptureSources.permitsWindow(
+                    id: id, processID: window.owningApplication?.processID,
+                    excludingOwnApplication: excludingOwnApplication, excludedWindowIDs: excluded)
+            else {
                 throw CaptureError.sourceNotFound("window \(id)")
             }
             let filter = SCContentFilter(desktopIndependentWindow: window)
@@ -58,13 +67,19 @@ enum ContentResolver {
         return display
     }
 
-    /// The whole display minus this app's windows (recorder UI, HUD, overlays).
+    /// Controls stay excluded in Demo Mode; other own-app windows follow the recording policy.
     private static func displayFilter(
-        _ display: SCDisplay, content: SCShareableContent, excludingOwnApplication: Bool
+        _ display: SCDisplay, content: SCShareableContent, excludingOwnApplication: Bool,
+        excludedWindowIDs: Set<CGWindowID>
     ) -> SCContentFilter {
         let pid = ProcessInfo.processInfo.processIdentifier
-        let own = excludingOwnApplication ? content.applications.filter { $0.processID == pid } : []
-        return SCContentFilter(display: display, excludingApplications: own, exceptingWindows: [])
+        if excludingOwnApplication {
+            return SCContentFilter(
+                display: display, excludingApplications: content.applications.filter { $0.processID == pid },
+                exceptingWindows: [])
+        }
+        return SCContentFilter(
+            display: display, excludingWindows: content.windows.filter { excludedWindowIDs.contains($0.windowID) })
     }
 
     private static func scale(of filter: SCContentFilter, display: CGDirectDisplayID) -> Double {

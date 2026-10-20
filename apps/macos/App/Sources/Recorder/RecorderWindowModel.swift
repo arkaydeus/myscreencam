@@ -12,6 +12,17 @@ import Observation
 @MainActor
 @Observable
 final class RecorderWindowModel {
+    struct SourceAccess {
+        var windows: (Bool) async throws -> [WindowInfo] = {
+            try await CaptureSources.windows(includingOwnApplication: $0)
+        }
+        var thumbnail: (ScreenSource, Int, Bool) async throws -> CGImage = {
+            try await CaptureSources.thumbnail(of: $0, maxPixelWidth: $1, excludingOwnApplication: $2)
+        }
+        var permissionStatus: (PermissionKind) -> PermissionStatus = { Permissions.status($0) }
+        var presentPicker: ((Bool, @escaping (ScreenSource?) -> Void) -> Void)?
+    }
+
     let controller: RecordingController
     var preferences: RecorderPreferences { controller.preferences }
 
@@ -39,6 +50,7 @@ final class RecorderWindowModel {
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     @ObservationIgnored private var devicesTask: Task<Void, Never>?
     @ObservationIgnored private var windowsTask: Task<Void, Never>?
+    @ObservationIgnored private var windowsGeneration = 0
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored private var pendingThumbnails: [CGWindowID] = []
@@ -47,9 +59,11 @@ final class RecorderWindowModel {
     @ObservationIgnored private var micDeviceShown: String?
     @ObservationIgnored private var micGeneration = 0
     @ObservationIgnored private let systemPicker = SystemContentPicker()
+    @ObservationIgnored private let sourceAccess: SourceAccess
 
-    init(controller: RecordingController) {
+    init(controller: RecordingController, sourceAccess: SourceAccess? = nil) {
         self.controller = controller
+        self.sourceAccess = sourceAccess ?? SourceAccess()
     }
 
     // MARK: - Lifecycle
@@ -88,6 +102,7 @@ final class RecorderWindowModel {
         devicesTask?.cancel()
         devicesTask = nil
         windowsTask?.cancel()
+        windowsGeneration += 1
         windowsTask = nil
         previewTask?.cancel()
         previewTask = nil
@@ -134,7 +149,7 @@ final class RecorderWindowModel {
 
     func refreshPermissions() {
         var statuses: [PermissionKind: PermissionStatus] = [:]
-        for kind in PermissionKind.allCases { statuses[kind] = Permissions.status(kind) }
+        for kind in PermissionKind.allCases { statuses[kind] = sourceAccess.permissionStatus(kind) }
         if statuses != permissions { permissions = statuses }
     }
 
@@ -177,7 +192,10 @@ final class RecorderWindowModel {
 
     var selectedWindow: WindowInfo? {
         guard let id = preferences.windowID else { return nil }
-        return windows.first { $0.id == id }
+        return windows.first {
+            $0.id == id && !CaptureSources.excludedWindowIDs.contains(id)
+                && (preferences.demoMode || $0.processID != ProcessInfo.processInfo.processIdentifier)
+        }
     }
 
     /// Whether Start can be pressed, and if not, why.
@@ -199,6 +217,7 @@ final class RecorderWindowModel {
     }
 
     func startRecording() {
+        guard startBlocker == nil else { return }
         controller.startRecording(windowFrame: preferences.sourceKind == .window ? selectedWindow?.frame : nil)
     }
 
@@ -210,32 +229,50 @@ final class RecorderWindowModel {
     }
 
     /// Reloads the window list (needs Screen Recording; never called without it, so it can't prompt).
-    func refreshWindows() {
-        guard isActive, isGranted(.screenRecording) else { return }
+    @discardableResult
+    func refreshWindows() -> Task<Void, Never>? {
+        guard isActive, isGranted(.screenRecording) else { return nil }
         windowsTask?.cancel()
+        windowsGeneration += 1
+        let generation = windowsGeneration
+        let demoMode = preferences.demoMode
         windowThumbnails = [:]
         pendingThumbnails = []
         windowsTask = Task { [weak self] in
             do {
-                let windows = try await CaptureSources.windows(
-                    includingOwnApplication: self?.preferences.demoMode ?? false)
                 guard let self, !Task.isCancelled else { return }
+                let windows = try await self.sourceAccess.windows(demoMode)
+                guard !Task.isCancelled, self.windowsGeneration == generation, self.preferences.demoMode == demoMode
+                else { return }
                 self.windows = windows
                 self.windowsError = nil
                 self.windowsLoaded = true
                 if self.preferences.sourceKind == .window { self.refreshSourcePreview() }
             } catch {
-                guard let self, !Task.isCancelled else { return }
+                guard let self, !Task.isCancelled, self.windowsGeneration == generation else { return }
                 self.windowsError = error.localizedDescription
                 Log.app.error("Window list failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+        return windowsTask
     }
 
     /// Demo Mode lists this app's windows too: reload the list now if it's showing, otherwise on the next visit.
     func demoModeChanged() {
+        windowsTask?.cancel()
+        windowsGeneration += 1
+        if !preferences.demoMode, selectedWindow == nil {
+            preferences.windowID = nil
+        }
+        windows = []
         windowsLoaded = false
+        windowsError = nil
+        thumbnailTask?.cancel()
+        thumbnailTask = nil
+        windowThumbnails = [:]
+        pendingThumbnails = []
         if preferences.sourceKind == .window { refreshWindows() }
+        refreshSourcePreview()
     }
 
     /// Queues a small thumbnail for a window row (loaded one at a time, off the main thread).
@@ -244,36 +281,43 @@ final class RecorderWindowModel {
         else { return }
         pendingThumbnails.append(id)
         guard thumbnailTask == nil else { return }
+        let excludesOwnApplication = !preferences.demoMode
         thumbnailTask = Task { [weak self] in
             while let self, !Task.isCancelled, !self.pendingThumbnails.isEmpty {
                 let id = self.pendingThumbnails.removeFirst()
-                if let image = try? await CaptureSources.thumbnail(of: .window(id), maxPixelWidth: 160),
+                if let image = try? await self.sourceAccess.thumbnail(.window(id), 160, excludesOwnApplication),
                     !Task.isCancelled
                 {
                     self.windowThumbnails[id] = NSImage(cgImage: image, size: .zero)
                 }
             }
-            self?.thumbnailTask = nil
+            if !Task.isCancelled { self?.thumbnailTask = nil }
         }
     }
 
     /// Takes a new still of the selected source.
-    func refreshSourcePreview() {
+    @discardableResult
+    func refreshSourcePreview() -> Task<Void, Never>? {
         previewTask?.cancel()
+        sourcePreview = nil
+        sourcePreviewError = nil
+        sourcePreviewLoading = false
         guard isActive, isGranted(.screenRecording), let source = preferences.selectedSource else {
             sourcePreview = nil
             sourcePreviewLoading = false
-            return
+            return nil
         }
         if case .window(let id) = source, windowsLoaded, !windows.contains(where: { $0.id == id }) {
             sourcePreview = nil
-            return
+            return nil
         }
         sourcePreviewLoading = true
+        let excludesOwnApplication = !preferences.demoMode
         previewTask = Task { [weak self] in
             do {
-                let image = try await CaptureSources.thumbnail(of: source, maxPixelWidth: 720)
                 guard let self, !Task.isCancelled else { return }
+                let image = try await self.sourceAccess.thumbnail(source, 720, excludesOwnApplication)
+                guard !Task.isCancelled else { return }
                 self.sourcePreview = NSImage(cgImage: image, size: .zero)
                 self.sourcePreviewError = nil
                 self.sourcePreviewLoading = false
@@ -284,11 +328,13 @@ final class RecorderWindowModel {
                 self.sourcePreviewLoading = false
             }
         }
+        return previewTask
     }
 
     func chooseWithSystemPicker() {
-        systemPicker.present(includingOwnApplication: preferences.demoMode) { [weak self] source in
-            guard let self, let source else { return }
+        let demoMode = preferences.demoMode
+        let completion: (ScreenSource?) -> Void = { [weak self] source in
+            guard let self, self.preferences.demoMode == demoMode, let source else { return }
             switch source {
             case .display(let id):
                 self.selectSourceKind(.display)
@@ -300,6 +346,11 @@ final class RecorderWindowModel {
             case .region:
                 break
             }
+        }
+        if let presentPicker = sourceAccess.presentPicker {
+            presentPicker(demoMode, completion)
+        } else {
+            systemPicker.present(includingOwnApplication: demoMode, completion: completion)
         }
     }
 

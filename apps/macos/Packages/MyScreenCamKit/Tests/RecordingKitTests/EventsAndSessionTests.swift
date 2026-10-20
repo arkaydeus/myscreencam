@@ -7,6 +7,22 @@ import Testing
 
 @testable import RecordingKit
 
+@Test func ownApplicationExclusionDefaultsAndReachesScreenConfiguration() {
+    let root = URL(filePath: "/tmp")
+    #expect(RecordingOptions(source: .display(1), recordingsRoot: root).excludesOwnApplication)
+    #expect(ScreenCaptureConfiguration(source: .display(1)).excludesOwnApplication)
+    for source: ScreenSource in [
+        .display(1), .region(display: 1, rect: CGRect(x: 0, y: 0, width: 20, height: 20)), .window(2),
+    ] {
+        for excluded in [true, false] {
+            let options = RecordingOptions(source: source, recordingsRoot: root, excludesOwnApplication: excluded)
+            let configuration = options.screenConfiguration(hasInputMonitoring: false)
+            #expect(configuration.excludesOwnApplication == excluded)
+            #expect(configuration.source == source)
+        }
+    }
+}
+
 @Test func firstFrameGatePropagatesStartupFailure() async throws {
     let gate = FirstFrameGate()
     gate.fail(RecordingError.writerFailed(.screen, "encoder stopped"))

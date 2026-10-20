@@ -167,12 +167,7 @@ public final class RecordingSession: @unchecked Sendable {
             Log.app.notice("Input Monitoring not granted: keeping the system cursor in the capture")
         }
 
-        let screen = ScreenCapture(
-            configuration: ScreenCaptureConfiguration(
-                source: options.source, frameRate: options.frameRate, showsCursor: !hidesCursor,
-                capturesSystemAudio: options.captureSystemAudio,
-                microphoneDeviceID: options.microphoneBackend == .screenCaptureKit ? options.microphoneDeviceID : nil,
-                excludesOwnApplication: options.excludesOwnApplication))
+        let screen = ScreenCapture(configuration: options.screenConfiguration(hasInputMonitoring: listenAccess))
         lock.withLock { self.screen = screen }
         let geometry: ScreenCaptureGeometry
         do { geometry = try await screen.prepare() } catch {
