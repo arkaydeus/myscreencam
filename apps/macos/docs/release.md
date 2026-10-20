@@ -12,7 +12,7 @@ The DMG and appcast are uploaded from this Mac as GitHub Releases of the public 
 | Version bump | `scripts/release/set-version.sh`: `mise run release:version -- v1.2.3` |
 | Pipeline script | `scripts/release/release.sh`: `mise run release` (build only) / `mise run release:publish` (build + upload) / `mise run release:dmg` (unnotarised test DMG) |
 | Export options | `scripts/release/ExportOptions.plist` (`developer-id`, manual signing) |
-| Releases repo | `arkaydeus/myscreencam`, the source repo (public; override with `MSC_RELEASES_REPO`) |
+| Releases repo | `arkaydeus/myscreencam`, the public source repo containing the build commit (override with `MSC_RELEASES_REPO`) |
 | Feed URL | `SUFeedURL` in `App/Info.plist`: `https://github.com/arkaydeus/myscreencam/releases/latest/download/appcast.xml` |
 | Website download | `https://github.com/arkaydeus/myscreencam/releases/latest/download/MyScreenCam.dmg` (stable asset name uploaded with each release) |
 | Public EdDSA key | `SPARKLE_PUBLIC_ED_KEY` build setting in `project.yml` → `SUPublicEDKey` |
@@ -41,13 +41,15 @@ xcrun notarytool store-credentials myscreencam-notary \
 ### 3. GitHub access
 `arkaydeus/myscreencam` must stay **public** (Sparkle and the website download from it anonymously). `gh` must be logged in with access to create releases there (`gh auth status`).
 
+`MSC_RELEASES_REPO` selects the public source repository for commit checks, release tags and assets. It must already contain the exact HEAD commit being built; a separate hosting-only repository is unsupported. When changing the default repository, also update `SUFeedURL` in `App/Info.plist`, the website's download and releases URLs, and the repository URLs in this guide so installed apps and the website find those releases.
+
 ## Cutting a release
 From the repo root (or `apps/macos`):
 1. Set the version:
    ```bash
    mise run release:version -- v1.2.3
    ```
-   This sets `MARKETING_VERSION` in `project.yml`, commits it and pushes the current branch. The release tag is created on that commit, so GitHub must have it. The version must be higher than the current one. The build number is the commit count on HEAD, so it always increases.
+   This sets `MARKETING_VERSION` in `project.yml`, commits it and pushes the current branch. Staged or unstaged changes to `project.yml` are rejected; unrelated changes stay out of the version commit. The release tag is created on that commit, so GitHub must have it. Use a higher numeric `major.minor.patch` version without leading zeros (optionally prefixed with `v`). The build number is the commit count on HEAD, so it always increases.
 2. Optionally write release notes to a Markdown file.
 3. Publish:
    ```bash

@@ -8,8 +8,7 @@ export const site = {
   description:
     "A native macOS screen recorder that turns raw recordings into finished videos: zooms that follow your cursor, painted backgrounds, webcam framing and hardware-accelerated export.",
   /** Stable DMG asset uploaded by apps/macos/scripts/release/release.sh. */
-  downloadUrl:
-    "https://github.com/arkaydeus/myscreencam/releases/latest/download/MyScreenCam.dmg",
+  downloadUrl: "https://github.com/arkaydeus/myscreencam/releases/latest/download/MyScreenCam.dmg",
   releasesUrl: "https://github.com/arkaydeus/myscreencam/releases/latest",
   requirements: "macOS 15 Sequoia or later, Apple silicon",
 } as const;

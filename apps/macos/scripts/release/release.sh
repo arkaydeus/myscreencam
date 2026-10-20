@@ -10,7 +10,7 @@
 #   NOTARY_PROFILE        notarytool keychain profile (default: myscreencam-notary)
 #   MSC_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
 #   MSC_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
-#   MSC_RELEASES_REPO     public GitHub repo that hosts DMGs + appcast (default: arkaydeus/myscreencam)
+#   MSC_RELEASES_REPO     public source repo containing HEAD, tags + assets (default: arkaydeus/myscreencam)
 #   MSC_SPARKLE_ACCOUNT   Keychain account of the Sparkle private key (default: Sparkle's default, "ed25519")
 #   MSC_PREVIOUS_APPCAST  path or URL of the current appcast.xml, merged so older versions stay listed
 #                         (default: the latest release's appcast.xml in MSC_RELEASES_REPO)
@@ -79,7 +79,7 @@ if [[ $publish -eq 1 ]]; then
   # The release tag is created on the commit being built, so GitHub must already have that commit.
   head_sha="$(git rev-parse HEAD)"
   gh api "repos/$releases_repo/commits/$head_sha" --silent 2>/dev/null \
-    || { echo "Push $head_sha to $releases_repo before publishing" >&2; exit 2; }
+    || { echo "Push $head_sha to $releases_repo before publishing; MSC_RELEASES_REPO must contain the source commit (hosting-only repositories are unsupported)" >&2; exit 2; }
 fi
 
 notarize_file() {

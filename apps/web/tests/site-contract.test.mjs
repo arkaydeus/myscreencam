@@ -26,13 +26,49 @@ import { recordingAt } from "../src/components/site/editor-demo-script";
 import { site } from "../src/lib/site";
 
 const css = readFileSync(resolve(import.meta.dir, "../src/app/globals.css"), "utf8");
+const releaseRepo = "arkaydeus/myscreencam";
+const releasesUrl = `https://github.com/${releaseRepo}/releases/latest`;
+const readRepoFile = (path) => readFileSync(resolve(import.meta.dir, "../../..", path), "utf8");
 
 test("Download for Mac points at the stable DMG asset", () => {
   const download = renderToStaticMarkup(createElement(DownloadButton));
 
-  expect(site.downloadUrl).toMatch(/\/releases\/latest\/download\/MyScreenCam\.dmg$/);
+  expect(site.downloadUrl).toBe(`${releasesUrl}/download/MyScreenCam.dmg`);
   expect(download).toContain(`href="${site.downloadUrl}"`);
   expect(download).toContain("Download for Mac");
+});
+
+test("website, Sparkle, release defaults and documentation use the same public source repo", () => {
+  const releaseScript = readRepoFile("apps/macos/scripts/release/release.sh");
+  const feed = readRepoFile("apps/macos/App/Info.plist").match(
+    /<key>SUFeedURL<\/key>\s*<string>([^<]+)<\/string>/,
+  )?.[1];
+  const defaultRepo = releaseScript.match(/releases_repo="\$\{MSC_RELEASES_REPO:-([^}]+)\}"/)?.[1];
+  const releaseDocs = readRepoFile("apps/macos/docs/release.md");
+
+  expect(defaultRepo).toBe(releaseRepo);
+  expect(site.releasesUrl).toBe(releasesUrl);
+  expect(feed).toBe(`${releasesUrl}/download/appcast.xml`);
+  expect(releaseDocs).toContain(`\`${site.downloadUrl}\``);
+  expect(releaseDocs).toContain(`\`${feed}\``);
+  const documentedUrls = Array.from(releaseDocs.matchAll(/https:\/\/github\.com\/[^\s`]+/g));
+  expect(documentedUrls.length).toBeGreaterThan(0);
+  for (const [url] of documentedUrls) {
+    expect(new URL(url).pathname.startsWith(`/${releaseRepo}/releases/`)).toBe(true);
+  }
+  for (const [path, line] of [
+    ["apps/macos/docs/release.md", "| Releases repo |"],
+    ["apps/macos/CLAUDE.md", "- Release:"],
+    ["apps/macos/mise.toml", 'description = "Full local release'],
+    ["apps/web/README.md", "The **Download for Mac**"],
+    ["apps/macos/scripts/release/release.sh", "#   MSC_RELEASES_REPO"],
+  ]) {
+    expect(
+      readRepoFile(path)
+        .split("\n")
+        .find((value) => value.startsWith(line)),
+    ).toContain(releaseRepo);
+  }
 });
 
 test("footer preserves the performance footnote and Releases, FAQ and download links", () => {

@@ -72,7 +72,7 @@ run = "echo 'All projects passed.'"
 
 [tasks."release:version"]
 description = "Set the Mac app version, commit and push it: `mise run release:version -- v1.2.3` (same as //apps/macos:release:version)"
-run = "mise run //apps/macos:release:version"
+run = "mise run //apps/macos:release:version --"
 
 [tasks."release:publish"]
 description = "Build, notarise and publish the Mac app locally as a GitHub Release (same as //apps/macos:release:publish)"

@@ -171,4 +171,6 @@ MSC_INSTALL_DIR="$tmp/Install" MSC_LSREGISTER="$tmp/bin/lsregister" MSC_TEST_LS_
 [[ ! -e "$tmp/Install/My Screen Cam.app/Old" && ! -e "$tmp/Install/My Screen Cam.app.installing" ]]
 [[ "$(cat "$tmp/ls-install-args")" == "-f -R -trusted $tmp/Install/My Screen Cam.app" ]]
 
-echo 'Script checks passed.' 
+/usr/bin/python3 "$root/scripts/test-release.py"
+
+echo 'Script checks passed.'
