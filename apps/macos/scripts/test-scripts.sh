@@ -51,6 +51,7 @@ bash -n "$root/scripts/dev/run.sh"
 bash -n "$root/scripts/dev/unregister-builds.sh"
 bash -n "$root/scripts/dev/xcodebuild.sh"
 bash -n "$root/scripts/release/release.sh"
+bash -n "$root/scripts/release/set-version.sh"
 bash -n "$root/scripts/release/install.sh"
 run_output="$(HOME="$tmp/home" MSC_DERIVED_DATA="$tmp/DerivedData" MSC_TEST_OPEN_ARGS="$tmp/open-args" \
   MSC_LSREGISTER="$tmp/bin/lsregister" MSC_TEST_LS_ARGS="$tmp/ls-run-args" PATH="$tmp/bin:$PATH" "$root/scripts/dev/run.sh")"
@@ -123,7 +124,7 @@ release_output="$(MSC_VERSION=1.2.3 "$root/scripts/release/release.sh" --print-c
 [[ "$release_output" == *"Archive: $root/build/release/MyScreenCam.xcarchive"* ]]
 [[ "$release_output" == *"App: $root/build/release/export/My Screen Cam.app"* ]]
 [[ "$release_output" == *"DMG asset: $root/build/release/MyScreenCam.dmg"* ]]
-[[ "$release_output" == *"Source tag: macos/v1.2.3"* ]]
+[[ "$release_output" == *"Release tag: v1.2.3"* ]]
 relative_output="$(MSC_VERSION=1.2.3 "$root/scripts/release/release.sh" --print-config --output relative-release)"
 [[ "$relative_output" == *"App: $root/relative-release/export/My Screen Cam.app"* ]]
 
@@ -170,4 +171,6 @@ MSC_INSTALL_DIR="$tmp/Install" MSC_LSREGISTER="$tmp/bin/lsregister" MSC_TEST_LS_
 [[ ! -e "$tmp/Install/My Screen Cam.app/Old" && ! -e "$tmp/Install/My Screen Cam.app.installing" ]]
 [[ "$(cat "$tmp/ls-install-args")" == "-f -R -trusted $tmp/Install/My Screen Cam.app" ]]
 
-echo 'Script checks passed.' 
+/usr/bin/python3 "$root/scripts/test-release.py"
+
+echo 'Script checks passed.'

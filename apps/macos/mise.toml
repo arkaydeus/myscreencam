@@ -74,8 +74,12 @@ run = "python3 scripts/perf/sample.py"
 description = "Archive, notarise, DMG, notarise DMG and refresh the Sparkle appcast, locally (see docs/release.md)"
 run = "scripts/release/release.sh"
 
+[tasks."release:version"]
+description = "Set the app version, commit and push it: `mise run release:version -- v1.2.3`"
+run = "scripts/release/set-version.sh"
+
 [tasks."release:publish"]
-description = "Full local release, then upload DMG + appcast to the public releases repo"
+description = "Full local release, then upload DMG + appcast as a GitHub Release of arkaydeus/myscreencam"
 run = "scripts/release/release.sh --publish"
 
 [tasks."release:dmg"]
