@@ -7,7 +7,7 @@
 #   MSC_VERSION=1.2.3 scripts/release/release.sh --print-config  # inspect paths and release tag
 #
 # Environment:
-#   NOTARY_PROFILE        notarytool keychain profile (default: myscreencam-notary)
+#   NOTARY_PROFILE        notarytool keychain profile (default: notary-arktech)
 #   MSC_VERSION           CFBundleShortVersionString override (default: MARKETING_VERSION in project.yml)
 #   MSC_BUILD             CFBundleVersion override (default: commits on HEAD; must increase per release)
 #   MSC_RELEASES_REPO     public source repo containing HEAD, tags + assets (default: arkaydeus/myscreencam)
@@ -48,7 +48,7 @@ out="$(/usr/bin/python3 -c 'import os, sys; print(os.path.realpath(os.path.join(
 
 team="QWD87G9T3P"
 identity="Developer ID Application"
-notary_profile="${NOTARY_PROFILE:-myscreencam-notary}"
+notary_profile="${NOTARY_PROFILE:-notary-arktech}"
 derived="$out/DerivedData"
 archive="$out/MyScreenCam.xcarchive"
 export_dir="$out/export"

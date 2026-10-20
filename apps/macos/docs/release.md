@@ -31,9 +31,9 @@ The DMG and appcast are uploaded from this Mac as GitHub Releases of the public 
   3. Export `MSC_SPARKLE_ACCOUNT=myscreencam` when releasing.
 
 ### 2. Notarisation credentials
-Store an App Store Connect API key (preferred) or an app-specific password in the Keychain under the profile name the script uses (`myscreencam-notary`; override with `NOTARY_PROFILE`):
+Store an App Store Connect API key (preferred) or an app-specific password in the Keychain under the profile name the script uses (`notary-arktech`; override with `NOTARY_PROFILE`):
 ```bash
-xcrun notarytool store-credentials myscreencam-notary \
+xcrun notarytool store-credentials notary-arktech \
   --key AuthKey_XXXXXXXXXX.p8 --key-id XXXXXXXXXX --issuer xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 # or: --apple-id you@example.com --team-id QWD87G9T3P --password <app-specific password>
 ```
