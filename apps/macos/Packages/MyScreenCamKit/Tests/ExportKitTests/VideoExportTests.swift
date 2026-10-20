@@ -167,6 +167,32 @@ struct VideoExportTests {
         #expect(try filesIn(directory).isEmpty)
     }
 
+    @Test(arguments: [true, false])
+    func progressAdvancesDuringEncoding(withVideoComposition: Bool) async throws {
+        let settings = ExportSettings(format: .proRes422, frameRate: .fps60)
+        let source = try await Fixtures.shared.clip(.long)
+        let url = try await Fixtures.shared.outputDirectory("progress-\(withVideoComposition)")
+            .appendingPathComponent("out.mov")
+
+        let exporter = VideoExporter(options: .init(progressInterval: .zero))
+        let job: ExportJob
+        if withVideoComposition {
+            let fixture = try await CompositionFixture.make(source: source, settings: settings)
+            job = exporter.start(
+                asset: fixture.composition, videoComposition: fixture.videoComposition,
+                audioMix: fixture.audioMix, to: url, settings: settings)
+        } else {
+            job = exporter.start(asset: AVURLAsset(url: source), to: url, settings: settings)
+        }
+        let progress = collectProgress(job)
+        _ = try await job.result
+        let encoding = await progress.value.filter { $0.stage == .encoding }.map(\.fraction)
+
+        // Composited frames carry no duration; progress must still follow their timestamps
+        // instead of sitting at 0 until the last frame and then jumping.
+        #expect(encoding.contains { $0 > 0.1 && $0 < 0.9 }, "no intermediate progress: \(encoding)")
+    }
+
     @Test func cancelMidwayDeletesThePartialFileAndKeepsAnExistingOne() async throws {
         let settings = ExportSettings(format: .proRes422, frameRate: .fps60)
         let source = try await Fixtures.shared.clip(.long)
