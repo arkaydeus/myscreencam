@@ -15,7 +15,7 @@ export function Hero() {
         Screen recordings that look finished.
       </h1>
       <p className="mt-3 text-[19px] font-semibold tracking-[-0.01em] sm:mt-4 sm:text-[26px]">
-        <span className="text-paint">100% free and open source forever</span>
+        <span className="text-paint">Free to download. No license keys.</span>
       </p>
       <p className="mx-auto mt-5 max-w-[760px] text-[19px] leading-[1.42] text-pretty text-muted-foreground sm:mt-7 sm:text-2xl sm:leading-[1.34]">
         Record your Mac, and My Screen Cam adds the zooms, the painted background, the framed webcam

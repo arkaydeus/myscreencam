@@ -149,15 +149,9 @@
     );
 }
 
-/* The canvas paint as a text fill, for the hero's "free and open source" line. */
+/* Darker canvas pigments keep the hero tagline above 4.5:1 on white throughout the sRGB gradient. */
 @utility text-paint {
-  background: linear-gradient(
-    90deg,
-    #ff8a5c 0%,
-    var(--color-rose) 35%,
-    #7b3fd6 68%,
-    var(--color-ultramarine) 100%
-  );
+  background: linear-gradient(90deg in srgb, #b54720 0%, #bd3565 35%, #7b3fd6 68%, #2f46e8 100%);
   background-clip: text;
   color: transparent;
 }
