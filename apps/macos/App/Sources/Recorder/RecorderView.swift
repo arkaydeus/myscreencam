@@ -413,6 +413,12 @@ private struct OptionsSection: View {
                 .font(.caption)
                 .foregroundStyle(Color.themeSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+                Toggle("Demo Mode", isOn: $preferences.demoMode)
+                    .onChange(of: preferences.demoMode) { model.demoModeChanged() }
+                Text("Records My Screen Cam's windows, except recording controls. Off at every launch.")
+                    .font(.caption)
+                    .foregroundStyle(Color.themeSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 DisclosureGroup(isExpanded: $showsAdvanced) {
                     VStack(alignment: .leading, spacing: 8) {
                         Picker("Frame rate", selection: $preferences.frameRate) {
@@ -530,7 +536,7 @@ private struct StartButton: View {
 
 /// Reports when the hosting window becomes hidden or visible again after appearing (minimised, covered, on
 /// another Space), so the camera preview and mic meter only run while someone can see them.
-private struct WindowVisibilityReader: NSViewRepresentable {
+struct WindowVisibilityReader: NSViewRepresentable {
     let onChange: (Bool) -> Void
 
     func makeNSView(context: Context) -> ReaderView {
@@ -553,6 +559,9 @@ private struct WindowVisibilityReader: NSViewRepresentable {
             if let observer { NotificationCenter.default.removeObserver(observer) }
             observer = nil
             guard let window else { return }
+            // The recorder is a capture control, including during the countdown and opening frames.
+            // CaptureSources applies this exclusion explicitly to previews, streams and window lists.
+            window.sharingType = .none
             observer = NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
             ) { [weak self] _ in MainActor.assumeIsolated { self?.report() } }

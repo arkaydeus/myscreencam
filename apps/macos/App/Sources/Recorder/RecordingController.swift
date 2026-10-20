@@ -31,7 +31,7 @@ final class RecordingController {
     private(set) var state: State = .idle
     let environment: AppEnvironment
     let router: AppRouter
-    let preferences = RecorderPreferences()
+    let preferences: RecorderPreferences
     /// The camera shared by the recorder preview and the recording.
     let cameraHub = CameraHub()
     /// Whole seconds recorded so far (pauses excluded). Ticks once a second while recording, and not at all
@@ -48,9 +48,10 @@ final class RecordingController {
     @ObservationIgnored private lazy var hud = RecordingHUD(controller: self)
     @ObservationIgnored private let countdownOverlay = CountdownOverlay()
 
-    init(environment: AppEnvironment, router: AppRouter) {
+    init(environment: AppEnvironment, router: AppRouter, preferences: RecorderPreferences = RecorderPreferences()) {
         self.environment = environment
         self.router = router
+        self.preferences = preferences
         // The recorder opens on the last-used tab unless a menu, URL or intent asks for another.
         router.recorderSourceRequest = preferences.sourceKind
     }
@@ -122,7 +123,7 @@ final class RecordingController {
         Log.app.info("Recording countdown cancelled")
     }
 
-    private func makeOptions(source: ScreenSource, root: URL) -> RecordingOptions {
+    func makeOptions(source: ScreenSource, root: URL) -> RecordingOptions {
         let devices = CaptureDevices.current()
         let cameraID = preferences.cameraID.flatMap { id in
             Permissions.status(.camera).isGranted && devices.cameras.contains { $0.id == id } ? id : nil
@@ -134,10 +135,12 @@ final class RecordingController {
             source: source, recordingsRoot: root, frameRate: preferences.frameRate,
             hideSystemCursor: preferences.customCursor, captureSystemAudio: preferences.captureSystemAudio,
             microphoneDeviceID: microphoneID, cameraDeviceID: cameraID, videoCodec: preferences.codec,
-            recordsInputEvents: true)
+            recordsInputEvents: true, excludesOwnApplication: !preferences.demoMode)
     }
 
     private func begin(_ options: RecordingOptions) async {
+        // Materialise the HUD before resolving the capture filter so its window ID is excluded too.
+        hud.show()
         let camera = cameraHub.holdForRecording(deviceID: options.cameraDeviceID)
         let session = RecordingSession(options: options, camera: camera)
         self.session = session
@@ -153,6 +156,7 @@ final class RecordingController {
             eventsTask = nil
             countdownTask = nil
             cameraHub.releaseFromRecording()
+            hud.hide()
             state = .idle
             presentAlert(title: "The recording couldn't start", message: error.localizedDescription)
             return
@@ -161,7 +165,6 @@ final class RecordingController {
         state = .recording(startedAt: Date(), paused: false)
         elapsedSeconds = 0
         startClock()
-        hud.show()
         Log.app.info("Recording started: \(String(describing: options.source), privacy: .public)")
     }
 

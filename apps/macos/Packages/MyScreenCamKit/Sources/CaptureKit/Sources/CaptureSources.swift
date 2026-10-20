@@ -5,6 +5,22 @@ import ScreenCaptureKit
 /// Lists what can be captured and renders still previews. All calls need Screen Recording permission
 /// (ScreenCaptureKit throws without it).
 public enum CaptureSources {
+    /// ScreenCaptureKit does not consistently honour `sharingType` itself. Explicitly exclude the
+    /// recorder, HUD and overlays that opt out, including when Demo Mode permits other app windows.
+    @MainActor
+    public static var excludedWindowIDs: Set<CGWindowID> {
+        Set(
+            (NSApp?.windows ?? []).filter { $0.sharingType == .none && $0.windowNumber > 0 }
+                .map { CGWindowID($0.windowNumber) })
+    }
+
+    static func permitsWindow(
+        id: CGWindowID, processID: pid_t?, excludingOwnApplication: Bool, excludedWindowIDs: Set<CGWindowID>
+    ) -> Bool {
+        !excludedWindowIDs.contains(id)
+            && (!excludingOwnApplication || processID != ProcessInfo.processInfo.processIdentifier)
+    }
+
     /// Connected displays, main display first.
     public static func displays() async throws -> [DisplayInfo] {
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
@@ -16,13 +32,17 @@ public enum CaptureSources {
             }
     }
 
-    /// On-screen, titled, normal-level (layer 0) windows of other applications, front to back.
-    public static func windows() async throws -> [WindowInfo] {
+    /// On-screen, titled, normal-level (layer 0) windows of other applications (and this one's, if
+    /// `includingOwnApplication`), front to back.
+    public static func windows(includingOwnApplication: Bool = false) async throws -> [WindowInfo] {
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
-        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let excluded = await excludedWindowIDs
         return content.windows.compactMap { window -> WindowInfo? in
             guard window.windowLayer == 0, window.isOnScreen, let title = window.title, !title.isEmpty,
-                let app = window.owningApplication, app.processID != ownPID,
+                let app = window.owningApplication,
+                permitsWindow(
+                    id: window.windowID, processID: app.processID,
+                    excludingOwnApplication: !includingOwnApplication, excludedWindowIDs: excluded),
                 window.frame.width >= 1, window.frame.height >= 1
             else { return nil }
             return WindowInfo(
@@ -32,8 +52,10 @@ public enum CaptureSources {
     }
 
     /// A still image of the source, at most `maxPixelWidth` wide, for the recorder's source preview.
-    public static func thumbnail(of source: ScreenSource, maxPixelWidth: Int = 480) async throws -> CGImage {
-        let resolved = try await ContentResolver.resolve(source, excludingOwnApplication: true)
+    public static func thumbnail(
+        of source: ScreenSource, maxPixelWidth: Int = 480, excludingOwnApplication: Bool = true
+    ) async throws -> CGImage {
+        let resolved = try await ContentResolver.resolve(source, excludingOwnApplication: excludingOwnApplication)
         let configuration = SCStreamConfiguration()
         let size = resolved.contentRect.size
         let scale = min(resolved.scale, Double(maxPixelWidth) / max(1, Double(size.width)))

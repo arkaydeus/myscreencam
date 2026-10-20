@@ -1,6 +1,8 @@
+import AppKit
 import CoreGraphics
 import CoreMedia
 import Foundation
+import ScreenCaptureKit
 import Testing
 
 @testable import CaptureKit
@@ -57,5 +59,90 @@ struct LiveScreenCaptureTests {
         #expect(!formats.isEmpty)
         #expect(formats.allSatisfy { $0 == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange })
         #expect(abs((times.last ?? 0) - HostClock.now()) < 1)
+    }
+}
+
+struct CaptureWindowPolicyTests {
+    @Test func demoModePermitsOwnWindowsButAlwaysExcludesControls() {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        for excluded in [true, false] {
+            #expect(
+                CaptureSources.permitsWindow(
+                    id: 1, processID: ownPID, excludingOwnApplication: excluded, excludedWindowIDs: [2]) == !excluded)
+            #expect(
+                CaptureSources.permitsWindow(
+                    id: 3, processID: -1, excludingOwnApplication: excluded, excludedWindowIDs: [2]))
+            #expect(
+                !CaptureSources.permitsWindow(
+                    id: 2, processID: ownPID, excludingOwnApplication: excluded, excludedWindowIDs: [2]))
+        }
+    }
+}
+
+@Suite(.enabled(if: CGPreflightScreenCaptureAccess()), .serialized)
+@MainActor
+struct LiveDemoCaptureTests {
+    @Test func ownWindowListingAndDisplayRegionFiltersExcludeControls() async throws {
+        guard #available(macOS 15.2, *) else { return }
+        let screen = try #require(NSScreen.screens.first { $0.frame.origin == .zero })
+        func makeWindow(_ title: String, excluded: Bool) -> NSWindow {
+            let window = NSWindow(
+                contentRect: CGRect(x: 40, y: screen.frame.maxY - 200, width: 200, height: 120), styleMask: [.titled],
+                backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.title = title
+            window.sharingType = excluded ? .none : .readOnly
+            window.contentView?.wantsLayer = true
+            window.contentView?.layer?.backgroundColor = (excluded ? NSColor.green : NSColor.red).cgColor
+            window.orderFrontRegardless()
+            window.displayIfNeeded()
+            return window
+        }
+        let editor = makeWindow("Demo editor", excluded: false)
+        let recorder = makeWindow("New Recording", excluded: true)
+        defer { editor.close(); recorder.close() }
+        let editorID = CGWindowID(editor.windowNumber)
+        let recorderID = CGWindowID(recorder.windowNumber)
+        let normal = try await CaptureSources.windows()
+        let demo = try await CaptureSources.windows(includingOwnApplication: true)
+        #expect(!normal.contains { $0.id == editorID || $0.id == recorderID })
+        #expect(demo.contains { $0.id == editorID })
+        #expect(!demo.contains { $0.id == recorderID })
+        for source: ScreenSource in [
+            .display(CGMainDisplayID()),
+            .region(display: CGMainDisplayID(), rect: CGRect(x: 0, y: 0, width: 400, height: 300)),
+        ] {
+            for excluded in [true, false] {
+                let preview = try await CaptureSources.thumbnail(
+                    of: source, maxPixelWidth: 160, excludingOwnApplication: excluded)
+                #expect(preview.width <= 160)
+                // Both windows overlap here. Demo previews must show the red editor beneath the green
+                // recorder; ordinary previews must omit both own-app windows.
+                let sourceWidth = source == .display(CGMainDisplayID()) ? screen.frame.width : 400
+                let scale = CGFloat(preview.width) / sourceWidth
+                let red = try isRed(preview, x: Int(140 * scale), y: Int(140 * scale))
+                #expect(red == !excluded)
+            }
+        }
+        await #expect(throws: CaptureError.self) {
+            try await ContentResolver.resolve(.window(recorderID), excludingOwnApplication: false)
+        }
+        await #expect(throws: CaptureError.self) {
+            try await ContentResolver.resolve(.window(editorID), excludingOwnApplication: true)
+        }
+        _ = try await ContentResolver.resolve(.window(editorID), excludingOwnApplication: false)
+    }
+
+    private func isRed(_ image: CGImage, x: Int, y: Int) throws -> Bool {
+        let crop = try #require(image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        try pixel.withUnsafeMutableBytes { bytes in
+            let context = try #require(
+                CGContext(
+                    data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(crop, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        return pixel[0] > 200 && pixel[1] < 50 && pixel[2] < 50
     }
 }
