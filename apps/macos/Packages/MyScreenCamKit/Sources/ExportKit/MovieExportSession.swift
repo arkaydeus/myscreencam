@@ -49,7 +49,11 @@ final class SamplePump: @unchecked Sendable {
                             control.fail(.writerFailed(underlying: writerError()))
                             return false
                         }
-                        let end = CMTimeAdd(sample.presentationTimeStamp, sample.duration)
+                        // Video composition frames usually have no duration; their timestamp still tracks progress.
+                        var end = sample.presentationTimeStamp
+                        if sample.duration.isNumeric {
+                            end = CMTimeAdd(end, sample.duration)
+                        }
                         reporter.didAppend(track, endTime: end.isNumeric ? end.seconds : 0)
                         return true
                     }
