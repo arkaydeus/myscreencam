@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { dragged, LOOP, REST, script } from "../src/components/site/editor-demo-script";
+import { site } from "../src/lib/site";
 
 // Exercise the production page, including its real CSS and React inspector updates.
 const reservation = Bun.serve({ port: 0, fetch: () => new Response() });
@@ -41,7 +42,7 @@ try {
   }
   assert(ready, "Production server must start");
   browser = await chromium.launch();
-  for (const width of [1440, 390, 320]) {
+  for (const width of [1440, 1024, 768, 640, 390, 320]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -79,6 +80,100 @@ try {
     });
     await page.goto(url);
     await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; }" });
+    await page.evaluate(() => document.fonts.ready);
+
+    const header = page.getByRole("banner");
+    const source = header.getByRole("link", {
+      name: "My Screen Cam on GitHub",
+      exact: true,
+      includeHidden: true,
+    });
+    assert.equal(await source.count(), 1, "Header has one accessibly named GitHub link");
+    assert.equal(
+      await source.getAttribute("href"),
+      site.sourceUrl,
+      "Header links to the source repository",
+    );
+    assert.equal(await source.isVisible(), width >= 640, "GitHub action uses the roomy header");
+    assert(
+      await page
+        .getByRole("contentinfo")
+        .getByRole("link", { name: "GitHub", exact: true })
+        .isVisible(),
+      "Footer GitHub link stays available",
+    );
+    assert(
+      await header.getByRole("link", { name: "Download", exact: true }).isVisible(),
+      "Header download stays available",
+    );
+    assert(
+      await page.getByText("Free to download. No license keys.", { exact: true }).isVisible(),
+      "Hero makes a supported free-download claim",
+    );
+    assert.doesNotMatch(await page.locator("body").innerText(), /open source|forever/i);
+
+    const headerLayout = await header.evaluate((element) => {
+      const brand = element.querySelector('a[href="#top"] span');
+      const family = getComputedStyle(brand).fontFamily.split(",")[0].replace(/["']/g, "").trim();
+      const row = element.firstElementChild;
+      const bounds = row.getBoundingClientRect();
+      const style = getComputedStyle(row);
+      const left = bounds.left + parseFloat(style.paddingLeft);
+      const right = bounds.right - parseFloat(style.paddingRight);
+      const links = [...element.querySelectorAll("a")].filter(
+        (link) => link.getClientRects().length,
+      );
+      return {
+        fontLoaded:
+          /nunito/i.test(family) &&
+          [...document.fonts].some(
+            (font) => font.family.replace(/["']/g, "") === family && font.status === "loaded",
+          ),
+        outside: links
+          .filter((link) => {
+            const rect = link.getBoundingClientRect();
+            return rect.left < left - 0.5 || rect.right > right + 0.5;
+          })
+          .map((link) => link.textContent || link.getAttribute("aria-label")),
+        overlap: links.some((link, i) =>
+          links.slice(i + 1).some((other) => {
+            const a = link.getBoundingClientRect();
+            const b = other.getBoundingClientRect();
+            return a.left < b.right && a.right > b.left;
+          }),
+        ),
+      };
+    });
+    assert(headerLayout.fontLoaded, `${width}px: header uses loaded Nunito`);
+    assert.deepEqual(
+      headerLayout.outside,
+      [],
+      `${width}px: header controls stay inside content gutters`,
+    );
+    assert.equal(headerLayout.overlap, false, `${width}px: header controls do not overlap`);
+
+    async function noHorizontalOverflow() {
+      const dimensions = await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        content: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      }));
+      assert(
+        dimensions.content <= dimensions.viewport,
+        `${width}px: no horizontal page overflow (${dimensions.content}px)`,
+      );
+    }
+    await noHorizontalOverflow();
+    if (process.env.BROWSER_SCREENSHOTS) {
+      await page.screenshot({ path: `${process.env.BROWSER_SCREENSHOTS}/hero-${width}.png` });
+    }
+    // The intermediate widths cover the header's responsive breakpoints; exercise
+    // the full illustration and animation suite at the original desktop/mobile sizes.
+    if (![1440, 390, 320].includes(width)) {
+      assert.deepEqual(errors, [], "No browser errors");
+      console.log(`Header bounds and page overflow passed at ${width}px`);
+      await page.close();
+      continue;
+    }
 
     /** Check all clipping ancestors, in CSS pixels, allowing only subpixel rounding. */
     async function contained(locator, label) {
@@ -205,6 +300,7 @@ try {
         );
       }
     }
+    await noHorizontalOverflow();
     assert.deepEqual(errors, [], "No browser errors");
     console.log(`Browser bounds and both hero cycles passed at ${width}px`);
     await page.close();
