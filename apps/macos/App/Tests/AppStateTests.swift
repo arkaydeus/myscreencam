@@ -325,6 +325,38 @@ struct AppStateTests {
         await model.close()
     }
 
+    @Test func cueSelectionRangesTogglesSelectsAllAndDeletesTogether() async throws {
+        let (root, model) = try await editorFixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cues = (0..<4).map { SubtitleCue(start: Double($0) * 0.5, end: Double($0) * 0.5 + 0.4, text: "\($0)") }
+        model.update("Seed") { $0.subtitles.cues = cues }
+        let ids = cues.map(\.id)
+
+        model.selectCue(ids[1])
+        #expect(model.selectedCue?.id == ids[1])
+        model.selectCue(ids[3], .range)
+        #expect(model.selectedCueIDs == Set(ids[1...3]))
+        #expect(model.selectedCue == nil)
+        model.selectCue(ids[2], .toggle)
+        #expect(model.selectedCueIDs == [ids[1], ids[3]])
+        model.selectCue(ids[0], .toggle)
+        #expect(model.selectedCueIDs == [ids[0], ids[1], ids[3]])
+
+        let undo = UndoManager()
+        model.undoManager = undo
+        model.deleteSelection()
+        #expect(model.edit.subtitles.cues.map(\.id) == [ids[2]])
+        #expect(model.selection == nil)
+        undo.undo()
+        #expect(model.edit.subtitles.cues.map(\.id) == ids)
+
+        model.selectAllCues()
+        #expect(model.selectedCueIDs == Set(ids))
+        model.deleteSelection()
+        #expect(model.edit.subtitles.cues.isEmpty)
+        await model.close()
+    }
+
     @Test func plainClickKeepsZoomGroupForDragAndCollapsesWithoutDrag() async throws {
         let (root, model) = try await editorFixture()
         defer { try? FileManager.default.removeItem(at: root) }

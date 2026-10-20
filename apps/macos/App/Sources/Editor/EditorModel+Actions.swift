@@ -51,13 +51,13 @@ extension EditorModel {
         if let next = try? edit.trimEnd(toSource: s, duration: meta.duration) { apply(next, action: "Trim End") }
     }
 
-    /// Delete / Backspace: the selected segment, keyframe, blur mask or subtitle.
+    /// Delete / Backspace: the selected segment, keyframes, blur mask or subtitles.
     func deleteSelection() {
         switch selection {
         case .segment: deleteSelectedSegment()
         case .keyframes(let ids): deleteKeyframes(ids)
         case .blur(let id): deleteBlur(id)
-        case .cue(let id): deleteCue(id)
+        case .cues(let ids): deleteCues(ids)
         case nil: break
         }
     }

@@ -90,9 +90,34 @@ extension EditorModel {
 
     // MARK: Cues
 
+    var selectedCueIDs: Set<SubtitleCue.ID> {
+        if case .cues(let ids) = selection { ids } else { [] }
+    }
+
+    /// The selected cue when exactly one is selected (the one the cue editor and preview handles edit).
     var selectedCue: SubtitleCue? {
-        guard case .cue(let id) = selection else { return nil }
+        let ids = selectedCueIDs
+        guard ids.count == 1, let id = ids.first else { return nil }
         return edit.subtitles.cues.first { $0.id == id }
+    }
+
+    /// Selects a cue from a click (plain, ⌘ or ⇧).
+    func selectCue(_ id: SubtitleCue.ID, _ modifier: SelectionModifier = .replace) {
+        let next = SelectionModifier.select(
+            id, modifier, current: selectedCueIDs, anchor: cueAnchor, ordered: edit.subtitles.cues.map(\.id))
+        if next.ids != [id] || selectedCue?.id != id { selectedWordIDs = [] }
+        cueAnchor = next.anchor
+        selection = next.ids.isEmpty ? nil : .cues(next.ids)
+    }
+
+    /// Selects every cue (clicking the timeline's Subtitles label).
+    func selectAllCues() {
+        let ids = Set(edit.subtitles.cues.map(\.id))
+        guard !ids.isEmpty else { return }
+        selectedWordIDs = []
+        cueAnchor = edit.subtitles.cues.first?.id
+        selection = .cues(ids)
+        inspectorTab = .subtitles
     }
 
     /// The first cue showing at the playhead.
@@ -110,8 +135,7 @@ extension EditorModel {
     /// Selects a cue, pauses and moves the playhead into it.
     func focusCue(_ id: SubtitleCue.ID) {
         guard let cue = edit.subtitles.cues.first(where: { $0.id == id }) else { return }
-        if selection != .cue(id) { selectedWordIDs = [] }
-        selection = .cue(id)
+        selectCue(id)
         pause()
         // A little into the cue so it's the one showing.
         seek(to: timeline.editedTimeSnapping(forSource: cue.start + min(0.05, cue.duration / 2)))
@@ -201,13 +225,14 @@ extension EditorModel {
         }
         let cue = SubtitleCue(start: start, end: min(meta.duration, start + 2), text: "", timingEdited: true)
         update("Add Subtitle") { $0.subtitles.cues.append(cue) }
-        selection = .cue(cue.id)
+        selectCue(cue.id)
         inspectorTab = .subtitles
     }
 
-    func deleteCue(_ id: SubtitleCue.ID) {
-        update("Delete Subtitle") { $0.subtitles.cues.removeAll { $0.id == id } }
-        if selection == .cue(id) { selection = nil }
+    func deleteCues(_ ids: Set<SubtitleCue.ID>) {
+        update(ids.count == 1 ? "Delete Subtitle" : "Delete Subtitles") {
+            $0.subtitles.cues.removeAll { ids.contains($0.id) }
+        }
     }
 
     // MARK: Transcript-driven cuts

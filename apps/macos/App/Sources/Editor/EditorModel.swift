@@ -11,7 +11,8 @@ enum EditorSelection: Hashable {
     /// One or more zooms (⇧-click selects a range, ⌘-click adds or removes one).
     case keyframes(Set<ZoomKeyframe.ID>)
     case blur(BlurMask.ID)
-    case cue(SubtitleCue.ID)
+    /// One or more subtitles (⇧-click selects a range, ⌘-click adds or removes one, the row label selects all).
+    case cues(Set<SubtitleCue.ID>)
 }
 
 /// How a click changes a multi-selection.
@@ -113,6 +114,8 @@ final class EditorModel {
     var timelineZoom: Double = 1
     /// The zoom last picked by a plain or ⌘-click: ⇧-click selects from here, and the inspector shows its values.
     @ObservationIgnored var keyframeAnchor: ZoomKeyframe.ID?
+    /// The subtitle last picked by a plain or ⌘-click: ⇧-click selects from here.
+    @ObservationIgnored var cueAnchor: SubtitleCue.ID?
     /// The next click on the preview sets the selected keyframes' target.
     var isPickingZoomTarget = false
     /// A short message shown in the transport bar ("Too close to edge").
@@ -338,7 +341,9 @@ final class EditorModel {
             let live = ids.filter { id in edit.zoom.keyframes.contains { $0.id == id } }
             if live != ids { selection = live.isEmpty ? nil : .keyframes(live) }
         case .blur(let id): if !edit.blur.contains(where: { $0.id == id }) { selection = nil }
-        case .cue(let id): if !edit.subtitles.cues.contains(where: { $0.id == id }) { selection = nil }
+        case .cues(let ids):
+            let live = ids.filter { id in edit.subtitles.cues.contains { $0.id == id } }
+            if live != ids { selection = live.isEmpty ? nil : .cues(live) }
         case nil: break
         }
     }

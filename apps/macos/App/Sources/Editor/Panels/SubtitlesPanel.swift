@@ -90,6 +90,8 @@ struct SubtitlesPanel: View {
     private var cueList: some View {
         let matches = Set(model.subtitleMatches)
         let searching = !model.subtitleSearch.trimmingCharacters(in: .whitespaces).isEmpty
+        let selected = model.selectedCueIDs
+        let editing = model.selectedCue?.id
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
@@ -101,7 +103,7 @@ struct SubtitlesPanel: View {
                     }
                     ForEach(settings.cues) { cue in
                         CueRow(
-                            model: model, cue: cue, isSelected: model.selection == .cue(cue.id),
+                            model: model, cue: cue, isSelected: selected.contains(cue.id), isEditing: editing == cue.id,
                             isActive: tracker.activeID == cue.id, isMatch: searching && matches.contains(cue.id),
                             isCut: model.timeline.editedTime(forSource: cue.start) == nil
                                 && model.timeline.editedTime(forSource: cue.end) == nil
@@ -116,7 +118,9 @@ struct SubtitlesPanel: View {
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
             }
             .onChange(of: model.selection) { _, selection in
-                if case .cue(let id) = selection { withAnimation { proxy.scrollTo(id) } }
+                if case .cues(let ids) = selection, ids.count == 1, let id = ids.first {
+                    withAnimation { proxy.scrollTo(id) }
+                }
             }
         }
     }
@@ -339,6 +343,8 @@ private struct CueRow: View {
     let model: EditorModel
     let cue: SubtitleCue
     let isSelected: Bool
+    /// The only selected cue: its row shows the editor.
+    let isEditing: Bool
     let isActive: Bool
     let isMatch: Bool
     let isCut: Bool
@@ -366,7 +372,7 @@ private struct CueRow: View {
                 }
                 Spacer()
             }
-            if isSelected {
+            if isEditing {
                 CueEditor(model: model, cue: cue)
             } else {
                 Text(cue.text.isEmpty ? "Empty subtitle" : cue.text)
@@ -384,8 +390,15 @@ private struct CueRow: View {
                 .strokeBorder(isSelected ? Color.themeAccent : .clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture { if !isSelected { model.focusCue(cue.id) } }
-        .accessibilityElement(children: isSelected ? .contain : .combine)
+        .onTapGesture {
+            let modifier = SelectionModifier(NSEvent.modifierFlags)
+            if modifier != .replace {
+                model.selectCue(cue.id, modifier)
+            } else if !isEditing {
+                model.focusCue(cue.id)
+            }
+        }
+        .accessibilityElement(children: isEditing ? .contain : .combine)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [.isButton])
         .accessibilityAction { model.focusCue(cue.id) }
         .help(isCut ? "This subtitle is inside a cut" : "")
@@ -469,7 +482,7 @@ private struct CueEditor: View {
                 }
                 Spacer()
                 Button(role: .destructive) {
-                    model.deleteCue(cue.id)
+                    model.deleteCues([cue.id])
                 } label: {
                     Image(systemName: "trash")
                 }
