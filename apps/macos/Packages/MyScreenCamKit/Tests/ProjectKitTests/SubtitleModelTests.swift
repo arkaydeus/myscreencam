@@ -483,6 +483,35 @@ struct SubtitleWordTests {
         #expect(SubtitleWords.progress(in: "one two tree", words: words, at: 1.2) == P(highlight: nil, spoken: 12))
     }
 
+    @Test func progressRevealsTrailingUntimedWordsWhenTheLastTimingEnds() {
+        let timing = { (start: Double, end: Double) in
+            UnitTiming(sourceRange: TranscriptFixtures.range(start, end), method: .tdt, validation: .valid)
+        }
+        let text = "one two three"
+        let words = SubtitleWords.build(
+            text: text, units: [("one", timing(0, 0.4)), ("two", timing(0.5, 0.9)), ("three", nil)])
+        #expect(words.map(\.text) == ["one", "two"])
+        typealias P = SubtitleWords.Progress
+        #expect(SubtitleWords.progress(in: text, words: words, at: 0.8) == P(highlight: 4..<7, spoken: 7))
+        #expect(SubtitleWords.progress(in: text, words: words, at: 0.9) == P(highlight: 4..<7, spoken: 13))
+        #expect(SubtitleWords.progress(in: text, words: words, at: 1.2) == P(highlight: 4..<7, spoken: 13))
+        // The same completion rule applies when corrected text no longer matches the last word.
+        #expect(SubtitleWords.progress(in: "one too three", words: words, at: 1.2) == P(highlight: nil, spoken: 13))
+    }
+
+    @Test func progressUsesUTF16OffsetsOnLaterLines() {
+        let text = "one\ntwo 😀 three"
+        let words = [
+            SubtitleWord(text: "one", start: 0, end: 0.4),
+            SubtitleWord(text: "two", start: 0.5, end: 0.9),
+            SubtitleWord(text: "😀", start: 1, end: 1.4),
+        ]
+        typealias P = SubtitleWords.Progress
+        #expect(SubtitleWords.progress(in: text, words: words, at: 0.6) == P(highlight: 4..<7, spoken: 7))
+        #expect(SubtitleWords.progress(in: text, words: words, at: 1.1) == P(highlight: 8..<10, spoken: 10))
+        #expect(SubtitleWords.progress(in: text, words: words, at: 1.4) == P(highlight: 8..<10, spoken: 16))
+    }
+
     @Test func oldFilesDecodeWithoutWordsOrHighlight() throws {
         var config = EditConfig(segments: [Segment(start: 0, end: 10)])
         config.subtitles.cues = [SubtitleCue(start: 1, end: 2, text: "Hi")]

@@ -155,13 +155,14 @@ final class SubtitleRasterCache: @unchecked Sendable {
             draw(filled ?? plain, in: ctx, word: highlight, scale: scale, glyphs: glyphs)
         }
         if let spoken, style.dimUpcoming, style.upcomingOpacity < 1 {
-            drawText(0..<spoken)
             // Faded as a whole (a transparency layer), so the outline doesn't show through the faded fill.
             ctx.setAlpha(style.upcomingOpacity)
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
             drawText(spoken..<Int.max)
             ctx.endTransparencyLayer()
             ctx.setAlpha(1)
+            // Keep the spoken fill above adjacent upcoming outlines, including tightly spaced CJK glyphs.
+            drawText(0..<spoken)
         } else {
             drawText(nil)
         }

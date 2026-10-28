@@ -94,7 +94,7 @@ public enum SubtitleWords {
         public var highlight: Range<Int>?
         /// UTF-16 offset where the words not spoken yet begin: the end of the current word or, when the user
         /// changed it, the start of the next word that still matches (the end of the text if none does). 0 before
-        /// the first word starts.
+        /// the first word starts. Once the last timed word ends, includes any trailing untimed text.
         public var spoken: Int
     }
 
@@ -120,7 +120,10 @@ public enum SubtitleWords {
         var j = 0
         while i < a.count, j < b.count {
             if a[i] == b[j] {
-                if j == current { return Progress(highlight: tokens[i], spoken: tokens[i].upperBound) }
+                if j == current {
+                    let finished = current == words.count - 1 && t >= words[current].end
+                    return Progress(highlight: tokens[i], spoken: finished ? utf16.count : tokens[i].upperBound)
+                }
                 // The current word was changed: everything before the next matching word is being spoken.
                 if j > current { return Progress(highlight: nil, spoken: tokens[i].lowerBound) }
                 i += 1
