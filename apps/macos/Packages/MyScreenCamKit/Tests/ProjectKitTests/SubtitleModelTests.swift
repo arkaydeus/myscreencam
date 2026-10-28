@@ -467,13 +467,32 @@ struct SubtitleWordTests {
         #expect(SubtitleWords.highlightedRange(in: "one too three", words: words, at: 1.1) == 8..<13)
     }
 
+    @Test func progressMarksWhereTheUpcomingWordsBegin() {
+        let words = [
+            SubtitleWord(text: "one", start: 0, end: 0.4),
+            SubtitleWord(text: "two", start: 0.5, end: 0.9),
+            SubtitleWord(text: "three", start: 1, end: 1.4),
+        ]
+        typealias P = SubtitleWords.Progress
+        #expect(SubtitleWords.progress(in: "one two three", words: [], at: 1) == nil)
+        #expect(SubtitleWords.progress(in: "one two three", words: words, at: -1) == P(highlight: nil, spoken: 0))
+        #expect(SubtitleWords.progress(in: "one two three", words: words, at: 0.6) == P(highlight: 4..<7, spoken: 7))
+        // A corrected word being spoken counts as spoken up to the next word that still matches.
+        #expect(SubtitleWords.progress(in: "one too three", words: words, at: 0.6) == P(highlight: nil, spoken: 8))
+        // ... or to the end when none does.
+        #expect(SubtitleWords.progress(in: "one two tree", words: words, at: 1.2) == P(highlight: nil, spoken: 12))
+    }
+
     @Test func oldFilesDecodeWithoutWordsOrHighlight() throws {
         var config = EditConfig(segments: [Segment(start: 0, end: 10)])
         config.subtitles.cues = [SubtitleCue(start: 1, end: 2, text: "Hi")]
         var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config)) as! [String: Any]
         var subtitles = json["subtitles"] as! [String: Any]
         var style = subtitles["style"] as! [String: Any]
-        for key in ["highlightWords", "highlightColor", "highlightGrow", "shadow", "uppercase"] {
+        for key in [
+            "highlightWords", "highlightColor", "highlightMode", "highlightGrow", "dimUpcoming", "upcomingOpacity",
+            "shadow", "uppercase",
+        ] {
             style.removeValue(forKey: key)
         }
         subtitles["style"] = style
@@ -484,11 +503,17 @@ struct SubtitleWordTests {
         let decoded = try JSONDecoder().decode(EditConfig.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(decoded == config)
         #expect(!decoded.subtitles.style.highlightWords)
+        #expect(decoded.subtitles.style.highlightMode == .text)
         #expect(decoded.subtitles.style.highlightGrow == 0.1)
+        #expect(!decoded.subtitles.style.dimUpcoming)
+        #expect(decoded.subtitles.style.upcomingOpacity == 0.5)
         #expect(!decoded.subtitles.style.shadow.enabled)
         #expect(!decoded.subtitles.style.uppercase)
 
         config.subtitles.style.highlightWords = true
+        config.subtitles.style.highlightMode = .box
+        config.subtitles.style.dimUpcoming = true
+        config.subtitles.style.upcomingOpacity = 0.4
         config.subtitles.cues[0].words = [SubtitleWord(text: "Hi", start: 1, end: 1.5)]
         #expect(try JSONDecoder().decode(EditConfig.self, from: JSONEncoder().encode(config)) == config)
     }
@@ -527,10 +552,12 @@ struct SubtitleShadowAndGrowTests {
     @Test func normalisationClampsGrowAndShadow() {
         var config = EditConfig(segments: [Segment(start: 0, end: 10)])
         config.subtitles.style.highlightGrow = 3
+        config.subtitles.style.upcomingOpacity = -1
         config.subtitles.style.shadow = SubtitleShadow(
             enabled: true, angle: -20, distance: 9, blur: .nan, opacity: 2)
         let style = config.normalized(duration: 10).subtitles.style
         #expect(style.highlightGrow == EditLimits.subtitleHighlightGrow.upperBound)
+        #expect(style.upcomingOpacity == 0)
         #expect(style.shadow.angle == 0)
         #expect(style.shadow.distance == EditLimits.subtitleShadowDistance.upperBound)
         #expect(style.shadow.blur == SubtitleShadow().blur)

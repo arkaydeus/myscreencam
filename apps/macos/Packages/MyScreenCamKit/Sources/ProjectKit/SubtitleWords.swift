@@ -85,7 +85,26 @@ public enum SubtitleWords {
     /// timing of every word it didn't change. A changed current word has no matching range and is never lit;
     /// the preceding word stays lit only during its own pause. Nil before the first word starts.
     public static func highlightedRange(in text: String, words: [SubtitleWord], at t: Double) -> Range<Int>? {
-        guard let current = words.indices.last(where: { words[$0].start <= t }) else { return nil }
+        progress(in: text, words: words, at: t)?.highlight
+    }
+
+    /// How far speech has got through `text` at source time `t`.
+    public struct Progress: Sendable, Hashable {
+        /// The current word (see ``SubtitleWords/highlightedRange(in:words:at:)``).
+        public var highlight: Range<Int>?
+        /// UTF-16 offset where the words not spoken yet begin: the end of the current word or, when the user
+        /// changed it, the start of the next word that still matches (the end of the text if none does). 0 before
+        /// the first word starts.
+        public var spoken: Int
+    }
+
+    /// Where speech is in `text` at `t`, matching `words` as ``highlightedRange(in:words:at:)`` does. Nil without
+    /// word timing.
+    public static func progress(in text: String, words: [SubtitleWord], at t: Double) -> Progress? {
+        guard !words.isEmpty else { return nil }
+        guard let current = words.indices.last(where: { words[$0].start <= t }) else {
+            return Progress(highlight: nil, spoken: 0)
+        }
         let utf16 = Array(text.utf16)
         let tokens = tokens(in: text)
         let a = tokens.map { key(String(decoding: utf16[$0], as: UTF16.self)) }
@@ -97,12 +116,13 @@ public enum SubtitleWords {
                 lengths[i][j] = a[i] == b[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
             }
         }
-        var matched: Range<Int>?
         var i = 0
         var j = 0
         while i < a.count, j < b.count {
             if a[i] == b[j] {
-                if j == current { matched = tokens[i] }
+                if j == current { return Progress(highlight: tokens[i], spoken: tokens[i].upperBound) }
+                // The current word was changed: everything before the next matching word is being spoken.
+                if j > current { return Progress(highlight: nil, spoken: tokens[i].lowerBound) }
                 i += 1
                 j += 1
             } else if lengths[i + 1][j] >= lengths[i][j + 1] {
@@ -111,7 +131,7 @@ public enum SubtitleWords {
                 j += 1
             }
         }
-        return matched
+        return Progress(highlight: nil, spoken: utf16.count)
     }
 
     /// Letters and digits, case- and diacritic-folded; a word of punctuation only is compared as is.

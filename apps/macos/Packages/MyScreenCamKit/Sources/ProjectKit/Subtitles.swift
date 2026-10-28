@@ -21,8 +21,13 @@ public struct SubtitleStyle: Codable, Sendable, Hashable {
     /// Colour the word being spoken in `highlightColor` (cues with word timing only; see ``SubtitleWords``).
     public var highlightWords: Bool
     public var highlightColor: RGBAColor
+    /// How the spoken word stands out: drawn in `highlightColor`, or on a box of it.
+    public var highlightMode: SubtitleHighlightMode
     /// How much bigger the highlighted word is drawn (0.1 = 10%). It grows in place, so the layout doesn't move.
     public var highlightGrow: Double
+    /// Draw the words not spoken yet at `upcomingOpacity` (cues with word timing only).
+    public var dimUpcoming: Bool
+    public var upcomingOpacity: Double
     /// Drop shadow behind the text (and its outline).
     public var shadow: SubtitleShadow
     /// Show every cue in capitals. Display only: the cue text (and the .srt) keep the case as written.
@@ -37,7 +42,8 @@ public struct SubtitleStyle: Codable, Sendable, Hashable {
         textColor: RGBAColor = .white, outlineWidth: Double = 0.06, outlineColor: RGBAColor = .black,
         background: Bool = true, backgroundColor: RGBAColor = .black, backgroundOpacity: Double = 0.55,
         maxWidth: Double = 0.8, highlightWords: Bool = false,
-        highlightColor: RGBAColor = SubtitleStyle.defaultHighlightColor, highlightGrow: Double = 0.1,
+        highlightColor: RGBAColor = SubtitleStyle.defaultHighlightColor, highlightMode: SubtitleHighlightMode = .text,
+        highlightGrow: Double = 0.1, dimUpcoming: Bool = false, upcomingOpacity: Double = 0.5,
         shadow: SubtitleShadow = SubtitleShadow(), uppercase: Bool = false
     ) {
         self.fontFamily = fontFamily
@@ -53,7 +59,10 @@ public struct SubtitleStyle: Codable, Sendable, Hashable {
         self.maxWidth = maxWidth
         self.highlightWords = highlightWords
         self.highlightColor = highlightColor
+        self.highlightMode = highlightMode
         self.highlightGrow = highlightGrow
+        self.dimUpcoming = dimUpcoming
+        self.upcomingOpacity = upcomingOpacity
         self.shadow = shadow
         self.uppercase = uppercase
     }
@@ -65,8 +74,8 @@ public struct SubtitleStyle: Codable, Sendable, Hashable {
 }
 
 extension SubtitleStyle {
-    /// Word highlighting, the shadow and uppercase are absent from files written before they existed (decoded as
-    /// the defaults: off).
+    /// Word highlighting (and its mode), dimming upcoming words, the shadow and uppercase are absent from files
+    /// written before they existed (decoded as the defaults: off).
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily)
@@ -83,10 +92,21 @@ extension SubtitleStyle {
         highlightWords = try c.decodeIfPresent(Bool.self, forKey: .highlightWords) ?? false
         highlightColor =
             try c.decodeIfPresent(RGBAColor.self, forKey: .highlightColor) ?? SubtitleStyle.defaultHighlightColor
+        highlightMode = try c.decodeIfPresent(SubtitleHighlightMode.self, forKey: .highlightMode) ?? .text
         highlightGrow = try c.decodeIfPresent(Double.self, forKey: .highlightGrow) ?? 0.1
+        dimUpcoming = try c.decodeIfPresent(Bool.self, forKey: .dimUpcoming) ?? false
+        upcomingOpacity = try c.decodeIfPresent(Double.self, forKey: .upcomingOpacity) ?? 0.5
         shadow = try c.decodeIfPresent(SubtitleShadow.self, forKey: .shadow) ?? SubtitleShadow()
         uppercase = try c.decodeIfPresent(Bool.self, forKey: .uppercase) ?? false
     }
+}
+
+/// How the spoken word stands out when words are highlighted.
+public enum SubtitleHighlightMode: String, Codable, Sendable, CaseIterable {
+    /// The word is drawn in the highlight colour.
+    case text
+    /// The word keeps the text colour, on a rounded box in the highlight colour.
+    case box
 }
 
 /// A drop shadow behind subtitle text. Lengths are fractions of the font size, so it scales with the text.
@@ -276,6 +296,7 @@ extension SubtitleSettings {
         settings.style.maxWidth = clamp(style.maxWidth, EditLimits.subtitleMaxWidth, fallback: fallback.maxWidth)
         settings.style.highlightGrow = clamp(
             style.highlightGrow, EditLimits.subtitleHighlightGrow, fallback: fallback.highlightGrow)
+        settings.style.upcomingOpacity = clamp(style.upcomingOpacity, 0...1, fallback: fallback.upcomingOpacity)
         let shadow = SubtitleShadow()
         settings.style.shadow.angle = clamp(style.shadow.angle, 0...360, fallback: shadow.angle)
         settings.style.shadow.distance = clamp(

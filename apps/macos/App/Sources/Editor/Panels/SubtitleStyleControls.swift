@@ -118,14 +118,13 @@ struct SubtitleStyleControls<Source: SubtitleStyleSource>: View {
                     .disabled(!style.highlightWords)
             }
             .help("Colour each word as it's spoken")
-            if style.highlightWords, !source.subtitleCues.isEmpty,
-                !source.subtitleCues.contains(where: { !$0.words.isEmpty })
-            {
-                Text("No word timing in these subtitles (approximate or typed by hand), so no words are highlighted.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             if style.highlightWords {
+                Picker("Highlight", selection: source.subtitleBinding(\.style.highlightMode, "Highlight Style")) {
+                    Text("Text").tag(SubtitleHighlightMode.text)
+                    Text("Box").tag(SubtitleHighlightMode.box)
+                }
+                .pickerStyle(.segmented)
+                .help("Colour the spoken word itself, or put a box of the colour behind it")
                 ValueSlider(
                     title: "Grow", value: source.subtitleBinding(\.style.highlightGrow, "Highlight Grow"),
                     range: EditLimits.subtitleHighlightGrow, step: 0.01,
@@ -133,6 +132,24 @@ struct SubtitleStyleControls<Source: SubtitleStyleSource>: View {
                     onEditingChanged: source.editingChanged
                 )
                 .help("How much bigger the spoken word is drawn")
+            }
+            Toggle("Dim upcoming words", isOn: source.subtitleBinding(\.style.dimUpcoming, "Dim Upcoming Words"))
+                .help("Fade the words that haven't been spoken yet")
+            if style.dimUpcoming {
+                ValueSlider(
+                    title: "Opacity", value: source.subtitleBinding(\.style.upcomingOpacity, "Upcoming Words Opacity"),
+                    range: 0...1, step: 0.01, format: percentFormat, onEditingChanged: source.editingChanged
+                )
+                .help("How visible the words not spoken yet are")
+            }
+            if style.highlightWords || style.dimUpcoming, !source.subtitleCues.isEmpty,
+                !source.subtitleCues.contains(where: { !$0.words.isEmpty })
+            {
+                Text(
+                    "No word timing in these subtitles (approximate or typed by hand), so no words are highlighted or dimmed."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             ValueSlider(
                 title: "Size", value: source.subtitleBinding(\.style.size, "Subtitle Size"),

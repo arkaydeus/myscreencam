@@ -15,6 +15,11 @@ public enum SubtitleLayout {
     static let paddingY = 0.18
     /// Box corner radius, in ems.
     static let cornerRadius = 0.22
+    /// Padding and corner radius of the box behind a highlighted word (`SubtitleHighlightMode.box`), in ems. It
+    /// stays inside the subtitle box's padding, so it needs no extra room.
+    static let wordBoxPaddingX = 0.2
+    static let wordBoxPaddingY = 0.2
+    static let wordBoxCornerRadius = 0.16
 
     public struct Measured: Sendable, Equatable {
         public var fontSize: Double

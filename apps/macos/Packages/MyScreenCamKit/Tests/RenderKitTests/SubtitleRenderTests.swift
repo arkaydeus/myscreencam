@@ -178,6 +178,38 @@ struct SubtitleRenderTests {
         #expect(greenPixels(try await render(edit, at: 0.2)) > before + 20)
         #expect(greenPixels(try await render(edit, at: 0.6)) > before + 20)
     }
+
+    @Test func compositorDrawsTheWordBoxAndDimsWhatsComing() async throws {
+        var edit = try await TestMedia.plainEdit()
+        edit.subtitles.style = SubtitleStyle(
+            size: 0.12, textColor: .white, outlineWidth: 0, background: false, highlightWords: true,
+            highlightColor: RGBAColor(r: 0, g: 1, b: 0), highlightMode: .box, highlightGrow: 0)
+        edit.subtitles.cues = [
+            SubtitleCue(
+                start: 0, end: 2, text: "one two",
+                words: [SubtitleWord(text: "one", start: 0.1, end: 0.4), SubtitleWord(text: "two", start: 0.5, end: 1)])
+        ]
+        func count(_ image: Bitmap, _ match: ((r: Int, g: Int, b: Int)) -> Bool) -> Int {
+            var count = 0
+            for y in 0..<360 {
+                for x in 0..<640 where match(image.pixel(x, y)) { count += 1 }
+            }
+            return count
+        }
+        let green = { (p: (r: Int, g: Int, b: Int)) in p.g > 180 && p.r < 100 && p.b < 100 }
+        let white = { (p: (r: Int, g: Int, b: Int)) in p.r > 235 && p.g > 235 && p.b > 235 }
+        #expect(count(try await render(edit, at: 0.05), green) == 0)
+        let lit = try await render(edit, at: 0.2)
+        #expect(count(lit, green) > 500)
+        let allWhite = count(lit, white)
+
+        edit.subtitles.style.highlightWords = false
+        edit.subtitles.style.dimUpcoming = true
+        // Nothing spoken yet, then "one" spoken.
+        #expect(count(try await render(edit, at: 0.05), white) == 0)
+        let half = count(try await render(edit, at: 0.2), white)
+        #expect(half > 20 && half < allWhite)
+    }
 }
 
 struct SubtitleHighlightRenderTests {
@@ -188,12 +220,13 @@ struct SubtitleHighlightRenderTests {
     }
 
     private func halves(
-        _ highlight: Range<Int>?, style: SubtitleStyle, lit: (Int, Int, Int) = (0, 255, 0), split: Double = 0.5
+        _ highlight: Range<Int>?, style: SubtitleStyle, lit: (Int, Int, Int) = (0, 255, 0), split: Double = 0.5,
+        spoken: Int? = nil
     ) throws -> Halves {
         let raster = try #require(
             SubtitleRasterCache.render(
                 text: "one two", style: style, canvasSize: CGSize(width: 640, height: 360),
-                grow: style.highlightGrow, highlight: highlight))
+                grow: style.highlightGrow, highlight: highlight, spoken: spoken))
         let extent = raster.image.extent
         var buffer: CVPixelBuffer?
         CVPixelBufferCreate(
@@ -235,6 +268,46 @@ struct SubtitleHighlightRenderTests {
         let second = try halves(4..<7, style: style)
         #expect(second.lit.right > 50 && second.lit.left == 0)
         #expect(second.white.left > 50)
+    }
+
+    @Test func boxModeDrawsABoxBehindTheWordInTheTextColour() throws {
+        var style = SubtitleStyle(size: 0.12, textColor: .white, outlineWidth: 0, background: false)
+        style.highlightColor = RGBAColor(r: 0, g: 1, b: 0)
+        style.highlightGrow = 0
+        let text = try halves(0..<3, style: style)
+        style.highlightMode = .box
+        let box = try halves(0..<3, style: style)
+        // The box fills far more than the word's glyphs did, and the word on it stays white.
+        #expect(box.lit.left > 3 * text.lit.left)
+        // Its padding may reach just past the middle, between the words.
+        #expect(box.lit.right < box.lit.left / 10)
+        #expect(box.white.left > 50 && box.white.right > 50)
+
+        // A grown word's box grows with it.
+        style.highlightGrow = 0.3
+        let grown = try halves(0..<3, style: style, split: 0.6)
+        #expect(Double(grown.lit.left) > 1.4 * Double(box.lit.left))
+    }
+
+    @Test func upcomingWordsAreDimmed() throws {
+        // Over an opaque black box, a faded white word is grey.
+        var style = SubtitleStyle(
+            size: 0.12, textColor: .white, outlineWidth: 0.1, outlineColor: RGBAColor(r: 1, g: 0, b: 0),
+            background: true, backgroundColor: .black, backgroundOpacity: 1)
+        style.highlightGrow = 0
+        let grey = (128, 128, 128)
+        let plain = try halves(nil, style: style, lit: grey, spoken: 3)
+        #expect(plain.white.left > 50 && plain.white.right > 50)
+        style.dimUpcoming = true
+        // "one" spoken, "two" not yet.
+        let dimmed = try halves(nil, style: style, lit: grey, spoken: 3)
+        #expect(abs(dimmed.white.left - plain.white.left) < plain.white.left / 10)
+        #expect(dimmed.white.right == 0)
+        #expect(dimmed.lit.right > plain.white.right / 2)
+        #expect(dimmed.lit.left == 0)
+        // Before the first word everything waits; without word timing (no offset) nothing is dimmed.
+        #expect(try halves(nil, style: style, lit: grey, spoken: 0).white.left == 0)
+        #expect(try halves(nil, style: style, lit: grey).white.right > 50)
     }
 
     @Test func highlightedWordGrowsInPlace() throws {
