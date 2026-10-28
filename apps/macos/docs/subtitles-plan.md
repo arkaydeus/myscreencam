@@ -155,6 +155,16 @@ Tests cover:
   opacity, lengths in ems) falls behind the text and outline together; the background box casts none. Rasters
   carry a transparent bleed around the box for the shadow (and a small ink margin when words grow), so neither is
   clipped and the box doesn't move. *Width* sets `maxWidth`, the widest line before text wraps (10–100% of the canvas width).
+- **Highlight box and dimmed upcoming words** (style options): *Highlight* › *Box*
+  (`SubtitleStyle.highlightMode`) puts a rounded box in the highlight colour behind the spoken word, which keeps
+  the text colour; the box is centred on the letters (baseline to cap height, equal padding above and below), grows
+  with a grown word, sits inside the subtitle box's padding (so needs no extra room) and casts the shadow with the
+  text. *Dim upcoming words*
+  (`dimUpcoming`, `upcomingOpacity`, default 50%) fades the words not spoken yet, outline included (one
+  transparency layer, so the outline doesn't show through the faded fill). It works with or without highlighting.
+  `SubtitleWords.progress` gives the spoken offset: the end of the current word or, when the user changed that
+  word, the start of the next word that still matches; before the first word starts, the whole cue waits. Cues
+  without word timing are never dimmed. Rasters are cached per spoken offset as well as highlighted word.
 - **Per-subtitle width**: dragging a box's left or right edge in the paused preview sets that cue's own
   `maxWidth` (`SubtitleCue.maxWidth`, nil = the style's; `SubtitleSettings.style(for:)` applies it). Both edges
   move together about the box's centre, so the centred text keeps its place and any own position is untouched;
